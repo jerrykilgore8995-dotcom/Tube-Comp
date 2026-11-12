@@ -4,6 +4,8 @@ on:
     paths:
       - ".github/workflows/live-compression-range.yml"
       - "scripts/closed_loop_compression_range.py"
+      - "spice/provisional/436b_exploratory.cir"
+      - "spice/models/tube_cells.lib"
   workflow_dispatch:
 permissions:
   contents: read
