@@ -237,6 +237,13 @@ public:
                     if((k%2)==0)
                         ratio*=clamp(1.f+params.balance*
                             (params.rs124?1.3f:1.1f),.05f,3.5f);
+                    // Match measured 44.1kHz high-order response: the
+                    // digital output low-pass and amplitude tracking
+                    // attenuate high K more than the 1kHz SPICE window.
+                    // Quadratic pre-emphasis is FIT to the output-bin grid,
+                    // not a claim about original 6CG7 plate physics.
+                    const float kFraction=float(k)/20.f;
+                    ratio*=1.f+.18f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
                 }
                 const float f=std::max(10000.f,25000.f-300.f*cv[c]);
