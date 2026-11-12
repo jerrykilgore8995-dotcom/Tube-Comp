@@ -208,6 +208,17 @@ def simulate(case,root):
         table=parse_wrdata(wd/"tran.txt",len(OUTFIELDS))
         t,y=table[:,0],table[:,1]
         h=harmonics(t,y,case["hz"])
+        # Every nonlinear tube plate path is retained as a separate distortion
+        # fingerprint. These are node voltages, not isolated physical tube THD.
+        h["stage_harmonics"]={}
+        for node,col in (("6BC8_A_plate",4),("6BC8_B_plate",5),
+                         ("6CG7_A_plate",6),("6CG7_B_plate",7)):
+            local=harmonics(t,table[:,col],case["hz"])
+            h["stage_harmonics"][node]={
+                "THD_percent":local["THD_percent"],
+                "fundamental_peak_volts":local["fundamental_peak_volts"],
+                **{f"K{k}_dBc":local[f"K{k}_dBc"] for k in range(2,21)}
+            }
         input_level=np.sqrt(np.mean(table[-max(10,len(table)//4):,2]**2))
         in_dbu=20*np.log10(max(input_level,1e-18)/.775)
         h["measured_input_dBu"]=float(in_dbu)
