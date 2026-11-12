@@ -293,7 +293,7 @@ private:
         g.setGradientFill(juce::ColourGradient(col(252,248,238),x+6,y+5,
                            col(220,215,204),x+w-5,y+h-9,false));
         g.fillRoundedRectangle(x+7,y+7,w-14,h-14,2);
-        const float c=x+w*.5f, pivotY=y+h+24;
+        const float c=x+w*.5f, pivotY=y+h-17;
         const std::array<int,7> values={30,25,20,15,10,5,0};
         for(size_t i=0;i<values.size();++i){
             // right-to-left zero compression scale as in the hardware.
@@ -353,8 +353,8 @@ private:
             stamp(g,juce::String(ticks[i]),cx+std::cos(a)*89-13,
                   py+std::sin(a)*92-8,26,17,11,col(51,49,42));
         }
-        stamp(g,"DB COMPRESSION",x+32,y+65,w-64,18,10.9f,col(55,50,46));
-        stamp(g,"A-436B",x+48,y+86,w-96,22,19,col(57,60,51),true);
+        stamp(g,"DB COMPRESSION",x+30,y+93,w-60,15,10.3f,col(55,50,46));
+        stamp(g,"A-436B",x+48,y+112,w-96,20,13.5f,col(57,60,51),true);
         const float angle=pi*1.80f-pi*.63f*meterDb/30.f;
         line(g,cx,py,cx+std::cos(angle)*114,py+std::sin(angle)*114,
              col(42,38,33),1.8f);
@@ -390,11 +390,11 @@ private:
         stamp(g,"A T T A C K",541,29,152,18,14,ink,true);
         attackMarks(g,617,105,ink);
         selectKnob(g,617,105,28,.24f);
-        stamp(g,"60070B",523,72,65,15,9.9f,col(166,39,34),true);
-        stamp(g,"60050A",650,69,66,15,9.9f,col(166,39,34),true);
+        stamp(g,"60070B",519,57,62,15,9.6f,col(166,39,34),true);
+        stamp(g,"60050A",651,57,66,15,9.6f,col(166,39,34),true);
 
-        stamp(g,"S L O W",536,157,68,15,11.1f,ink,true);
-        stamp(g,"F A S T",636,157,72,15,11.1f,ink,true);
+        stamp(g,"S L O W",504,231,60,15,10.7f,ink,true);
+        stamp(g,"F A S T",678,231,62,15,10.7f,ink,true);
         recoveryMarks(g,617,217,ink);
         selectKnob(g,617,217,27,.45f);
         stamp(g,"R E C O V E R Y",542,274,148,17,11.7f,ink,true);
@@ -406,7 +406,7 @@ private:
         const std::array<juce::String,11> out={"-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"};
         dialScale(g,1119,169,46,out,ink,12.f);
         pointerKnob(g,1119,169,45,.67f);
-        pilot(g,1294,101);
+        pilot(g,1262,101);
         stamp(g,"FUSE",1376,56,91,17,13,ink,true);
         fuse(g,1421,101,false);
         stamp(g,"OFF",1330,168,57,17,11,ink,true);
