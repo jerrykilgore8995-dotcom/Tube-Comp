@@ -10,11 +10,11 @@ K2-K20 read from 1kHz coherent last-24-cycle window at 15us max timestep;
 harmonics >= Nyquist receive 'None' as run_lab harmonics() specifies.
 """
 from pathlib import Path
-import csv,json,re,subprocess
+import csv,json,re,subprocess,os
 import numpy as np
 from run_lab import prepare,parse_wrdata,harmonics,op_nodes,OUTFIELDS
 
-ROOT=Path("output/long_steady_compression");ROOT.mkdir(parents=True,exist_ok=True)
+ROOT=Path("output/long_steady_compression")/os.getenv("TUBECOMP_PARITY_MODE","baseline");ROOT.mkdir(parents=True,exist_ok=True)
 def measure(mode,level,knob):
     case=dict(mode=mode,hz=1000,dbu=level,attack=0,recovery=0,
               hold=False,input_knob=knob)
@@ -75,10 +75,16 @@ def measure(mode,level,knob):
         supply_platefeed_idle_V=v("platefeed"))
 
 rows=[]
-for mode,knob,level in [
-    ("A-436B",.8,7),("A-436B",1.,7),
-    ("A-436B",1.,10),("A-436B",1.,13),
-    ("RS124",.8,7),("RS124",1.,7)]:
+parity_mode=os.getenv("TUBECOMP_PARITY_MODE")
+cases=([(mode,knob,level)
+       for mode in (parity_mode,)
+       for knob in (.8,1.)
+       for level in (-24,-18,-12,-6,0,3,7,10,13)]
+       if parity_mode in ("A-436B","RS124") else
+       [("A-436B",.8,7),("A-436B",1.,7),
+        ("A-436B",1.,10),("A-436B",1.,13),
+        ("RS124",.8,7),("RS124",1.,7)])
+for mode,knob,level in cases:
     row=measure(mode,level,knob)
     rows.append(row)
     if row["status"]=="OK":
