@@ -1,0 +1,31 @@
+name: TubeComp 1.6s Settled 30dB Compression Acceptance
+on:
+  push:
+    paths:
+      - ".github/workflows/long-steady-compression.yml"
+      - "scripts/long_steady_compression.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  settled:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Check simulation source
+        run: python3 -m py_compile scripts/long_steady_compression.py
+      - name: Measure +7 to +13dBu at 1.6s settled conditions
+        run: python3 scripts/long_steady_compression.py
+      - name: Save long-settling voltages harmonics and THD
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-long-settled-live-compression
+          path: |
+            output/long_steady_compression/long_steady.csv
+            output/long_steady_compression/long_steady.json
+          if-no-files-found: error
