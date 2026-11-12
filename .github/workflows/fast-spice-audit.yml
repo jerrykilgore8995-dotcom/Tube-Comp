@@ -41,3 +41,11 @@ jobs:
                         f"THD {on['thd_percent']:.3f}%; "
                         f"out {on['output_dBu']:.2f}dBu",flush=True)
           PY
+      - name: Measure actual primary loading and 6BC8 grid level vs 50k input-pot positions
+        run: python3 scripts/input_transformer_audit.py --output output/input_transformer
+      - name: Upload transformer / pot loading measurement table
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-input-transformer-loading
+          path: output/input_transformer/input_loading_1khz.csv
+          if-no-files-found: error
