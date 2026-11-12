@@ -4,7 +4,7 @@ Altec 436B exploratory topology - NOT VERIFIED WIRING
 * Sidechain is rectified by 6AL5 diode proxies. Differential triodes truly conduct.
 .include "models/tube_cells.lib"
 .param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
-.param ATTACK_R=47000 REC_R=1000000 OUTPAD=1
+.param ATTACK_R=33000 REC_R=1000000 OUTPAD=1
 .param BPLUS=272 SRC_OHM=600 R6CG7_DROP=11000
 .option reltol=1e-4 abstol=1e-11 method=gear
 * Documented idle voltage: 272V before R13, vs 210V after R13 (Altec drawing).
@@ -108,9 +108,11 @@ R11 scb k2 220k
 * Detector 6AL5 anodes collect the negative phase excursions.
 DDET1 detector sca D6AL5
 DDET2 detector scb D6AL5
-RATT detector cv {ATTACK_R}
-CREC cv 0 1u
-RREC cv 0 {REC_R}
+* Altec 436B factory-labeled control filter: R12 33k, C4 1u, R9 1Meg.
+* RS124 branch remains a separate exploratory variation using switched RC.
+R12 detector cv {ATTACK_R}
+C4 cv 0 1u
+R9 cv 0 {REC_R}
 RDC detector 0 50Meg
 * Simulations are not hardware-calibrated until the source-locked drawing
 * and valve plate curves are verified against reference data.
