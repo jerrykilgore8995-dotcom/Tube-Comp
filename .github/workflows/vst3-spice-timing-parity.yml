@@ -18,21 +18,21 @@ jobs:
       - name: Download measured 6AL5 ngspice attack cases
         uses: actions/download-artifact@v4
         with:
-          run-id: 43283800009
+          run-id: 43287439318
           name: TubeComp-SPICE-switch-timing-attack
           github-token: ${{ github.token }}
           path: ref/attack
       - name: Download measured 6AL5 ngspice recovery cases
         uses: actions/download-artifact@v4
         with:
-          run-id: 43283800009
+          run-id: 43287439318
           name: TubeComp-SPICE-switch-timing-recovery
           github-token: ${{ github.token }}
           path: ref/recovery
       - name: Download measured 6AL5 ngspice HOLD cases
         uses: actions/download-artifact@v4
         with:
-          run-id: 43283800009
+          run-id: 43287439318
           name: TubeComp-SPICE-switch-timing-hold
           github-token: ${{ github.token }}
           path: ref/hold
