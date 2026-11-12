@@ -1,0 +1,29 @@
+name: 6BC8 Remote Cutoff Monotonicity Gate
+on:
+  push:
+    paths:
+      - ".github/workflows/6bc8-remote-cv-monotonic.yml"
+      - "scripts/6bc8_remote_cv_monotonic.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  monotonic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Syntax preflight
+        run: python3 -m py_compile scripts/6bc8_remote_cv_monotonic.py
+      - name: Measure 6BC8 0 to -30V forced-CV monotonic gain
+        run: python3 scripts/6bc8_remote_cv_monotonic.py
+      - name: Archive gain-reduction transfer
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-6BC8-remote-CV-monotonicity
+          path: output/6bc8_cv_monotonic/monotonic_ac.csv
+          if-no-files-found: error
