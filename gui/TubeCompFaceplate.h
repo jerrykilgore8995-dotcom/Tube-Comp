@@ -113,9 +113,11 @@ private:
         g.setColour(rgb(240,241,230));
         g.drawLine(x+dx*r*.26f,y+dy*r*.26f,
                    x+dx*r*.86f,y+dy*r*.86f,3.f);
-        g.setColour(C::fromRGBA(255,255,255,48));g.drawArc(
-            juce::Rectangle<float>(x-r+8,y-r+8,2*r-16,2*r-16),
-            pi*.90f,pi*1.50f,1.5f);
+        g.setColour(C::fromRGBA(255,255,255,48));
+        juce::Path highlight;
+        highlight.addCentredArc(x,y,r-8.f,r-8.f,0.f,
+                                pi*.90f,pi*1.50f,true);
+        g.strokePath(highlight,juce::PathStrokeType(1.5f));
         // Control index ticks form period-correct stamped legends.
         for(int i=0;i<ticks;++i){
             const float t=float(i)/float(ticks-1);
