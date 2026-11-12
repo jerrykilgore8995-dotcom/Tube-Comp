@@ -25,6 +25,11 @@ def measure(mode,level,knob,load_ohms=600):
     new="BINPUT source 0 V={AMP*sin(2*pi*FREQ*time)*(0.5-0.5*cos(pi*min(time/0.04,1)))}"
     if old not in s:raise RuntimeError("Cannot find VIN")
     s=s.replace(old,new)
+    if load_ohms not in (200,600):
+        raise ValueError("Only 200/600 ohm measured output loads")
+    needle="RLOAD secOut 0 600"
+    if needle not in s:raise RuntimeError("SPICE output termination not found")
+    s=s.replace(needle,f"RLOAD secOut 0 {load_ohms}",1)
     s=re.sub(r"tran [^\n]+(?=\nwrdata tran.txt)","tran 15u 1.6 0 15u",s,count=1)
     old_w="wrdata tran.txt v(out) v(in) v(cv) v(pa) v(pb) v(p2a) v(p2b) v(k1) v(k2)"
     if old_w not in s:raise RuntimeError("missing waveform outputs")
