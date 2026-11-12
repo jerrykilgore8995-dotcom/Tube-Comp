@@ -1,7 +1,13 @@
 name: VST3 8 Percent All Input Dial Position Parity
 on:
   push:
-    paths: [".github/workflows/vst3-input-grid-parity.yml"]
+    paths:
+      - ".github/workflows/vst3-input-grid-parity.yml"
+      - "plugin/SpiceReference.h"
+      - "plugin/SpiceInputGridMeasured.inc"
+      - "plugin/TubeCompDSP.h"
+      - "tests/TubeCompParitySurvey.cpp"
+      - "scripts/verify_input_grid_parity.py"
   workflow_dispatch:
 permissions:
   contents: read
