@@ -19,12 +19,12 @@ for half_h in (20,30,40,50,60):
  for k in (.995,.998,.999,.9995,.9999):
     s=original
     for needle,replace in [
-       ("LPRI_A priA p2a 20",f"LPRI_A priA p2a {half_h}"),
-       ("LPRI_B p2b priB 20",f"LPRI_B p2b priB {half_h}"),
-       ("LSEC secOut 0 2.08",f"LSEC secOut 0 {2.08*half_h/20:.5f}"),
-       ("KPP LPRI_A LPRI_B 0.995",f"KPP LPRI_A LPRI_B {k}"),
-       ("KPSA LPRI_A LSEC 0.995",f"KPSA LPRI_A LSEC {k}"),
-       ("KPSB LPRI_B LSEC 0.995",f"KPSB LPRI_B LSEC {k}"),
+       ("LPRI_A priA p2a 40",f"LPRI_A priA p2a {half_h}"),
+       ("LPRI_B p2b priB 40",f"LPRI_B p2b priB {half_h}"),
+       ("LSEC secOut 0 4.16",f"LSEC secOut 0 {2.08*half_h/20:.5f}"),
+       ("KPP LPRI_A LPRI_B 0.9995",f"KPP LPRI_A LPRI_B {k}"),
+       ("KPSA LPRI_A LSEC 0.9995",f"KPSA LPRI_A LSEC {k}"),
+       ("KPSB LPRI_B LSEC 0.9995",f"KPSB LPRI_B LSEC {k}"),
     ]:
         if needle not in s:raise RuntimeError("Missing model anchor: "+needle)
         s=s.replace(needle,replace)
