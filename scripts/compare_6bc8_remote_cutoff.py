@@ -18,10 +18,12 @@ def run(model,dbu,detector=True,cv_override=None,bplus_override=None):
  wd=ROOT/suffix
  deck=prepare(case,wd)
  s=deck.read_text()
- if model in ("REMOTE","REMOTE_EXP"):
-  actual="V6BC8_REMOTE" if model=="REMOTE" else "V6BC8_REMOTE_EXP"
-  s,n=re.subn(r"\bk1 V6BC8(?=\n)","k1 "+actual,s)
-  if n!=2:raise RuntimeError("6BC8 two-device replacement failed")
+ # Force each tube variant explicitly, irrespective of the active default.
+ actual={"KOREN":"V6BC8","REMOTE":"V6BC8_REMOTE",
+         "REMOTE_EXP":"V6BC8_REMOTE_EXP"}[model]
+ s,n=re.subn(r"\bk1 V6BC8(?:_REMOTE(?:_EXP)?)?(?=\n)",
+             lambda match:"k1 "+actual,s)
+ if n!=2:raise RuntimeError("6BC8 two-device replacement failed")
  if not detector:
   s,n=re.subn(r"^DDET[12]\s+.*$",lambda m:"* "+m.group(0),s,count=2,flags=re.M)
   if n!=2:raise RuntimeError("Failed detector-off ref")
