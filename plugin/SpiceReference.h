@@ -99,7 +99,7 @@ inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
               rs?at(rs80,level):at(altec80,level),
               rs?at(rs100,level):at(altec100,level),.5f);
         const float weight=std::clamp(1.f-std::fabs(k-9.f),0.f,1.f);
-        for(size_t i=0;i<19;++i)
+        for(std::size_t i=0;i<19;++i)
             result.harmonicDb[i]+=(actual90.harmonicDb[i]-
                                       predicted90.harmonicDb[i])*weight;
     }
