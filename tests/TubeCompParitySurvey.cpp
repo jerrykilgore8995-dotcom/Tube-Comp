@@ -79,8 +79,10 @@ Result measure(bool rs,int knob,int inputDb) {
  return out;
 }
 int main(int argc,char** argv) {
- if(argc!=2) {
-    std::cerr<<"Use: TubeCompParitySurvey output.csv\n";return 2;
+ const bool fullInputGrid=argc==3 && std::string(argv[2])=="--input-grid";
+ if(argc<2 || argc>3 || (argc==3&&!fullInputGrid)){
+    std::cerr<<"Use: TubeCompParitySurvey output.csv [--input-grid]\n";
+    return 2;
  }
  std::ofstream out(argv[1]);
  if(!out){std::cerr<<"Cannot create "<<argv[1]<<"\n";return 2;}
@@ -89,9 +91,15 @@ int main(int argc,char** argv) {
        "CV_magnitude_V,phase_deg,estimated_GR_dB";
  for(int h=2;h<=20;++h)out<<",K"<<h<<"_dBc";
  out<<"\n";
+ const std::vector<int> knobs=fullInputGrid?
+    std::vector<int>{0,10,20,30,40,50,60,70,80,90,100}:
+    std::vector<int>{80,100};
+ const std::vector<int> drive=fullInputGrid?
+    std::vector<int>{-18,-6,7}:
+    std::vector<int>{-24,-18,-12,-6,0,3,7,10,13};
  for(bool rs:{false,true})
-  for(int knob:{80,100})
-   for(int inputDb:{-24,-18,-12,-6,0,3,7,10,13}) {
+  for(int knob:knobs)
+   for(int inputDb:drive) {
     const auto p=measure(rs,knob,inputDb);
     out<<(rs?"RS124":"A-436B")<<","<<knob<<","<<inputDb<<","
        <<p.outputDbu<<","<<p.thd<<","<<p.cvV<<","
