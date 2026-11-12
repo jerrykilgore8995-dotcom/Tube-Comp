@@ -22,7 +22,7 @@ Front panel painted 1574 x 283 pixels in a 1600 x 350 captured component. Coordi
 | 11-position recovery/HOLD | (617,217) | small phenolic pointer, alternate HOLD markings |
 | meter | rectangle x744..1001, y66..237 | inset black rectangular vintage VU case, white dB compression dial |
 | output attenuator | (1119,169) | large black tapered pointer knob |
-| red pilot | (1294,101) | red jewel in metal bezel |
+| red pilot | (1262,101) | red jewel in metal bezel |
 | fuse/superfuse location | (1421,101) | black fuse cap |
 | power switch | (1406,225) | period metal switch |
 | right identity | x1453..1571 | TYPE RS124 without copyrighted vendor logo |
