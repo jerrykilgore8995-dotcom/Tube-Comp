@@ -1,0 +1,50 @@
+name: Circuit Simulation Laboratory
+on:
+  push:
+    branches: [main]
+    paths:
+      - "spice/**"
+      - "scripts/**"
+      - "research/**"
+      - ".github/workflows/spice-laboratory.yml"
+  workflow_dispatch:
+    inputs:
+      sweep:
+        description: "Quick exploratory or broad study"
+        type: choice
+        required: true
+        default: quick
+        options: [quick, broad]
+permissions:
+  contents: read
+jobs:
+  ngspice:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual SPICE solver and analysis software
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy python3-matplotlib
+      - name: Toolchain and model provenance
+        run: |
+          ngspice --version
+          python3 --version
+          sha256sum spice/models/tube_cells.lib
+      - name: Run provisional circuit analysis and parameter study
+        run: |
+          if [ "${{ github.event.inputs.sweep }}" = "broad" ]; then
+            python3 scripts/run_lab.py --broad --output output
+          else
+            python3 scripts/run_lab.py --quick --output output
+          fi
+      - name: Regression tests and historical calibration status
+        run: python3 scripts/verify_results.py output
+      - name: Upload raw ngspice results, harmonics and report
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-ngspice-exploratory-results
+          path: output/
+          if-no-files-found: error
+          retention-days: 30
