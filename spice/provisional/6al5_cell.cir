@@ -1,0 +1,19 @@
+6AL5 rectifier charging/recovery behavior - provisional tube diode model
+.include "models/tube_cells.lib"
+.param ATTACK_R=47000 REC_R=1000000
+V1 a 0 SIN(0 10 1000)
+V2 b 0 SIN(0 10 1000 0 0 180)
+D1 rect a D6AL5
+D2 rect b D6AL5
+Rattack rect cv {ATTACK_R}
+Cenv cv 0 1u IC=0
+Rrelease cv 0 {REC_R}
+Rdc rect 0 100Meg
+.control
+set wr_singlescale
+set wr_vecnames
+tran 10u .25
+wrdata diode.txt v(cv) v(a) v(b)
+quit
+.endc
+.end
