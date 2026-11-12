@@ -134,7 +134,10 @@ int main() {
              <<"% K2="<<d.k[2]<<" K3="<<d.k[3]<<"\n";
     check(d.gr>2.f,"compressor must actually compress");
     check(d.thd<2.5,"avoid excessive uncalibrated THD at working levels");
-    check(d.k[2]>1.e-7&&d.k[3]>1.e-7,"must generate even and odd harmonics");
+    check(d.k[2]>1.e-9&&d.k[3]>1.e-7,"must generate even and odd harmonics");
+    std::cout<<"Balanced push-pull K2/K3: "<<d.k[2]/d.k[3]
+             <<" (should be substantially K3 dominant)\n";
+    check(d.k[3]>d.k[2]*4.0,"balanced push-pull K3 must dominate K2");
 
     p.input=10.f;
     Engine crush;crush.prepare(SR,128);crush.setParameters(p,true);
