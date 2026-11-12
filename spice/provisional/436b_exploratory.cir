@@ -58,8 +58,8 @@ VGRIDOFFSET gridcentre cv {BIAS}
 * Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
 R3 platefeed pa 47k
 R4 platefeed pb 47k
-XU1A pa ga k1 V6BC8_REMOTE
-XU1B pb gb k1 V6BC8_REMOTE
+XU1A pa ga k1 V6BC8_REMOTE_EXP
+XU1B pb gb k1 V6BC8_REMOTE_EXP
 R8 k1 0 34
 * Coupling to push-pull 6CG7; R5 and R6 are historically 1M.
 C2 pa g2a 22n
