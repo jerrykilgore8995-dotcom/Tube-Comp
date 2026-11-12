@@ -11,8 +11,10 @@ from pathlib import Path
 import csv,hashlib,math,sys
 import numpy as np
 
-if len(sys.argv)!=3:raise SystemExit("Use measured.csv output.inc")
+if len(sys.argv) not in (3,4):raise SystemExit("Use measured.csv output.inc [coupling_HPF_Hz]")
 inp=Path(sys.argv[1]);dest=Path(sys.argv[2])
+HP_CORNER_HZ=float(sys.argv[3]) if len(sys.argv)==4 else 9.7
+if not 2.<=HP_CORNER_HZ<=20.:raise ValueError("Unphysical coupling corner")
 with inp.open(newline="") as file:source=list(csv.DictReader(file))
 FS=44100.
 N=33
@@ -49,7 +51,7 @@ for mode,short in modes:
   phase=np.interp(np.log(f),np.log(measured_f),measured_phase)
   desired=(10**(mag/20)*np.exp(1j*np.deg2rad(phase+180.))*
            np.exp(-1j*omega*LATENCY))
-  alpha=np.exp(-2*np.pi*9.7/FS)
+  alpha=np.exp(-2*np.pi*HP_CORNER_HZ/FS)
   z=np.exp(-1j*omega)
   highpass=(alpha*(1-z)/(1-alpha*z))**2
   residual=desired/highpass
