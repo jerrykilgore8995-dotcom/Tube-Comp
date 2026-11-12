@@ -5,6 +5,7 @@ on:
     paths:
       - "plugin/TubeCompDSP.h"
       - "tests/TubeCompDSPTests.cpp"
+      - "tests/TubeCompSurvey.cpp"
       - ".github/workflows/dsp-fast-check.yml"
   workflow_dispatch:
 permissions:
@@ -22,8 +23,17 @@ jobs:
       - name: Run measured compressor, THD, attack and HOLD suite
         run: |
           ./TubeCompDSPTests | tee DSPTestMeasurements.txt
+      - name: Generate full RS124/A436B harmonic and timing measurement CSVs
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin tests/TubeCompSurvey.cpp -o TubeCompSurvey
+          ./TubeCompSurvey | tee SurveyRun.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TubeComp-DSP-Test-Measurements
-          path: DSPTestMeasurements.txt
+          path: |
+            DSPTestMeasurements.txt
+            SurveyRun.txt
+            harmonic_grid.csv
+            timing_grid.csv
+          if-no-files-found: error
           if-no-files-found: error
