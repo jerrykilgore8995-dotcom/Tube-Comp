@@ -1,24 +1,33 @@
-* TUBE COMP - PROVISIONAL NONLINEAR CELL LIBRARY (NOT YET HARDWARE-CALIBRATED)
-* First engineering guesses for qualitative behavior and numeric methods.
-* Triode space-charge equations are original engineering approximations motivated
-* by Child-Langmuir / Koren modeling; parameters NOT fitted to 6BC8/6CG7 curves.
-* Never cite predicted absolute THD or operating points as measured hardware.
+* TUBE COMP - DATASHEET-ANCHORED VALVE CELLS (rev B / 2026-11-12)
+* These models correct the original hard 6BC8 cutoff and 6CG7 gain error.
+* A per-device parametric fit is NOT proof of a factory-original Altec unit.
+* 6BC8 model from published Sylvania plate-curve Koren parameter candidate,
+* also stored in models/6bc8_sylvania_curve_candidate.lib (source there).
+* See RCA 6BC8 datasheet: https://frank.pocnet.net/sheets/049/6/6BC8.pdf
+* The model at Va=150V has nonzero conduction at Vg=-10V; this is essential
+* for remote-cutoff gain reduction across many tens of dB.
 .subckt V6BC8 P G K
-* Dual triode half. Remote cutoff sensitivity is grid-bias dependent.
-BPL P K I={5.0e-4*pow(uramp(V(G,K)+uramp(V(P,K))/32),1.5)*(uramp(V(P,K))/(18+uramp(V(P,K))))}
+BPL P K I={20.19891536u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+54.16463004*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)}
 Rleak P K 1000Meg
-CGK G K 2.4p
-CGA G P 2.1p
-CPK P K 2.2p
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
 .ends V6BC8
 
+* 6CG7: CC0 model fitted by Circuit Codex to published RCA anchor:
+* Va=250V / Vg=-8V -> 9mA, 2600umho, mu=20.
+* Further checkpoints at 90V/0V and 250V/-12.5V are approximate.
+* Upstream model: https://github.com/TheAnalogMaker/circuit-codex/blob/main/models/6cg7.inc
+* License: CC0 1.0 Universal. Heater and positive grid current not modeled.
 .subckt V6CG7 P G K
-BPL P K I={9.0e-4*pow(uramp(V(G,K)+uramp(V(P,K))/21),1.5)*(uramp(V(P,K))/(28+uramp(V(P,K))))}
+BPL P K I={pow(uramp((V(P,K)/127.155)*ln(1+exp(127.155*(1/20+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.5)/1134.77}
 Rleak P K 1000Meg
 CGK G K 2.3p
-CGA G P 3p
-CPK P K 2.5p
+CGA G P 4p
+CPK P K 2.2p
 .ends V6CG7
 
-* Dual diode 6AL5: preliminary valve-diode characteristic; NOT calibrated.
-.model D6AL5 D(Is=3n N=1.55 Rs=600 Cjo=2.5p M=0.40 Tt=65n)
+* 6AL5 diode remains a provisional forward characteristic.
+* Diode's 3.2-3.6pF element capacitance comes from Sylvania 6AL5 sheet.
+* Equivalent Is/N/Rs NOT a calibrated plate-current curve.
+.model D6AL5 D(Is=3n N=1.55 Rs=600 Cjo=3.4p M=0.40 Tt=65n)
