@@ -1,0 +1,34 @@
+name: SPICE Accurate Nine Attack Six Recovery Five HOLD Curves
+on:
+  push:
+    paths:
+      - ".github/workflows/spice-switch-timing-calibration.yml"
+      - "scripts/spice_switch_timing.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-switch-curves:
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ["attack","recovery","hold"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TUBECOMP_TIMING_FAMILY: ${{ matrix.family }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tube circuit solver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Measure every attack release and HOLD from real 6AL5 SPICE
+        run: python3 scripts/spice_switch_timing.py
+      - name: Archive 63/90 percent switch time constants and held CV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-switch-timing-${{ matrix.family }}
+          path: output/actual_spice_timing/${{ matrix.family }}/timing.csv
+          if-no-files-found: warn
