@@ -158,6 +158,34 @@ int main() {
     std::cout<<"A-436B THD "<<altec.thd<<"%, RS124 "<<rs.thd<<"%\n";
     check(std::fabs(altec.thd-rs.thd)>1.e-5,"modes must differ electrically");
 
+    // Factory THD guardrail at a deliberately hot, 25-30dB-GR scenario.
+    // Tests use physical analog limits as goals, not as proof of exact hardware.
+    p.balance=0.f;p.input=8.f;p.superfuse=false;
+    p.rs124=true;
+    const auto hotRS=measure(p,db2lin(-6.f));
+    std::cout<<"RS124 hot-drive GR="<<hotRS.gr<<"dB THD="<<hotRS.thd<<"%\\n";
+    check(hotRS.gr>25.f && hotRS.thd<1.5,
+          "RS124 balanced high-GR distortion exceeds 1.5 percent target");
+    p.rs124=false;
+    const auto hotAltec=measure(p,db2lin(-6.f));
+    std::cout<<"A-436B hot-drive GR="<<hotAltec.gr<<"dB THD="<<hotAltec.thd<<"%\\n";
+    check(hotAltec.gr>20.f&&hotAltec.thd<1.5,
+          "Stock A-436B hot-drive distortion exceeds 1.5 percent target");
+    // The proprietary real SuperFuse is unavailable, but its explicitly
+    // identified reconstruction must actually alter the audio compression.
+    p.rs124=true;p.input=6.f;
+    p.superfuse=false;
+    Engine normal;normal.prepare(SR,128);normal.setParameters(p,true);
+    run(normal,.18f,(int)SR);
+    const float regularGR=normal.meters().gainReduction;
+    p.superfuse=true;
+    Engine fuse;fuse.prepare(SR,128);fuse.setParameters(p,true);
+    run(fuse,.18f,(int)SR);
+    const float fuseGR=fuse.meters().gainReduction;
+    std::cout<<"SuperFuse reconstruction: normal="<<regularGR
+             <<"dB / FUSE+="<<fuseGR<<"dB\\n";
+    check(fuseGR>regularGR+1.f,"FUSE+ must change real compressor behavior");
+
     // Reference bench only: performance on GitHub runner is not a SER8 meter.
     p.rs124=true;p.input=5.f;
     Engine perf;perf.prepare(SR,128);perf.setParameters(p,true);
