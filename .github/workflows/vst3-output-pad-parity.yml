@@ -1,0 +1,30 @@
+name: VST3 SPICE Post-Detector Output Dial Calibration
+on:
+  push:
+    paths:
+      - ".github/workflows/vst3-output-pad-parity.yml"
+      - "tests/TubeCompOutputPadSurvey.cpp"
+      - "plugin/TubeCompDSP.h"
+      - "plugin/SpiceReference.h"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pad:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual DSP independent output-pad test
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompOutputPadSurvey.cpp -o TubeCompOutputPadSurvey
+      - name: Assert 252 output-pad cases match SPICE post-detector scaling
+        run: ./TubeCompOutputPadSurvey output_pad_parity.csv
+      - name: Archive measured pad gains, CV, THD, harmonics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-252-case-output-pad-SPICE-identity
+          path: output_pad_parity.csv
+          if-no-files-found: error
