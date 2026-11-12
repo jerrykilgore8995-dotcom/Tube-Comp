@@ -1,0 +1,25 @@
+name: RS124 Bias and Harmonic Comparison
+on:
+  push:
+    paths: [".github/workflows/rs124-bias-probe.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bias:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Run RS124 gain-reduction and distortion versus grid bias
+        run: python3 scripts/rs124_bias_probe.py
+      - name: Archive results
+        uses: actions/upload-artifact@v4
+        with:
+          name: RS124-6BC8-bias-THD-GR
+          path: output/rs124_bias_probe/bias_thd_gr.csv
+          if-no-files-found: error
