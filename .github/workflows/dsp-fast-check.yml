@@ -1,0 +1,29 @@
+name: Fast Native DSP Regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/TubeCompDSP.h"
+      - "tests/TubeCompDSPTests.cpp"
+      - ".github/workflows/dsp-fast-check.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-dsp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build 44.1k lightweight DSP (no JUCE needed)
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Werror=return-type \
+            -Iplugin tests/TubeCompDSPTests.cpp -o TubeCompDSPTests
+      - name: Run measured compressor, THD, attack and HOLD suite
+        run: |
+          ./TubeCompDSPTests | tee DSPTestMeasurements.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-DSP-Test-Measurements
+          path: DSPTestMeasurements.txt
+          if-no-files-found: error
