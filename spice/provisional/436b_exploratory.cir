@@ -5,7 +5,7 @@ Altec 436B exploratory topology - NOT VERIFIED WIRING
 .include "models/tube_cells.lib"
 .param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
 .param ATTACK_R=47000 REC_R=1000000 OUTPAD=1 SCGAIN=0.22
-.param BPLUS=372 SRC_OHM=600 R6CG7_DROP=6200
+.param BPLUS=372 SRC_OHM=600 R6CG7_DROP=15000
 .option reltol=1e-4 abstol=1e-11 method=gear
 * User-specified power-supply variant: 372 V nominal before R13.
 * 150uF reservoir BEFORE 10k R13; 47uF decoupling AFTER R13.
@@ -35,18 +35,27 @@ R6 g2b 0 1Meg
 XU2A p2a g2a k2 V6CG7
 XU2B p2b g2b k2 V6CG7
 R7 k2 0 220
-* Independent 6CG7 supply branch, per user's 47uF filtering requirement.
-* At the present 18k-per-side output-winding DCR PROXY, 6.2k aims
-* for approximately 150 V on both 6CG7 plates at zero input.
-* Final R6CG7_DROP and transformer DCR require source / unit measurements.
+* Independent 6CG7 B+ supply: dedicated dropping resistor and 47uF cap.
+* User requested 372V upstream, so the dropper here is a fitted stand-in.
+* The original 436B parts list identifies R14 as 6.8k from a lower
+* upstream voltage. DO NOT treat this 15k variant as a factory BOM.
 R6CG7DROP bplus outputfeed {R6CG7_DROP}
 C6CG7FILTER outputfeed 0 47u
-* DC resistances of output winding remain UNKNOWN; 18k values are proxies.
-RWP1 outputfeed p2a 18k
-RWP2 outputfeed p2b 18k
-* Linear differential output transformer proxy; NO hysteresis or iron distortion.
-BOUT out 0 V={OUTPAD*0.12*V(p2a,p2b)}
-RLOAD out 0 600
+* Output transformer 16402: idealized coupled inductor approximation.
+* PRIMARY DCR must be in hundreds of ohms, NOT 18k as in the old model.
+* 50H half-primaries / 12H secondary = about 10k:600 pp load ratio.
+* Core loss, leakage, saturation, winding capacitance are NOT calibrated.
+RWP1 outputfeed priA 200
+RWP2 outputfeed priB 200
+LPRI_A priA p2a 50
+LPRI_B p2b priB 50
+LSEC secOut 0 12
+KPP LPRI_A LPRI_B 0.995
+KPSA LPRI_A LSEC 0.995
+KPSB LPRI_B LSEC 0.995
+* Keep the output attenuator outside the power stage.
+BOUT out 0 V={OUTPAD*V(secOut)}
+RLOAD secOut 0 600
 * 6AL5 full-wave rectification from opposite-phase signal into negative envelope.
 BSCA sca 0 V={SCGAIN*V(out)}
 BSCB scb 0 V={-SCGAIN*V(out)}
