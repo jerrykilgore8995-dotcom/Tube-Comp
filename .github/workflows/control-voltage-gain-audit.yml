@@ -1,7 +1,7 @@
 name: TubeComp Static Control Voltage vs Gain
 on:
   push:
-    paths: [".github/workflows/control-voltage-gain-audit.yml"]
+    paths: [".github/workflows/control-voltage-gain-audit.yml", "scripts/static_cv_ac.py"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +15,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ngspice python3-numpy python3-matplotlib
+      - name: Syntax preflight
+        run: python3 -m py_compile scripts/static_cv_ac.py scripts/run_lab.py
       - name: Measure 1kHz gain vs forced 6BC8 negative grid voltage
         run: |
           python3 - <<'PY'
