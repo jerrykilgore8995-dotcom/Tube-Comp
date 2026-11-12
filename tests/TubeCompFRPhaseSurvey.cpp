@@ -14,9 +14,10 @@
 constexpr double SR=44100.0;
 constexpr double PI=3.14159265358979323846;
 struct Point {double hz=0,gainDb=0,phaseDeg=0;};
-Point measure(bool rs,int controlV,int hz) {
+Point measure(bool rs,int controlV,int hz,bool load200=false) {
  tubecomp::Parameters p;p.rs124=rs;p.input=8.f;
  p.attack=0;p.recovery=10;p.output=0;p.wet=1;
+ p.outputOhms=load200?200.f:600.f;
  tubecomp::Engine engine;engine.prepare(float(SR),256);
  engine.setParameters(p,true);
  engine.setCalibrationControlVolts(float(-controlV));
@@ -44,7 +45,8 @@ Point measure(bool rs,int controlV,int hz) {
  return {double(hz),outGain,phase};
 }
 int main(int argc,char** argv){
- if(argc!=2)return 2;
+ bool load200=argc==3 && std::string(argv[2])=="--load-200";
+ if(argc<2 || argc>3 || (argc==3&&!load200))return 2;
  std::ofstream o(argv[1]);
  if(!o)return 2;
  o<<std::setprecision(10);
@@ -53,9 +55,9 @@ int main(int argc,char** argv){
      20,30,40,50,100,200,500,975,1000,1025,
      2000,4975,5000,5025,10000,15000,20000};
  for(bool rs:{false,true}) for(int cv:{0,-6,-12,-15,-17}){
-  const auto base=measure(rs,cv,1000);
+  const auto base=measure(rs,cv,1000,load200);
   for(auto hz:frequencies){
-   const auto d=hz==1000?base:measure(rs,cv,hz);
+   const auto d=hz==1000?base:measure(rs,cv,hz,load200);
    o<<(rs?"RS124":"A-436B")<<","<<cv<<","<<hz<<","
       <<d.gainDb-base.gainDb<<","<<d.phaseDeg<<","<<base.gainDb<<"\n";
    std::cout<<"FR_PHASE "<<(rs?"RS124":"A-436B")
