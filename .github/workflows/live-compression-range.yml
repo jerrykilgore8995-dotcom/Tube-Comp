@@ -1,0 +1,31 @@
+name: TubeComp Closed-Loop Maximum Compression Range
+on:
+  push:
+    paths:
+      - ".github/workflows/live-compression-range.yml"
+      - "scripts/closed_loop_compression_range.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-range:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Syntax preflight
+        run: python3 -m py_compile scripts/closed_loop_compression_range.py scripts/run_lab.py
+      - name: Run 600 ohm source to output, 80 and 100 percent input, both modes
+        run: python3 scripts/closed_loop_compression_range.py
+      - name: Upload live compression THD harmonic and voltage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-closed-loop-compression-range
+          path: |
+            output/live_compression_range/live_range.csv
+            output/live_compression_range/live_range.json
+          if-no-files-found: error
