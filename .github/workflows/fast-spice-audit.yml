@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - ".github/workflows/fast-spice-audit.yml"
+      - "scripts/input_transformer_audit.py"
+      - "spice/provisional/436b_exploratory.cir"
   workflow_dispatch:
 permissions:
   contents: read
