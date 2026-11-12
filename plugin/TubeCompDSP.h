@@ -210,9 +210,12 @@ public:
         }
         for(int c=0;c<2;++c){
             const float goal=heldAim[c];
-            if(goal>cv[c])cv[c]+=(goal-cv[c])*attackAlpha;
-            else if(!holdEnabled())cv[c]+=(goal-cv[c])*releaseAlpha;
-            cv[c]=clamp(cv[c],0.f,39.f);
+            if(calibrationCv>=0.f)cv[c]=calibrationCv;
+            else {
+                if(goal>cv[c])cv[c]+=(goal-cv[c])*attackAlpha;
+                else if(!holdEnabled())cv[c]+=(goal-cv[c])*releaseAlpha;
+                cv[c]=clamp(cv[c],0.f,39.f);
+            }
             if(update){
                 const auto target=spice::lookup(params.rs124,params.input,
                                                 sourceDbu[c]);
@@ -285,9 +288,15 @@ public:
     }
     Meter meters() const noexcept{return lastMeter;}
     float controlVolts() const noexcept{return std::max(cv[0],cv[1]);}
+    // Offline calibration only: force a static 6BC8 control voltage as in
+    // SPICE .AC; not exposed as a user plugin parameter.
+    void setCalibrationControlVolts(float cvMagnitude) noexcept {
+        calibrationCv=cvMagnitude<0.f?-1.f:clamp(cvMagnitude,0.f,39.f);
+    }
     StageProbe stageProbe() const noexcept{return lastProbe;}
 private:
     float fs=44100.f;
+    float calibrationCv=-1.f;
     Parameters params;
     Meter lastMeter{};
     StageProbe lastProbe{};
