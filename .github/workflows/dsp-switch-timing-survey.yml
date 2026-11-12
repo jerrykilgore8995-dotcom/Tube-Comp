@@ -1,0 +1,33 @@
+name: Measure Actual VST3 Nine Attack Six Recovery HOLD Curves
+on:
+  push:
+    paths:
+      - ".github/workflows/dsp-switch-timing-survey.yml"
+      - "tests/TubeCompSwitchTimingSurvey.cpp"
+      - "plugin/TubeCompDSP.h"
+      - "plugin/SpiceReference.h"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-dsp:
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ["attack","recovery","hold"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native 44.1kHz exact VST3 feedback circuit
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompSwitchTimingSurvey.cpp -o TubeCompSwitchTimingSurvey
+      - name: Measure long-burst 10/63/90% timing for every physical switch
+        run: ./TubeCompSwitchTimingSurvey measured_dsp_timing.csv ${{ matrix.family }}
+      - name: Preserve independent per-switch dynamic measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-DSP-timing-${{ matrix.family }}
+          path: measured_dsp_timing.csv
+          if-no-files-found: error
