@@ -44,13 +44,48 @@ inline Point blend(Point a,Point b,float t) noexcept {
 }
 // Provenance-locked 36-case, 1.6-second measured SPICE harmonic data.
 #include "SpiceReferenceMeasured.inc"
+// Real 0..100% dual-section 50k input attenuator curves at three levels.
+#include "SpiceInputGridMeasured.inc"
+inline Point measuredInputAt(bool rs,int index,float inputDbu) noexcept {
+    const auto& bank=rs?measuredRSInput:measuredAltecInput;
+    const auto& points=bank[static_cast<size_t>(std::clamp(index,0,10))];
+    Point result=at(points,inputDbu);
+    // Below/above the measured -18..+7dBu range use explicit EXTRAPOLATION,
+    // never describe these out-of-grid levels as measured SPICE.
+    if(inputDbu<-18.f){
+        result.outputDbu+=inputDbu+18.f;
+        result.cvMagnitude=std::max(0.f,result.cvMagnitude+
+                                    .20f*(inputDbu+18.f));
+    }
+    if(inputDbu>7.f){
+        const float d=std::max(1.f,points[2].inputDbu-points[1].inputDbu);
+        result.outputDbu+=(inputDbu-7.f)*
+                 (points[2].outputDbu-points[1].outputDbu)/d;
+        result.cvMagnitude+=(inputDbu-7.f)*
+                 (points[2].cvMagnitude-points[1].cvMagnitude)/d;
+    }
+    result.cvMagnitude=std::max(0.f,result.cvMagnitude);
+    result.inputDbu=inputDbu;
+    return result;
+}
 inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
     const float k=std::clamp(inputKnob,0.f,10.f);
-    // The actual dual-50k attenuator's near-zero wiper loading varies with
-    // frequency. This input control extrapolation remains unverified <80%.
-    float level=inputDbu;
-    if(k<8.f)
-        level+=20.f*std::log10(std::max(.001f,k)/8.f);
+    // Measured independent ngspice 11-position 50k dual-pot loading.
+    // Below 80% use actual 0..70% SPICE, not a 20log(k/8) estimate.
+    if(k<8.f){
+        const int index=std::clamp(int(k),0,7);
+        const Point lower=measuredInputAt(rs,index,inputDbu);
+        // Use the existing 80% broad-level calibration as the endpoint to
+        // avoid a sudden gain discontinuity at 80% of the physical dial.
+        const Point upper=(index==7)?
+            (rs?at(rs80,inputDbu):at(altec80,inputDbu)):
+            measuredInputAt(rs,index+1,inputDbu);
+        const float frac=clamp(k-float(index),0.f,1.f);
+        auto result=blend(lower,upper,frac);
+        result.inputDbu=inputDbu;
+        return result;
+    }
+    const float level=inputDbu;
     const auto p80=rs?at(rs80,level):at(altec80,level);
     const auto p100=rs?at(rs100,level):at(altec100,level);
     auto result=blend(p80,p100,(k-8.f)/2.f);
@@ -86,6 +121,18 @@ inline float feedbackCv(bool rs,float knob,float outputDbu) noexcept {
     // Detector follows the 6CG7 plate outputs before the RS124 output pad.
     // The pad-independent output measurement is mapped back to the SPICE
     // detector response. At non-sinusoidal input this is a proxy.
+    if(knob<8.f){
+        const auto& bank=rs?measuredRSInput:measuredAltecInput;
+        const int index=std::clamp(int(knob),0,7);
+        const float a=detectorCvFromOutput(
+                                  bank[static_cast<size_t>(index)],outputDbu);
+        const float b=(index==7)?
+                  (rs?detectorCvFromOutput(rs80,outputDbu):
+                      detectorCvFromOutput(altec80,outputDbu)):
+                   detectorCvFromOutput(
+                       bank[static_cast<size_t>(index+1)],outputDbu);
+        return std::max(0.f,a+(b-a)*clamp(knob-index,0.f,1.f));
+    }
     const float from80=rs?detectorCvFromOutput(rs80,outputDbu):
                             detectorCvFromOutput(altec80,outputDbu);
     const float from100=rs?detectorCvFromOutput(rs100,outputDbu):
