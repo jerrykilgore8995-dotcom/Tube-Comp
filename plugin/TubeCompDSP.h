@@ -155,6 +155,8 @@ public:
     }
     void reset() noexcept {
         sampleCount=0;
+        dryDelayIndex=0;
+        for(auto& channel:dryDelay)channel.fill(0.f);
         cv={0.f,0.f};inputEnv={0.f,0.f};harmonicEnv={0.f,0.f};outputEnv={0.f,0.f};
         feedbackAudio={0.f,0.f};
         gainDb={30.f,30.f};
@@ -197,6 +199,13 @@ public:
         wetLevel+=(targetWet-wetLevel)*wetSmoothAlpha;
         outputLevel+=(targetOutput-outputLevel)*outputSmoothAlpha;
         const float dry[2]={left,right};
+        float alignedDry[2]={};
+        for(int c=0;c<2;++c){
+            dryDelay[c][static_cast<size_t>(dryDelayIndex)]=dry[c];
+            alignedDry[c]=dryDelay[c][static_cast<size_t>(
+                         (dryDelayIndex+1)%(phasefit::kLatency+1))];
+        }
+        if(++dryDelayIndex==phasefit::kLatency+1)dryDelayIndex=0;
         float shaped[2]={};
         float targets[2]={};
         float inPeak[2]={};
@@ -295,7 +304,7 @@ public:
             feedbackAudio[c]=beforeOutputPad;
             const float pad=params.rs124?.65f:1.f;
             const float wet=beforeOutputPad*pad*outputLevel;
-            const float result=dry[c]+wetLevel*(wet-dry[c]);
+            const float result=alignedDry[c]+wetLevel*(wet-alignedDry[c]);
             shaped[c]=std::isfinite(result)?result:0.f;
             if(c==0)lastProbe={inAfterHp[c],beforePad,nonlinear,
                               beforeOutputPad,spice::attenuationDb(
@@ -323,6 +332,8 @@ private:
     Meter lastMeter{};
     StageProbe lastProbe{};
     unsigned sampleCount=0;
+    int dryDelayIndex=0;
+    std::array<std::array<float,phasefit::kLatency+1>,2> dryDelay{};
     float inputEnvAlpha=.01f,harmonicEnvAlpha=.001f,outputEnvAlpha=.01f;
     float gainSmoothAlpha=.01f,wetSmoothAlpha=.01f,outputSmoothAlpha=.01f;
     float attack63=50.f,release63=1000.f,attackAlpha=.001f,releaseAlpha=.001f;
