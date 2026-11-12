@@ -39,6 +39,8 @@ jobs:
           else
             python3 scripts/run_lab.py --quick --output output
           fi
+      - name: Measure 1kHz compression and K2-K20 THD against detector-disabled reference
+        run: python3 scripts/measure_compression_thd.py --output output/compression_thd
       - name: Rectified 6AL5 attack / recovery / HOLD time sweeps
         run: |
           if [ "${{ github.event.inputs.sweep }}" = "broad" ]; then
@@ -67,6 +69,9 @@ jobs:
             output/manifest.json
             output/cases.json
             output/measurement_table.csv
+            output/compression_thd/compression_thd_1khz.csv
+            output/compression_thd/compression_thd_1khz.json
+            output/compression_thd/summary.json
             output/transfer_1k.png
             output/thd_1k.png
             output/timing/timing.csv
