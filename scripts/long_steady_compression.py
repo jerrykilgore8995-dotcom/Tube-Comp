@@ -15,10 +15,10 @@ import numpy as np
 from run_lab import prepare,parse_wrdata,harmonics,op_nodes,OUTFIELDS
 
 ROOT=Path("output/long_steady_compression")/os.getenv("TUBECOMP_PARITY_MODE","baseline");ROOT.mkdir(parents=True,exist_ok=True)
-def measure(mode,level,knob):
+def measure(mode,level,knob,load_ohms=600):
     case=dict(mode=mode,hz=1000,dbu=level,attack=0,recovery=0,
               hold=False,input_knob=knob)
-    wd=ROOT/f"{mode.replace('-','')}_L{str(level).replace('-','m')}_G{int(knob*100)}"
+    wd=ROOT/f"{mode.replace('-','')}_L{str(level).replace('-','m')}_G{int(knob*100)}_Z{load_ohms}"
     f=prepare(case,wd)
     s=f.read_text()
     old="VIN source 0 SIN(0 {AMP} {FREQ}) AC 1"
@@ -57,7 +57,7 @@ def measure(mode,level,knob):
                 cv_V=float(np.mean(cv[samples])))
     op=op_nodes(log)
     v=lambda node:op.get("v("+node+")")
-    return dict(mode=mode,input_dBu=level,input_pct=int(knob*100),status="OK",
+    return dict(mode=mode,input_dBu=level,input_pct=int(knob*100),load_ohms=load_ohms,status="OK",
         final_output_dBu=end["fundamental_output_dBu"],
         final_THD_percent=end["THD_percent"],
         final_CV_V=float(np.mean(tail[:,3])),
