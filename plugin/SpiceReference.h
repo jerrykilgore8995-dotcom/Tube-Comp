@@ -80,7 +80,7 @@ inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
         const Point upper=(index==7)?
             (rs?at(rs80,inputDbu):at(altec80,inputDbu)):
             measuredInputAt(rs,index+1,inputDbu);
-        const float frac=clamp(k-float(index),0.f,1.f);
+        const float frac=std::clamp(k-float(index),0.f,1.f);
         auto result=blend(lower,upper,frac);
         result.inputDbu=inputDbu;
         return result;
@@ -131,7 +131,7 @@ inline float feedbackCv(bool rs,float knob,float outputDbu) noexcept {
                       detectorCvFromOutput(altec80,outputDbu)):
                    detectorCvFromOutput(
                        bank[static_cast<size_t>(index+1)],outputDbu);
-        return std::max(0.f,a+(b-a)*clamp(knob-index,0.f,1.f));
+        return std::max(0.f,a+(b-a)*std::clamp(knob-index,0.f,1.f));
     }
     const float from80=rs?detectorCvFromOutput(rs80,outputDbu):
                             detectorCvFromOutput(altec80,outputDbu);
