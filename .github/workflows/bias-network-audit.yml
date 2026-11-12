@@ -1,0 +1,27 @@
+name: TubeComp 6BC8 and 6CG7 Bias Voltage Audit
+on:
+  push:
+    paths:
+      - ".github/workflows/bias-network-audit.yml"
+      - "scripts/bias_network_audit.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual ngspice solver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Compare 100 voltage/bias/resistor configurations
+        run: python3 scripts/bias_network_audit.py
+      - name: Upload all operating-point measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-100-case-operating-points
+          path: output/bias_network/bias_network_100_points.csv
+          if-no-files-found: error
