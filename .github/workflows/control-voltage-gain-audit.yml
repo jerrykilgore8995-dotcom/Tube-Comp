@@ -1,0 +1,55 @@
+name: TubeComp Static Control Voltage vs Gain
+on:
+  push:
+    paths: [".github/workflows/control-voltage-gain-audit.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gain-cell:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice numpy matplotlib
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy python3-matplotlib
+      - name: Measure 1kHz gain vs forced 6BC8 negative grid voltage
+        run: |
+          python3 - <<'PY'
+          import sys,csv
+          from pathlib import Path
+          sys.path.insert(0,"scripts")
+          from static_cv_ac import simulate
+          root=Path("output/control_gain")
+          root.mkdir(parents=True,exist_ok=True)
+          rows=[]
+          for mode in ("A-436B","RS124"):
+              baseline=None
+              for cv in (0,-3,-6,-9,-12,-15,-18,-22,-26,-30):
+                  try:
+                      wd,f,g,ph,gd,op=simulate(mode,float(cv),root/"raw")
+                      j=abs(f-1000).argmin()
+                      gain=float(g[j])
+                      if baseline is None:baseline=gain
+                      GR=baseline-gain
+                      rows.append(dict(mode=mode,control_V=cv,
+                                       gain_dB=gain,relative_GR_dB=GR,
+                                       plate_6bc8_V=op.get("v(pa)"),
+                                       plate_6cg7_V=op.get("v(p2a)")))
+                      print(f"CONTROL_CURVE {mode} CV={cv:4}V "
+                            f"gain={gain:+.2f}dB GR={GR:.2f}dB "
+                            f"plate6BC8={op.get('v(pa)')}",flush=True)
+                  except Exception as e:
+                      print(f"CONTROL_CURVE_FAIL {mode} {cv}: {e}",flush=True)
+          if not rows:raise RuntimeError("No SPICE AC results")
+          with (root/"gain_vs_control.csv").open("w",newline="") as fp:
+              w=csv.DictWriter(fp,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+          PY
+      - name: Upload gain-cell static transfer measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-6BC8-control-gain-transfer
+          path: output/control_gain/gain_vs_control.csv
+          if-no-files-found: error
