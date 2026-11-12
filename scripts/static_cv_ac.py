@@ -47,7 +47,7 @@ def main():
     p.add_argument("--output",default="output/static_bias_ac")
     p.add_argument("--broad",action="store_true")
     args=p.parse_args();root=Path(args.output);root.mkdir(parents=True,exist_ok=True)
-    cvs=np.arange(0,-10.1,-.5) if args.broad else [0,-1,-3,-5,-8]
+    cvs=np.arange(0,-40.1,-1.0) if args.broad else [0,-1,-3,-5,-8,-12,-16,-20,-25,-30,-35]
     allrows=[];summary=[]
     for mode in ["A-436B","RS124"]:
         curves=[]
