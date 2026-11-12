@@ -165,8 +165,8 @@ private:
             label(g,juce::String(n),cx+std::cos(ang)*95-11,
                   base+std::sin(ang)*95-7,22,14,11,rgb(43,43,42));
         }
-        label(g,"dB  COMPRESSION",window.getX()+25,window.getY()+70,
-              window.getWidth()-50,17,13,rgb(55,54,50));
+        label(g,"dB  COMPRESSION",window.getX()+25,window.getY()+104,
+              window.getWidth()-50,16,12,rgb(55,54,50));
         const float angle=sweep0+(sweep1-sweep0)*(1.f-db/30.f);
         const float tipX=cx+std::cos(angle)*121,tipY=base+std::sin(angle)*121;
         g.setColour(rgb(30,26,26));g.drawLine(cx,base,tipX,tipY,2.1f);
@@ -194,7 +194,8 @@ private:
         plate(g,p,rgb(173,172,169),rgb(125,127,127),true);
         const C ink=rgb(36,38,39);
         // Hardware controls in the approximate real Chandler 2U locations.
-        label(g,"BAL.",126,146,83,22,14,rgb(250,250,246));
+        g.setColour(rgb(71,73,74));g.drawRect(143,155,61,23,1);
+        label(g,"BAL.",143,157,61,19,13,ink);
         screw(g,168,103,8);
         g.setGradientFill(juce::ColourGradient(rgb(227,234,235),161,189,
                            rgb(64,71,75),179,216,false));
@@ -237,13 +238,12 @@ private:
         const C bone=rgb(236,231,208);
         label(g,"A-436B",150,67,300,65,48,bone);
         label(g,"COMPRESSOR AMPLIFIER",150,120,300,24,18,bone);
-        label(g,"INPUT",192,155,120,19,14,bone);
-        label(g,"LEVEL",192,174,120,19,14,bone);
+        label(g,"INPUT LEVEL",332,199,145,23,15,bone);
         dial(g,239,232,43,.64f,bone,true);
         vu(g,{655,65,272,161},meterDb,false);
         label(g,"GAIN REDUCTION",699,263,188,20,14,bone);
         jewel(g,1118,92);
-        label(g,"POWER",1057,132,120,17,14,bone);
+        label(g,"POWER",1057,124,120,17,14,bone);
         smallSwitch(g,1122,193,"ON / OFF",true);
         label(g,"FUSE",1332,101,95,18,13,bone);
         g.setColour(rgb(16,22,18));g.fillEllipse(1355,131,48,48);
