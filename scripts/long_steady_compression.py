@@ -74,31 +74,35 @@ def measure(mode,level,knob):
         plate_6bc8_idle_V=v("pa"),plate_6cg7_idle_V=v("p2a"),
         supply_platefeed_idle_V=v("platefeed"))
 
-rows=[]
-parity_mode=os.getenv("TUBECOMP_PARITY_MODE")
-cases=([(mode,knob,level)
-       for mode in (parity_mode,)
-       for knob in (.8,1.)
-       for level in (-24,-18,-12,-6,0,3,7,10,13)]
-       if parity_mode in ("A-436B","RS124") else
-       [("A-436B",.8,7),("A-436B",1.,7),
-        ("A-436B",1.,10),("A-436B",1.,13),
-        ("RS124",.8,7),("RS124",1.,7)])
-for mode,knob,level in cases:
-    row=measure(mode,level,knob)
-    rows.append(row)
-    if row["status"]=="OK":
-        print(f"LONG_STEADY {mode} input={int(knob*100)}% {level:+}dBu "
-              f"OUT={row['final_output_dBu']:+.2f}dBu "
-              f"THD={row['final_THD_percent']:.3f}% "
-              f"CV={row['final_CV_V']:.2f}V "
-              f"CVdrift50ms={row['CV_drift_final_50ms_V']:+.3f}V "
-              f"6BC8plate={row['plate_6bc8_late_V']:.2f}V "
-              f"Bplus_filtered={row['platefeed_6bc8_late_V']:.2f}V",
-              flush=True)
-    else:print("LONG_STEADY_FAILED",row,flush=True)
-with (ROOT/"long_steady.csv").open("w",newline="") as fh:
-    flat=[{k:v for k,v in x.items() if k!="snapshots"} for x in rows]
-    cols=sorted({k for x in flat for k in x});w=csv.DictWriter(fh,fieldnames=cols)
-    w.writeheader();w.writerows(flat)
-(ROOT/"long_steady.json").write_text(json.dumps(rows,indent=2))
+def main():
+    rows=[]
+    parity_mode=os.getenv("TUBECOMP_PARITY_MODE")
+    cases=([(mode,knob,level)
+           for mode in (parity_mode,)
+           for knob in (.8,1.)
+           for level in (-24,-18,-12,-6,0,3,7,10,13)]
+           if parity_mode in ("A-436B","RS124") else
+           [("A-436B",.8,7),("A-436B",1.,7),
+            ("A-436B",1.,10),("A-436B",1.,13),
+            ("RS124",.8,7),("RS124",1.,7)])
+    for mode,knob,level in cases:
+        row=measure(mode,level,knob)
+        rows.append(row)
+        if row["status"]=="OK":
+            print(f"LONG_STEADY {mode} input={int(knob*100)}% {level:+}dBu "
+                  f"OUT={row['final_output_dBu']:+.2f}dBu "
+                  f"THD={row['final_THD_percent']:.3f}% "
+                  f"CV={row['final_CV_V']:.2f}V "
+                  f"CVdrift50ms={row['CV_drift_final_50ms_V']:+.3f}V "
+                  f"6BC8plate={row['plate_6bc8_late_V']:.2f}V "
+                  f"Bplus_filtered={row['platefeed_6bc8_late_V']:.2f}V",
+                  flush=True)
+        else:print("LONG_STEADY_FAILED",row,flush=True)
+    with (ROOT/"long_steady.csv").open("w",newline="") as fh:
+        flat=[{k:v for k,v in x.items() if k!="snapshots"} for x in rows]
+        cols=sorted({k for x in flat for k in x});w=csv.DictWriter(fh,fieldnames=cols)
+        w.writeheader();w.writerows(flat)
+    (ROOT/"long_steady.json").write_text(json.dumps(rows,indent=2))
+
+if __name__=='__main__':
+    main()
