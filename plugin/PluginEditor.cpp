@@ -10,6 +10,9 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
         setParameter("rs124",m==TubeCompFaceplate::Mode::rs124?1.f:0.f);
         setMode(m==TubeCompFaceplate::Mode::rs124);
     };
+    face.onPowerSelected=[this](bool on) {
+        setParameter("bypass",on?0.f:1.f);
+    };
     for(const char* id: {"input","output","attack","recovery","balance"})
         makeDial(id);
     bypass.setButtonText("BYPASS");
@@ -40,7 +43,7 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     timerCallback();
     startTimerHz(30);
 }
-TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;}
+TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;face.onPowerSelected=nullptr;}
 void TubeCompEditor::makeDial(const char* id) {
     Dial control;
     control.slider=std::make_unique<InvisibleDial>();
@@ -84,6 +87,7 @@ void TubeCompEditor::timerCallback() {
     face.setControlPositions(in*.1f,(out+10.f)*.1f,
                              (at-1.f)/8.f,rec*.1f);
     face.setMeterDb(proc.grMeter.load(std::memory_order_relaxed));
+    face.setPowerOn(proc.state.getRawParameterValue("bypass")->load()<.5f);
 }
 void TubeCompEditor::resized() {
     face.setBounds(0,0,getWidth(),getHeight());
