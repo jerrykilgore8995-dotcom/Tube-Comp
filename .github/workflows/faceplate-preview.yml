@@ -1,0 +1,38 @@
+name: Capture Hardware Faceplates in JUCE
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gui/**"
+      - ".github/workflows/faceplate-preview.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure JUCE and Visual Studio
+        run: cmake -S gui -B gui/build -G "Visual Studio 17 2022" -A x64
+      - name: Compile real front panel capture
+        run: cmake --build gui/build --config Release --target TubeCompFaceplates --parallel 4
+      - name: Capture silver RS124 and green A-436B JUCE panels
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem gui/build -Recurse -File -Filter "TubeCompFaceplates.exe" |
+            Where-Object { $_.FullName -match "Release" } | Select-Object -First 1
+          if (-not $exe) { throw "Missing faceplate capture executable" }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "JUCE panel capture failed" }
+          if (-not (Test-Path "TubeComp_RS124_Actual_JUCE.png")) { throw "Missing RS124 screenshot" }
+          if (-not (Test-Path "TubeComp_A-436B_Actual_JUCE.png")) { throw "Missing Altec screenshot" }
+      - name: Publish actual JUCE screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-RS124-and-A436B-JUCE-faceplates
+          path: |
+            TubeComp_RS124_Actual_JUCE.png
+            TubeComp_A-436B_Actual_JUCE.png
+          if-no-files-found: error
