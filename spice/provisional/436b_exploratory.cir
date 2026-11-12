@@ -63,17 +63,19 @@ RLOAD secOut 0 600
 * plates BEFORE the output attenuator, NOT a scaled sample of the 600R output.
 * C5 and C6 are real 22nF blocking capacitors: DC plate voltage must
 * never be injected into the control network. R10/R11 are 220k returns.
-* The original 436B threshold/bias network and 6AL5 diode curves still
-* need independent hardware-model calibration; +20V is the known drawing
-* nominal threshold supply but the exact source is provisionally ideal.
+* Original 436B factory schematic: R10/R11 detector bias comes from
+* the 6CG7 joined cathodes (k2, factory annotated ~2.3V at idle).
+* IMPORTANT: the prior 20V source belonged to a different, variable
+* threshold arrangement and was not original 436B wiring.
+* R10/R11 directly load the joined cathode as in the original drawing.
+* See Altec 436B operating instructions drawing 416C (source-register).
 * Plate-coupled detector, no behavioral buffer: the two 22nF coupling
 * capacitors and 220k grid-return resistors genuinely load the 6CG7 plates.
 * The reference sweep disconnects diode conduction rather than scaling audio.
 C5 p2a sca 22n
 C6 p2b scb 22n
-VTHRESHOLD threshold 0 20
-R10 sca threshold 220k
-R11 scb threshold 220k
+R10 sca k2 220k
+R11 scb k2 220k
 * Detector 6AL5 anodes collect the negative phase excursions.
 DDET1 detector sca D6AL5
 DDET2 detector scb D6AL5
