@@ -282,7 +282,7 @@ private:
                   i%2?col(165,42,43):ink,true);
         }
     }
-    static void meterRS124(juce::Graphics& g,float x,float y)
+    void meterRS124(juce::Graphics& g,float x,float y)
     {
         const float w=257,h=171;
         g.setColour(col(20,20,21));g.fillRoundedRectangle(x-10,y-11,w+20,h+22,5);
@@ -317,7 +317,7 @@ private:
         g.setColour(C::fromRGBA(255,255,255,80));
         g.drawRoundedRectangle(x+7,y+7,w-14,h-14,2,1);
     }
-    static void meterAltec(juce::Graphics& g,float x,float y)
+    void meterAltec(juce::Graphics& g,float x,float y)
     {
         // Distinctive original Altec 6049 round-topped Bakelite meter,
         // NOT the modern rectangular VU housing.
@@ -365,7 +365,7 @@ private:
         panHead(g,cx,y+h-25,7);
     }
 
-    static void renderRS124(juce::Graphics& g)
+    void renderRS124(juce::Graphics& g)
     {
         metal(g,13,17,1574,283,false);
         fittings(g,false);
@@ -416,7 +416,7 @@ private:
         stamp(g,"T Y P E   R S 1 2 4",1453,211,118,16,9.8f,ink,true);
         stamp(g,"T U B E   C O M P",1453,232,118,15,9.4f,ink,true);
     }
-    static void render436B(juce::Graphics& g)
+    void render436B(juce::Graphics& g)
     {
         metal(g,13,17,1574,283,true);
         fittings(g,true);
@@ -450,7 +450,7 @@ private:
         // Bottom-right factory model identity, not invented release controls.
         stamp(g,"A-436B",1363,250,135,23,14.3f,cream,true);
     }
-    static void renderChooser(juce::Graphics& g)
+    void renderChooser(juce::Graphics& g)
     {
         // Separate host UI strip OUTSIDE the historical faceplate geometry.
         // The actual 19-inch rack remains a complete self-contained panel.
