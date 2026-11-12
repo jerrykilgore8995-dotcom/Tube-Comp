@@ -114,6 +114,7 @@ public:
     void prepare(float sampleRate,int) noexcept {
         fs=std::max(8000.f,sampleRate);
         inputEnvAlpha=coeff(8.f,fs);
+        harmonicEnvAlpha=coeff(90.f,fs);
         outputEnvAlpha=coeff(5.f,fs);
         gainSmoothAlpha=coeff(1.8f,fs);
         wetSmoothAlpha=coeff(7.f,fs);
@@ -129,7 +130,7 @@ public:
     }
     void reset() noexcept {
         sampleCount=0;
-        cv={0.f,0.f};inputEnv={0.f,0.f};outputEnv={0.f,0.f};
+        cv={0.f,0.f};inputEnv={0.f,0.f};harmonicEnv={0.f,0.f};outputEnv={0.f,0.f};
         feedbackAudio={0.f,0.f};
         gainDb={30.f,30.f};
         sourceDbu={-36.f,-36.f};
@@ -183,6 +184,7 @@ public:
             // First coupling pole before tube and one after its output.
             inAfterHp[c]=hpf[c][0].tick(x);
             inputEnv[c]+=inputEnvAlpha*(std::fabs(inAfterHp[c])-inputEnv[c]);
+            harmonicEnv[c]+=harmonicEnvAlpha*(std::fabs(inAfterHp[c])-harmonicEnv[c]);
             // mean(abs(sine))=2/pi of peak. Explicit DAW convention:
             // -18 dBFS PEAK corresponds to +4 dBu, so 0 dBFS = +22 dBu.
             inPeak[c]=std::max(1.e-8f,inputEnv[c]*(pi*.5f));
@@ -245,7 +247,11 @@ public:
             // Signal remains bipolar and is never rectified into the audio.
             const float beforePad=inAfterHp[c]*db2lin(gainDb[c]);
             shaped[c]=beforePad;
-            const float drivePeak=inPeak[c]*db2lin(gainDb[c]);
+            // The waveshaper's Chebyshev basis needs a steady peak estimate.
+            // A fast 8ms abs-envelope ripples at 2*f and cross-modulates
+            // K7-K20; this slower normalizer avoids injecting fake partials.
+            const float drivePeak=std::max(1.e-8f,harmonicEnv[c]*
+                                 (pi*.5f))*db2lin(gainDb[c]);
             const float nonlinear=harmonics(beforePad,drivePeak,harmonicLinear[c]);
             // Plate polarity inversion is deliberate: phase should match
             // the negative push-pull polarity in the ngspice output.
@@ -279,11 +285,11 @@ private:
     Meter lastMeter{};
     StageProbe lastProbe{};
     unsigned sampleCount=0;
-    float inputEnvAlpha=.01f,outputEnvAlpha=.01f;
+    float inputEnvAlpha=.01f,harmonicEnvAlpha=.001f,outputEnvAlpha=.01f;
     float gainSmoothAlpha=.01f,wetSmoothAlpha=.01f,outputSmoothAlpha=.01f;
     float attack63=50.f,release63=1000.f,attackAlpha=.001f,releaseAlpha=.001f;
     float targetOutput=1.f,targetWet=1.f,outputLevel=1.f,wetLevel=1.f;
-    std::array<float,2> inputEnv{},outputEnv{},feedbackAudio{},cv{},heldAim{};
+    std::array<float,2> inputEnv{},harmonicEnv{},outputEnv{},feedbackAudio{},cv{},heldAim{};
     std::array<float,2> gainDb{},desiredGain{},sourceDbu{};
     std::array<spice::Point,2> harmonicTargets{};
     std::array<std::array<float,19>,2> harmonicLinear{};
