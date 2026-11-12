@@ -89,6 +89,20 @@ inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
     const auto p80=rs?at(rs80,level):at(altec80,level);
     const auto p100=rs?at(rs100,level):at(altec100,level);
     auto result=blend(p80,p100,(k-8.f)/2.f);
+    // Pot midpoint at 90% is not generally the arithmetic average of the
+    // 80/100% harmonic spectra. Independently measured ngspice midpoint
+    // corrects the weak K9/K19 residual without moving either calibrated
+    // 80/100% endpoint. The correction is zero at each endpoint.
+    if(k>8.f && k<10.f){
+        const Point actual90=measuredInputAt(rs,9,inputDbu);
+        const Point predicted90=blend(
+              rs?at(rs80,level):at(altec80,level),
+              rs?at(rs100,level):at(altec100,level),.5f);
+        const float weight=std::clamp(1.f-std::fabs(k-9.f),0.f,1.f);
+        for(size_t i=0;i<19;++i)
+            result.harmonicDb[i]+=(actual90.harmonicDb[i]-
+                                      predicted90.harmonicDb[i])*weight;
+    }
     if(level< -24.f) {
         result.outputDbu+=level+24.f;
         result.cvMagnitude=std::max(0.f,result.cvMagnitude+.18f*(level+24.f));
