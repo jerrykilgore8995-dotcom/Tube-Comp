@@ -220,9 +220,14 @@ public:
                  drive[c],gr,params.balance,params.rs124);
             const float vca=t1*variableMuGain;
             const float coupling=couplingHP[(size_t)c].tick(vca);
+            // Real output amplifiers operate at greater INTERNAL voltage swing
+            // than the final line-level delivery. A calibrated internal swing
+            // allows the 6CG7 stage to contribute its own harmonics; level
+            // is normalized after the simulated output stage.
+            constexpr float internalOutputSwing=3.5f;
             const float t2=cells[(size_t)c][1].outputAmp(
-                 coupling,gr,params.balance,
-                 params.rs124?params.outputOhms:600.f);
+                 coupling*internalOutputSwing,gr,params.balance,
+                 params.rs124?params.outputOhms:600.f)/internalOutputSwing;
             if(c==0)lastProbe={drive[c],t1,vca,t2,gr};
             const float filtered=outLP[(size_t)c].tick(t2)*outLevel;
             // Mix compensates preamp boost only at 100% wet; zero mix is
