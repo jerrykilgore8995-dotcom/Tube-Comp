@@ -31,7 +31,11 @@ LT1_PRIMARY tp1 0 220
 RT1_SEC_TOP tsH tsech 1400
 LT1_SECONDARY tsech tsecl 1487.2
 RT1_SEC_BOTTOM tsecl tsL 1400
-KT1 LT1_PRIMARY LT1_SECONDARY 0.995
+* Coupling calibrated as a wideband starting point. With Lpri=220H,
+* K=0.995 caused ~2.19H leakage and an UNPHYSICAL 40deg 1kHz shift.
+* K=0.9999 leaves ~44mH referred primary leakage; the exact Peerless
+* leakage/winding parasitics remain pending verified measurements.
+KT1 LT1_PRIMARY LT1_SECONDARY 0.9999
 * Altec P1A and P1B: two 50k variable resistive divider sections.
 * Signal comes off BOTH wipers directly into the 6BC8 grids.
 * Pot midpoint is referenced to the negative 6AL5 control bias; no
