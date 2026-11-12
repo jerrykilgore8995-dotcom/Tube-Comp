@@ -96,7 +96,7 @@ public:
         const float z=clamp(x*.90f,-3.0f,3.0f);
         const float bias=clamp(gr/30.f,0.f,1.f);
         const float even=(rs?.00010f:.00008f)+balance*.013f+bias*.00004f;
-        const float odd=(rs?-.021f:-.019f)-bias*.005f;
+        const float odd=(rs?-.0095f:-.0088f)-bias*.0025f;
         // Local 6BC8 transfer and push-pull imbalance.
         const float y=z+even*z*z+odd*z*z*z;
         return dc.tick(y/.90f);
