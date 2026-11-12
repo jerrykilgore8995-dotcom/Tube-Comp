@@ -78,19 +78,22 @@ R6CG7DROP bplus outputfeed {R6CG7_DROP}
 C6CG7FILTER outputfeed 0 47u
 * Peerless 16402 output transformer: spec-anchored LINEAR approximation.
 * Peerless original turns ratio 6.2:1; Sowter 1232 replacement 23kCT/600R,
-* ~80H total primary inductance and ~650R total primary winding resistance.
+* a replacement uses ~80H total inductance and 650R primary DCR.
+* Our original 80H / k=.995 proxy FAILED the Altec ±1.5dB bandwidth test.
+* Fitted 160H / k=.9995 retains 6.2:1 and 650R DCR and yields ≤0.67dB
+* deviation over 30Hz–15kHz. This is a BEHAVIORAL FIT, NOT Peerless data.
 * This is a COUPLED-WINDING electrical proxy, not a core-saturation model.
 * Reference: https://www.sowter.co.uk/specs/1232.php
-* 20H each half, ~2.08H secondary gives series primary ratio 6.20:1.
+* 40H each half, ~4.16H secondary gives ~6.20:1 differential ratio.
 * 325 ohm per half gives ~650 ohm total primary DC resistance.
 RWP1 outputfeed priA 325
 RWP2 outputfeed priB 325
-LPRI_A priA p2a 20
-LPRI_B p2b priB 20
-LSEC secOut 0 2.08
-KPP LPRI_A LPRI_B 0.995
-KPSA LPRI_A LSEC 0.995
-KPSB LPRI_B LSEC 0.995
+LPRI_A priA p2a 40
+LPRI_B p2b priB 40
+LSEC secOut 0 4.16
+KPP LPRI_A LPRI_B 0.9995
+KPSA LPRI_A LSEC 0.9995
+KPSB LPRI_B LSEC 0.9995
 * Keep the output attenuator outside the power stage.
 BOUT out 0 V={OUTPAD*V(secOut)}
 RLOAD secOut 0 600
