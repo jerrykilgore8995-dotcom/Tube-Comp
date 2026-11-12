@@ -1,0 +1,27 @@
+name: TubeComp Forced-CV High Drive THD Test
+on:
+  push:
+    paths: [".github/workflows/high-drive-THD-audit.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  high-drive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Syntax preflight
+        run: python3 -m py_compile scripts/forced_cv_high_drive.py
+      - name: Measure forced negative control voltages at hot input
+        run: python3 scripts/forced_cv_high_drive.py
+      - name: Upload measured harmonic performance
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-forced-control-high-drive-THD
+          path: output/forced_cv_high_drive/output_thd_vs_forced_cv.csv
+          if-no-files-found: error
