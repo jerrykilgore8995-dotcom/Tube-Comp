@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 
 class TubeCompFaceplate final : public juce::Component
 {
@@ -18,6 +19,14 @@ public:
     enum class Mode { rs124, altec436b };
 
     TubeCompFaceplate() { setSize(1600, 350); }
+    std::function<void(Mode)> onModeSelected;
+    void setControlPositions(float input,float output,float attack,float recovery) {
+        inPosition=juce::jlimit(0.f,1.f,input);
+        outPosition=juce::jlimit(0.f,1.f,output);
+        attackPosition=juce::jlimit(0.f,1.f,attack);
+        recPosition=juce::jlimit(0.f,1.f,recovery);
+        repaint();
+    }
     void setMode(Mode m) { mode = m; repaint(); }
     Mode getMode() const noexcept { return mode; }
     void setMeterDb(float db) { meterDb = juce::jlimit(0.0f, 30.0f, db); repaint(); }
@@ -33,10 +42,13 @@ public:
     void mouseDown(const juce::MouseEvent& e) override
     {
         if (e.position.y >= 313.0f) {
-            if (e.position.x >= 1292.0f && e.position.x < 1440.0f)
+            if (e.position.x >= 1292.0f && e.position.x < 1440.0f) {
                 setMode(Mode::rs124);
-            else if (e.position.x >= 1440.0f && e.position.x <= 1582.0f)
+                if (onModeSelected) onModeSelected(mode);
+            } else if (e.position.x >= 1440.0f && e.position.x <= 1582.0f) {
                 setMode(Mode::altec436b);
+                if (onModeSelected) onModeSelected(mode);
+            }
         }
     }
 
@@ -45,6 +57,7 @@ private:
     static constexpr float pi = 3.14159265358979323846f;
     Mode mode = Mode::rs124;
     float meterDb = 8.0f;
+    float inPosition=.50f,outPosition=1.f,attackPosition=.375f,recPosition=.60f;
 
     static C col(int r, int g, int b) {
         return C::fromRGB((juce::uint8) r,(juce::uint8) g,(juce::uint8) b);
@@ -385,18 +398,18 @@ private:
         stamp(g,"C O N T R O L",270,46,180,17,11.5f,ink,true);
         const std::array<juce::String,11> ints={"0","1","2","3","4","5","6","7","8","9","10"};
         dialScale(g,356,166,48,ints,ink,12.4f);
-        pointerKnob(g,356,166,46,.53f);
+        pointerKnob(g,356,166,46,inPosition);
 
         stamp(g,"A T T A C K",541,29,152,18,14,ink,true);
         attackMarks(g,617,105,ink);
-        selectKnob(g,617,105,28,.24f);
+        selectKnob(g,617,105,28,attackPosition);
         stamp(g,"60070B",519,57,62,15,9.6f,col(166,39,34),true);
         stamp(g,"60050A",651,57,66,15,9.6f,col(166,39,34),true);
 
         stamp(g,"S L O W",504,231,60,15,10.7f,ink,true);
         stamp(g,"F A S T",678,231,62,15,10.7f,ink,true);
         recoveryMarks(g,617,217,ink);
-        selectKnob(g,617,217,27,.45f);
+        selectKnob(g,617,217,27,recPosition);
         stamp(g,"R E C O V E R Y",542,274,148,17,11.7f,ink,true);
 
         meterRS124(g,744,66);
@@ -405,7 +418,7 @@ private:
         stamp(g,"A T T E N U A T O R  (dB)",1004,48,255,17,11.7f,ink,true);
         const std::array<juce::String,11> out={"-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"};
         dialScale(g,1119,169,46,out,ink,12.f);
-        pointerKnob(g,1119,169,45,.67f);
+        pointerKnob(g,1119,169,45,outPosition);
         pilot(g,1262,101);
         stamp(g,"FUSE",1376,56,91,17,13,ink,true);
         fuse(g,1421,101,false);
@@ -426,7 +439,7 @@ private:
         const std::array<juce::String,11> ints={"0","1","2","3","4","5","6","7","8","9","10"};
         dialScale(g,234,181,49,ints,cream,12.6f);
         // Vintage Altec black fluted skirt, bright chickenhead pointer.
-        pointerKnob(g,234,181,49,.42f);
+        pointerKnob(g,234,181,49,inPosition);
 
         // Replaces original brand name in its correct left-middle location.
         stamp(g,"A-436B",390,105,258,53,42,cream,true);
