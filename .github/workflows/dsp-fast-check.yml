@@ -36,4 +36,3 @@ jobs:
             harmonic_grid.csv
             timing_grid.csv
           if-no-files-found: error
-          if-no-files-found: error
