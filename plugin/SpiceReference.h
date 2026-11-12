@@ -101,6 +101,51 @@ inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
     result.inputDbu=inputDbu;
     return result;
 }
+template<std::size_t N>
+inline float detectorCvFromOutput(const std::array<Point,N>& a,float outputDbu) noexcept {
+    if(outputDbu<=a.front().outputDbu)
+        return std::max(0.f,a.front().cvMagnitude+
+                          .20f*(outputDbu-a.front().outputDbu));
+    for(std::size_t j=1;j<N;++j){
+        if(outputDbu<=a[j].outputDbu){
+            const float t=std::clamp((outputDbu-a[j-1].outputDbu)/
+                   std::max(.01f,a[j].outputDbu-a[j-1].outputDbu),0.f,1.f);
+            return a[j-1].cvMagnitude+
+                        t*(a[j].cvMagnitude-a[j-1].cvMagnitude);
+        }
+    }
+    const auto& end=a.back();
+    return std::clamp(end.cvMagnitude+
+                   2.0f*(outputDbu-end.outputDbu),0.f,39.f);
+}
+inline float feedbackCv(bool rs,float knob,float outputDbu) noexcept {
+    // Detector follows the 6CG7 plate outputs before the RS124 output pad.
+    // The pad-independent output measurement is mapped back to the SPICE
+    // detector response. At non-sinusoidal input this is a proxy.
+    const float from80=rs?detectorCvFromOutput(rs80,outputDbu):
+                            detectorCvFromOutput(altec80,outputDbu);
+    const float from100=rs?detectorCvFromOutput(rs100,outputDbu):
+                             detectorCvFromOutput(altec100,outputDbu);
+    const float t=std::clamp((knob-8.f)*.5f,0.f,1.f);
+    return from80+(from100-from80)*t;
+}
+inline float attenuationDb(bool rs,float cv) noexcept {
+    // Latest monotonic exponential 6BC8 gain-vs-control ngspice .AC results.
+    static constexpr float grids[10]={0,3,6,9,12,15,18,22,26,30};
+    static constexpr float altec[10]={0,4.9086f,9.2751f,13.3466f,
+          16.6711f,19.5014f,22.2703f,26.1775f,30.3779f,34.8054f};
+    static constexpr float rs124[10]={0,4.8322f,9.1913f,13.2219f,
+          16.4986f,19.3136f,22.0878f,26.0100f,30.2236f,34.6604f};
+    const auto* y=rs?rs124:altec;
+    cv=std::clamp(cv,0.f,39.f);
+    for(std::size_t i=1;i<10;++i)
+        if(cv<=grids[i]){
+            const float t=(cv-grids[i-1])/(grids[i]-grids[i-1]);
+            return y[i-1]+t*(y[i]-y[i-1]);
+        }
+    return y[9]+(cv-30.f)*1.1f;
+}
+
 inline float linearGainDb(bool rs,float inputKnob) noexcept {
     const float base=rs?34.24f:38.35f;
     return base+20.f*std::log10(std::max(.001f,inputKnob)/8.f);
