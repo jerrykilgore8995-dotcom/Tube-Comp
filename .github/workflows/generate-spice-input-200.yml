@@ -1,0 +1,50 @@
+name: Generate Source-Locked 200 Ohm Input SPICE Coefficients
+on:
+  push:
+    paths:
+      - ".github/workflows/generate-spice-input-200.yml"
+      - "scripts/generate_spice_input_grid_200.py"
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  create:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load actual 200-ohm Altec SPICE measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283042777
+          name: TubeComp-SPICE-200ohm-allinputs-A-436B
+          github-token: ${{ github.token }}
+          path: ref/altec
+      - name: Load actual 200-ohm RS124 SPICE measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283042777
+          name: TubeComp-SPICE-200ohm-allinputs-RS124
+          github-token: ${{ github.token }}
+          path: ref/rs124
+      - name: Generate all 66 loaded SPICE transfer and K2-K20 measurements
+        run: |
+          python3 scripts/generate_spice_input_grid_200.py \
+            ref/altec/input200.csv ref/rs124/input200.csv \
+            plugin/SpiceInputGrid200Measured.inc
+      - name: Preserve source-generated C++ measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-200ohm-66case-SPICE-input-coefficients
+          path: plugin/SpiceInputGrid200Measured.inc
+          if-no-files-found: error
+      - name: Commit verified 200ohm transfer coefficients
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugin/SpiceInputGrid200Measured.inc
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Source-lock 200ohm loaded 66-case 6BC8 and transformer curves"
+          git pull --rebase origin main
+          git push origin HEAD:main
