@@ -51,6 +51,11 @@ struct Parameters {
 struct Meter {
     float gainReduction=0.f, inputPeak=0.f, outputPeak=0.f;
 };
+// Probe points expose real computed audio samples to the offline test runner,
+// not invented stage spectra. Unit convention: normalized DSP amplitudes.
+struct StageProbe {
+    float input=0.f,muPlate=0.f,gainCell=0.f,outputPlate=0.f,grDb=0.f;
+};
 
 // Cheap highpass for coupling networks and DC removal. 1-pole digital HP,
 // corner corresponds approximately to 0.022uF / known grid leak values.
@@ -136,6 +141,7 @@ public:
         cv={0.f,0.f};
         detector={0.f,0.f};
         inLevel=outLevel=1.f;wetLevel=1.f;
+        lastProbe={};
         for(int c=0;c<2;++c){
             inputHP[(size_t)c].reset();
             couplingHP[(size_t)c].reset();
@@ -217,6 +223,7 @@ public:
             const float t2=cells[(size_t)c][1].outputAmp(
                  coupling,gr,params.balance,
                  params.rs124?params.outputOhms:600.f);
+            if(c==0)lastProbe={drive[c],t1,vca,t2,gr};
             const float filtered=outLP[(size_t)c].tick(t2)*outLevel;
             // Mix compensates preamp boost only at 100% wet; zero mix is
             // truly original input and unprocessed.
@@ -229,6 +236,7 @@ public:
         lastMeter.outputPeak=std::max(std::fabs(left),std::fabs(right));
     }
     Meter meters() const noexcept{return lastMeter;}
+    StageProbe stageProbe() const noexcept{return lastProbe;}
 private:
     float threshold() const noexcept {
         // These calibration targets refer to nominal +4dBu modeled as
@@ -239,6 +247,7 @@ private:
     float fs=44100.f;
     Parameters params;
     Meter lastMeter {};
+    StageProbe lastProbe {};
     std::array<float,2> detector{},cv{};
     float peakCoef=.1f,inputSmooth=.001f,outputSmooth=.001f,bypassSmooth=.001f;
     float inLevel=1.f,outLevel=1.f,wetLevel=1.f;
