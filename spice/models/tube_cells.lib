@@ -27,6 +27,20 @@ CGA G P 4p
 CPK P K 2.2p
 .ends V6CG7
 
+* Alternative independently published 6CG7 plate-curve candidate: GE 1963.
+* The GE Koren parameters (MU=21.86 EX=1.319 KG1=1248.5 KP=140.12
+* KVB=300) originate in GE-derived triode libraries. They are a
+* cross-check candidate, NOT a proof of the particular Altec factory tube.
+* Do not silently replace the RCA candidate until multiple anchor points
+* and the circuit operating-point measurements have been compared.
+.subckt V6CG7_GE P G K
+BPL P K I={pow(uramp((V(P,K)/140.12)*ln(1+exp(140.12*(1/21.86+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.319)/1248.5}
+Rleak P K 1000Meg
+CGK G K 2.9p
+CGA G P 4.7p
+CPK P K 2.7p
+.ends V6CG7_GE
+
 * 6AL5 diode remains a provisional forward characteristic.
 * Diode's 3.2-3.6pF element capacitance comes from Sylvania 6AL5 sheet.
 * Equivalent Is/N/Rs NOT a calibrated plate-current curve.
