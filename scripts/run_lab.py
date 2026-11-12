@@ -151,13 +151,42 @@ def op_nodes(text):
 
 
 def analyze_ac(file):
-    # Complex wrdata layout can depend on version. Keep raw ac.txt as authoritative.
-    try:
-        rows=parse_wrdata(file,2)
-        return {"f_start_hz":float(rows[0,0]),"f_stop_hz":float(rows[-1,0]),
-                "max_raw_ac_value":float(np.max(np.abs(rows[:,1])))}
-    except Exception as e:
-        return {"warning":f"AC format requires manual inspection: {e}"}
+    """Actual AC response: complex transfer, unwrapped phase and group delay.
+
+    The baseline AC analysis linearizes at quiescent bias, NOT at sustained
+    20 dB gain reduction. Under-GR AC is a separate required later test.
+    """
+    rows=parse_wrdata(file,2)
+    frequency=rows[:,0]
+    valid=(frequency>0)&np.isfinite(frequency)
+    frequency=frequency[valid]
+    z=rows[valid,1]+1j*rows[valid,2]
+    magnitude_db=20*np.log10(np.maximum(np.abs(z),1e-30))
+    phase=np.unwrap(np.angle(z))
+    group_delay_s=-np.gradient(phase,2*np.pi*frequency)
+    index=int(np.argmin(np.abs(frequency-1000)))
+    relative=magnitude_db-magnitude_db[index]
+    fields=["frequency_hz","magnitude_dB","relative_to_1k_dB",
+            "phase_deg_unwrapped","group_delay_ms"]
+    with (Path(file).parent/"frequency_phase.csv").open("w",newline="") as f:
+        writer=csv.writer(f);writer.writerow(fields)
+        writer.writerows(zip(frequency,magnitude_db,relative,
+                             np.degrees(phase),group_delay_s*1000))
+    def at(freq):
+        idx=int(np.argmin(abs(frequency-freq)))
+        return dict(frequency_hz=round(float(frequency[idx]),2),
+                    relative_gain_dB=round(float(relative[idx]),4),
+                    phase_deg=round(float(np.degrees(phase[idx])),4),
+                    group_delay_ms=round(float(group_delay_s[idx]*1000),6))
+    return {
+        "state":"LINEARIZED_IDLE_AC",
+        "frequency_response_points":int(len(frequency)),
+        "midband_gain_dB":float(magnitude_db[index]),
+        "max_relative_gain_dB":float(np.max(relative)),
+        "min_relative_gain_dB":float(np.min(relative)),
+        "frequencies":{str(f):at(f) for f in
+                         [20,30,50,100,500,1000,5000,10000,15000,20000]}
+    }
 
 
 def simulate(case,root):
@@ -185,6 +214,13 @@ def simulate(case,root):
         h["input_to_output_gain_dB"]=float(h["fundamental_output_dBu"]-in_dbu)
         h["control_voltage_end_V"]=float(table[-1,3])
         h["control_voltage_min_V"]=float(np.min(table[:,3]))
+        # Approximate late-time DC component at every tube electrode under GR.
+        # Fourier DC average in last 10% of run is NOT a formal .op at compression.
+        final=table[-max(25,len(table)//10):]
+        h["operating_level_nodes_V"]={
+            field:float(np.mean(final[:,idx+1]))
+            for idx,field in enumerate(OUTFIELDS[2:],start=2)
+        }
         h["op_nodes"]=op_nodes(log)
         h["ac"]=analyze_ac(wd/"ac.txt")
         h["status"]="OK";h["provenance"]="NGSPICE_EXPLORATORY"
