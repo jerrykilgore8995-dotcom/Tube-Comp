@@ -1,7 +1,7 @@
 name: TubeComp Forced-CV High Drive THD Test
 on:
   push:
-    paths: [".github/workflows/high-drive-THD-audit.yml"]
+    paths: [".github/workflows/high-drive-THD-audit.yml", "scripts/forced_cv_high_drive.py", "spice/provisional/436b_exploratory.cir", "spice/models/tube_cells.lib"]
   workflow_dispatch:
 permissions:
   contents: read
