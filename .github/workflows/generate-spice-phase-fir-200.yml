@@ -1,0 +1,45 @@
+name: Generate source-locked 200 Ohm SPICE Phase FIR
+on:
+  push:
+    paths:
+      - ".github/workflows/generate-spice-phase-fir-200.yml"
+      - "scripts/generate_spice_phase_fir200.py"
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve measured 200ohm complex SPICE
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283226539
+          name: TubeComp-SPICE-200ohm-frequency-phase
+          github-token: ${{ github.token }}
+          path: reference/200ohm
+      - name: Install numpy BLAS tools
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-numpy
+      - name: Generate checked 33tap 16-sample-PDC 200ohm complex FIR
+        run: |
+          python3 scripts/generate_spice_phase_fir200.py \
+            reference/200ohm/frequency_phase_all_points.csv \
+            plugin/SpicePhaseFIR200Measured.inc
+      - name: Preserve SPICE-FIR source measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-200ohm-source-locked-33tap-phase-FIR
+          path: plugin/SpicePhaseFIR200Measured.inc
+          if-no-files-found: error
+      - name: Commit generated 200ohm phase coefficients
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugin/SpicePhaseFIR200Measured.inc
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Source-lock real 200ohm transformer FR and phase FIR"
+          git pull --rebase origin main
+          git push origin HEAD:main
