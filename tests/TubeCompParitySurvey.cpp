@@ -20,11 +20,12 @@ struct Result {
  double outputDbu=0,thd=0,phaseDeg=0,grDb=0,cvV=0;
  std::array<double,21> dBc{};
 };
-Result measure(bool rs,int knob,int inputDb) {
+Result measure(bool rs,int knob,int inputDb,bool load200=false) {
  tubecomp::Engine engine;
  tubecomp::Parameters p;
  p.rs124=rs;p.input=float(knob)*.1f;
  p.output=0.f;p.attack=0;p.recovery=10;p.stereoLink=1.f;p.wet=1.f;
+ p.outputOhms=load200?200.f:600.f;
  engine.prepare(float(SR),256);
  engine.setParameters(p,true);
  // 0dBFS PEAK is +22dBu, +4dBu corresponds -18dBFS peak.
@@ -79,10 +80,18 @@ Result measure(bool rs,int knob,int inputDb) {
  return out;
 }
 int main(int argc,char** argv) {
- const bool fullInputGrid=argc==3 && std::string(argv[2])=="--input-grid";
- if(argc<2 || argc>3 || (argc==3&&!fullInputGrid)){
-    std::cerr<<"Use: TubeCompParitySurvey output.csv [--input-grid]\n";
-    return 2;
+ bool fullInputGrid=false,load200=false;
+ for(int i=2;i<argc;++i){
+    const std::string arg=argv[i];
+    if(arg=="--input-grid")fullInputGrid=true;
+    else if(arg=="--load-200")load200=true;
+    else {
+      std::cerr<<"Unrecognized survey setting "<<arg<<"\n";return 2;
+    }
+ }
+ if(argc<2 || argc>4){
+    std::cerr<<"Use: TubeCompParitySurvey output.csv "
+               "[--input-grid] [--load-200]\n";return 2;
  }
  std::ofstream out(argv[1]);
  if(!out){std::cerr<<"Cannot create "<<argv[1]<<"\n";return 2;}
@@ -100,7 +109,7 @@ int main(int argc,char** argv) {
  for(bool rs:{false,true})
   for(int knob:knobs)
    for(int inputDb:drive) {
-    const auto p=measure(rs,knob,inputDb);
+    const auto p=measure(rs,knob,inputDb,load200);
     out<<(rs?"RS124":"A-436B")<<","<<knob<<","<<inputDb<<","
        <<p.outputDbu<<","<<p.thd<<","<<p.cvV<<","
        <<p.phaseDeg<<","<<p.grDb;
