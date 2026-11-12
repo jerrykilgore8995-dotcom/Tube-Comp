@@ -1,0 +1,14 @@
+6BC8 dual-triode standalone DC bias sweep - provisional device model
+.include "models/tube_cells.lib"
+.param GRID=-2.0
+VHT bplus 0 275
+RPL bplus plate 47k
+VG grid 0 {GRID}
+XU plate grid cath V6BC8
+RK cath 0 100
+.control
+op
+print v(plate) v(cath) v(grid) i(vht)
+quit
+.endc
+.end
