@@ -40,7 +40,7 @@ quit
     if p.returncode!=0 or not (wd/"input_load.txt").exists():
         raise RuntimeError("ngspice AC failed "+log[-1500:])
     table=parse_wrdata(wd/"input_load.txt",4)
-    v=table[int(np.argmin(np.abs(table[:,0]-1000)))]]
+    v=table[int(np.argmin(np.abs(table[:,0]-1000)))]
     zin=complex(v[1],v[2])
     gain=complex(v[3],v[4])
     return dict(mode=mode,knob_fraction=knob,source_ohms=source_ohms,
