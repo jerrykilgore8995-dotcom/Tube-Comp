@@ -2,7 +2,7 @@
 """Measure gain reduction and K2-K20 THD from actual ngspice audio-path runs.
 
 The paired "detector disabled" case keeps the exact same signal path and input
-level, but sets SCGAIN=0, removing the 6AL5 drive.  The level difference
+level, but disconnects the 6AL5 diode branches, preserving feedback-network AC loading.  The level difference
 estimates closed-loop reduction at the fundamental.  These are provisional
 model results, not verified Altec or Chandler hardware data.
 """
@@ -21,8 +21,9 @@ def measure(case, workdir, disable_feedback=False):
     deck=prepare(case,workdir)
     if disable_feedback:
         source=deck.read_text()
-        modified,n=re.subn(r"SCGAIN=[^\s]+","SCGAIN=0",source,count=1)
-        if n!=1:raise RuntimeError("Failed to disable feedback detector")
+        modified,n=re.subn(r"^(DDET[12]\\s+.*)$",r"* \\1",source,
+                           count=2,flags=re.MULTILINE)
+        if n!=2:raise RuntimeError("Failed to isolate both 6AL5 detector diodes")
         deck.write_text(modified)
     proc=subprocess.run(["ngspice","-b",deck.name],cwd=workdir,
                         capture_output=True,text=True,timeout=120)
