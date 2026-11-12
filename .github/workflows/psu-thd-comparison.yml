@@ -1,0 +1,29 @@
+name: TubeComp PSU Sag vs THD at 25-30 dB GR
+on:
+  push:
+    paths:
+      - ".github/workflows/psu-thd-comparison.yml"
+      - "scripts/psu_thd_compare.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare-supply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual ngspice solver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Compare 272V and sagging supply at +7dBu
+        run: python3 scripts/psu_thd_compare.py
+      - name: Upload THD and B+ bias comparisons
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-fixed-vs-sagging-Bplus-THD
+          path: |
+            output/psu_thd_compare/psu_thd_vs_gr.csv
+            output/psu_thd_compare/psu_thd_vs_gr.json
+          if-no-files-found: error
