@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include "SpiceReference.h"
+#include "SpicePhaseFIRMeasured.inc"
 
 namespace tubecomp {
 constexpr float pi=3.14159265358979323846f;
@@ -76,20 +77,44 @@ public:
 private:
     float a=.9f,y=0.f;
 };
-class FractionalAllpass {
+// Causal measured-response FIR. Real coefficients are source-generated from
+// SPICE .AC complex response, not invented phase shifts. The FIR replaces
+// both the previously approximate fractional allpass and the output LP.
+class SpicePhaseFilter {
 public:
-    void prepare(float sampleFraction) noexcept {
-        a=clamp((1.f-sampleFraction)/(1.f+sampleFraction),0.f,.99f);
-        reset();
+    void reset() noexcept {hist.fill(0.f);pos=0;}
+    void configure(bool rs,float cv) noexcept {
+        const auto& bank=rs?phasefit::rs:phasefit::altec;
+        const auto& voltages=phasefit::cv;
+        cv=clamp(cv,0.f,17.f);
+        size_t hi=1;
+        while(hi<4&&cv>voltages[hi])++hi;
+        const size_t lo=hi-1;
+        const float t=(cv-voltages[lo])/(voltages[hi]-voltages[lo]);
+        for(int k=0;k<phasefit::kLen;++k)
+            taps[static_cast<size_t>(k)]=
+               bank[lo][static_cast<size_t>(k)]+t*
+               (bank[hi][static_cast<size_t>(k)]-
+                bank[lo][static_cast<size_t>(k)]);
     }
     float tick(float x) noexcept {
-        const float y=a*x+x1-a*y1;
-        x1=x;y1=y;
-        return y;
+        hist[static_cast<size_t>(pos)]=x;
+        float y=0.f;
+        int index=pos;
+        for(int k=0;k<phasefit::kLen;++k){
+            y+=taps[static_cast<size_t>(k)]*
+               hist[static_cast<size_t>(index)];
+            if(--index<0)index=phasefit::kLen-1;
+        }
+        if(++pos==phasefit::kLen)pos=0;
+        return std::fabs(y)<1.e-24f?0.f:y;
     }
-    void reset() noexcept {x1=y1=0.f;}
-private:float a=.5f,x1=0.f,y1=0.f;
+private:
+    std::array<float,phasefit::kLen> taps{};
+    std::array<float,phasefit::kLen> hist{};
+    int pos=0;
 };
+
 // Chebyshev waveshaper for the K2..K11 harmonic-bin targets. Coefficients
 // interpolate with input operating point, rather than a static K3 preset.
 // Chebyshev of a normalized sine yields pure higher-order partials.
@@ -122,8 +147,8 @@ public:
         for(int c=0;c<2;++c){
             hpf[c][0].prepare(9.7f,fs);
             hpf[c][1].prepare(9.7f,fs);
-            hf[c].prepare(std::min(.46f*fs,20000.f),fs);
-            phase[c].prepare(.335f*fs/44100.f);
+            phase[c].reset();
+            phase[c].configure(params.rs124,0.f);
         }
         reset();
         setParameters(params,true);
@@ -138,7 +163,7 @@ public:
         wetLevel=1.f;outputLevel=1.f;
         for(int c=0;c<2;++c){
             for(auto& filter:hpf[c])filter.reset();
-            hf[c].reset();phase[c].reset();
+            phase[c].reset();
         }
     }
     void setParameters(Parameters p,bool immediate=false) noexcept {
@@ -249,9 +274,7 @@ public:
                     ratio*=1.f+.18f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
                 }
-                const float f=std::max(10000.f,25000.f-300.f*cv[c]);
-                hf[c].setCoefficient(1.f-std::exp(-2.f*pi*
-                                     std::min(f,.49f*fs)/fs));
+                phase[c].configure(params.rs124,cv[c]);
             }
             gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
             // Signal remains bipolar and is never rectified into the audio.
@@ -266,8 +289,7 @@ public:
             // Plate polarity inversion is deliberate: phase should match
             // the negative push-pull polarity in the ngspice output.
             const float afterHP=hpf[c][1].tick(nonlinear);
-            const float afterPhase=-phase[c].tick(afterHP);
-            const float beforeOutputPad=hf[c].tick(afterPhase);
+            const float beforeOutputPad=-phase[c].tick(afterHP);
             outputEnv[c]+=outputEnvAlpha*
                  (std::fabs(beforeOutputPad)-outputEnv[c]);
             feedbackAudio[c]=beforeOutputPad;
@@ -310,7 +332,6 @@ private:
     std::array<spice::Point,2> harmonicTargets{};
     std::array<std::array<float,19>,2> harmonicLinear{};
     std::array<std::array<HighPass,2>,2> hpf;
-    std::array<LowPass,2> hf;
-    std::array<FractionalAllpass,2> phase;
+    std::array<SpicePhaseFilter,2> phase;
 };
 } // namespace tubecomp
