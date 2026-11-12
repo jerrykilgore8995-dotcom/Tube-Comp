@@ -24,7 +24,7 @@ for bplus in (272,290,310,330,372):
    file=prepare(case,d)
    s=file.read_text()
    s=s.replace("BPLUS=372",f"BPLUS={bplus}")
-   s=s.replace("R6CG7_DROP=20000",f"R6CG7_DROP={drop}")
+   s=s.replace("R6CG7_DROP=11000",f"R6CG7_DROP={drop}")
    s=s.replace("BIAS=-0.8",f"BIAS={bias}")
    a=s.index("\n.control\n")
    b=s.index("\n.endc",a)
