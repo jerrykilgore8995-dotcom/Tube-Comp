@@ -157,7 +157,7 @@ public:
         targetWet=p.bypass?0.f:p.wet;
         attack63=p.rs124?rsAttackMs[(size_t)p.attack]:50.f;
         release63=p.rs124?rsReleaseMs[(size_t)(recoveryNumber(p.recovery)-1)]:1000.f;
-        attackAlpha=coefficient(attack63,fs);
+        attackAlpha=coefficient(attack63*(p.rs124&&p.superfuse?.75f:1.f),fs);
         releaseAlpha=coefficient(release63,fs);
         if(immediate) {
             inLevel=targetInput;outLevel=targetOutput;wetLevel=targetWet;
@@ -191,7 +191,8 @@ public:
                   (over < -knee*.5f ? 0.f:(over+knee*.5f)*inKnee*.5f);
             const float compression=clamp(softOver/34.f,0.f,1.f);
             const float ratio=3.0f+3.5f*compression+
-                              (params.rs124?.3f:0.f);
+                              (params.rs124?.3f:0.f)+
+                              (params.rs124&&params.superfuse?1.5f:0.f);
             targetGR[c]=clamp(softOver*(1.f-1.f/ratio),0.f,
                               params.superfuse&&params.rs124?34.f:30.f);
         }
@@ -233,7 +234,7 @@ private:
         // These calibration targets refer to nominal +4dBu modeled as
         // -18dBFS in a 24-bit DAW, not absolute hardware dBu.
         // Substitution of measured Altec and RS124 values remains pending.
-        return params.rs124?-28.f:-25.5f;
+        return params.rs124?(params.superfuse?-31.f:-28.f):-25.5f;
     }
     float fs=44100.f;
     Parameters params;
