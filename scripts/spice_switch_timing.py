@@ -39,11 +39,17 @@ def simulate(mode,attack,recovery,hold):
     if old not in s:raise RuntimeError("Missing SPICE stimulus")
     s=s.replace(old,new)
     rec_ms=[180,330,680,1000,1800,3300][recovery] if mode=="RS124" else 1000
-    duration=max(3.5,OFF+4.*rec_ms/1000.)
-    if hold:duration=3.5
+    # A 100µs max step resolves 1kHz with 10 pts/cycle, while reducing
+    # the long 6AL5 simulation burden. Store a higher-resolution control
+    # run separately before claiming physical-frequency convergence.
+    duration=max(2.2,OFF+2.6*rec_ms/1000.)
+    if hold:duration=2.2
+    if FAMILY=="attack":duration=2.2
     s,n=re.subn(r"tran [^\n]+(?=\nwrdata tran.txt)",
-               f"tran 30u {duration:.6f} 0 30u",s,count=1)
+               f"tran 100u {duration:.6f} 0 100u",s,count=1)
     if n!=1:raise RuntimeError("Missing SPICE transient")
+    s=s.replace(".option reltol=1e-4 abstol=1e-11 method=gear",
+                ".option reltol=4e-4 abstol=1e-10 method=gear")
     deck.write_text(s)
     try:
         p=subprocess.run(["ngspice","-b",deck.name],cwd=wd,
@@ -86,13 +92,21 @@ if FAMILY=="attack":
 elif FAMILY=="recovery":
     cases.extend(("RS124",4,r,False) for r in range(6))
 elif FAMILY=="hold":
-    cases.extend(("RS124",4,r,True) for r in range(5))
+    # HOLD disables recovery R9 irrespective of the rotary recovery index;
+    # this is ONE identical circuit for all five HOLD positions.
+    cases.append(("RS124",4,2,True))
 out=[]
 for m,a,r,h in cases:
     row=simulate(m,a,r,h)
-    out.append(row)
+    if FAMILY=="hold" and row["status"]=="OK":
+        # All five HOLD positions select exactly the same 1e12-ohm R9.
+        # Replicate one measured physical circuit, not unmeasured variations.
+        for i in range(5):
+            out.append({**row,"recovery":i})
+    else:
+        out.append(row)
     print("SPICE_SWITCH_TIMING",row,flush=True)
-if len(out)!=len(cases) or any(r["status"]!="OK" for r in out):
+if len(out)!=(5 if FAMILY=="hold" else len(cases)) or any(r["status"]!="OK" for r in out):
     raise RuntimeError("One or more SPICE switch-timing cases failed")
 with (ROOT/"timing.csv").open("w",newline="") as fp:
     w=csv.DictWriter(fp,fieldnames=list(out[0]))
