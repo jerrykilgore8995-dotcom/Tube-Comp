@@ -21,9 +21,10 @@ for model in ("REMOTE","REMOTE_EXP"):
              hold=False,input_knob=.8)
    f=prepare(case,wd)
    s=f.read_text()
-   if model=="REMOTE_EXP":
-    s,n=re.subn(r"\bk1 V6BC8_REMOTE(?=\n)", "k1 V6BC8_REMOTE_EXP",s)
-    assert n==2
+   actual="V6BC8_REMOTE" if model=="REMOTE" else "V6BC8_REMOTE_EXP"
+   s,n=re.subn(r"\bk1 V6BC8(?:_REMOTE(?:_EXP)?)?(?=\n)",
+               lambda match:"k1 "+actual,s)
+   assert n==2
    lines=s.splitlines()
    for prefix in ("R12 detector cv ","C4 cv 0 ","R9 cv 0 "):
     idx=[i for i,v in enumerate(lines) if v.startswith(prefix)]
