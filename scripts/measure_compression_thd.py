@@ -54,8 +54,10 @@ def main():
     root=Path(args.output)
     root.mkdir(parents=True,exist_ok=True)
     results=[]
+    # +6 and +12 dBu sweeps need a separate high-drive study; the
+    # uncalibrated tube model becomes numerically stiff above 0 dBu.
     for mode in ("A-436B","RS124"):
-        for level in (-36,-24,-18,-12,-6,0,6):
+        for level in (-36,-24,-18,-12,-6,0):
             case=dict(mode=mode,hz=1000,dbu=level,attack=0,recovery=0,
                       hold=False,input_knob=.8)
             prefix=f"{mode.replace('-','')}_L{str(level).replace('-','m')}"
