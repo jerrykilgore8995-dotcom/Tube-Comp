@@ -1,0 +1,29 @@
+name: TubeComp PSU Idle and Compressed Voltage Fit
+on:
+  push:
+    paths:
+      - ".github/workflows/supply-regulation-audit.yml"
+      - "scripts/supply_regulation_audit.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  supply-fit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Audit B+ 272V idle to 290V compressed operating points
+        run: python3 scripts/supply_regulation_audit.py
+      - name: Archive source-sag fit candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-unregulated-supply-bias-curve
+          path: |
+            output/supply_regulation/all_thevenin_supply_points.csv
+            output/supply_regulation/best_supply_points.json
+          if-no-files-found: error
