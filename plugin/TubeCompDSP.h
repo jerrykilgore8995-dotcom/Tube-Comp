@@ -95,22 +95,16 @@ private:float a=.5f,x1=0.f,y1=0.f;
 // Chebyshev of a normalized sine yields pure higher-order partials.
 // This is NOT equivalent to independently verified 6CG7 plate equations.
 // All nonlinear spectral targets must be assessed on the render at 44.1k.
-inline float harmonics(float x,float peak,const spice::Point& target,
-                       float balance,bool rs) noexcept {
+inline float harmonics(float x,float peak,
+                       const std::array<float,19>& gains) noexcept {
     peak=std::max(peak,1.e-8f);
     const float z=clamp(x/peak,-1.f,1.f);
     float prev=1.f,cur=z;
     float residue=0.f;
-    for(int k=2;k<=11;++k){
+    for(int k=2;k<=20;++k){
         const float next=2.f*z*cur-prev;
         prev=cur;cur=next;
-        float ratio=std::exp2(target.harmonicDb[static_cast<size_t>(k-2)]/
-                              6.020599913f);
-        if((k%2)==0)
-            ratio*=clamp(1.f+balance*(rs?1.3f:1.1f),.05f,3.5f);
-        // The original 6BC8 is differential and its balanced K2 is small.
-        // The centered stage therefore preserves the measured K2 target.
-        residue+=ratio*next;
+        residue+=gains[static_cast<size_t>(k-2)]*next;
     }
     return x+peak*residue;
 }
@@ -234,6 +228,15 @@ public:
                                  dynamicCorrection+padCorrection;
                 desiredGain[c]=clamp(desiredGainDb[c],-65.f,65.f);
                 harmonicTargets[c]=target;
+                for(int k=2;k<=20;++k){
+                    float ratio=std::exp2(target.harmonicDb[
+                                       static_cast<size_t>(k-2)]/
+                                          6.020599913f);
+                    if((k%2)==0)
+                        ratio*=clamp(1.f+params.balance*
+                            (params.rs124?1.3f:1.1f),.05f,3.5f);
+                    harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
+                }
                 const float f=std::max(10000.f,25000.f-300.f*cv[c]);
                 hf[c].setCoefficient(1.f-std::exp(-2.f*pi*
                                      std::min(f,.49f*fs)/fs));
@@ -243,8 +246,7 @@ public:
             const float beforePad=inAfterHp[c]*db2lin(gainDb[c]);
             shaped[c]=beforePad;
             const float drivePeak=inPeak[c]*db2lin(gainDb[c]);
-            const float nonlinear=harmonics(beforePad,drivePeak,
-                              harmonicTargets[c],params.balance,params.rs124);
+            const float nonlinear=harmonics(beforePad,drivePeak,harmonicLinear[c]);
             // Plate polarity inversion is deliberate: phase should match
             // the negative push-pull polarity in the ngspice output.
             const float afterHP=hpf[c][1].tick(nonlinear);
@@ -284,6 +286,7 @@ private:
     std::array<float,2> inputEnv{},outputEnv{},feedbackAudio{},cv{},heldAim{};
     std::array<float,2> gainDb{},desiredGain{},sourceDbu{};
     std::array<spice::Point,2> harmonicTargets{};
+    std::array<std::array<float,19>,2> harmonicLinear{};
     std::array<std::array<HighPass,2>,2> hpf;
     std::array<LowPass,2> hf;
     std::array<FractionalAllpass,2> phase;
