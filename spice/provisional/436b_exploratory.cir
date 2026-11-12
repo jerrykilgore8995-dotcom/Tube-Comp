@@ -41,15 +41,18 @@ R7 k2 0 220
 * upstream voltage. DO NOT treat this 15k variant as a factory BOM.
 R6CG7DROP bplus outputfeed {R6CG7_DROP}
 C6CG7FILTER outputfeed 0 47u
-* Output transformer 16402: idealized coupled inductor approximation.
-* PRIMARY DCR must be in hundreds of ohms, NOT 18k as in the old model.
-* 50H half-primaries / 12H secondary = about 10k:600 pp load ratio.
-* Core loss, leakage, saturation, winding capacitance are NOT calibrated.
-RWP1 outputfeed priA 200
-RWP2 outputfeed priB 200
-LPRI_A priA p2a 50
-LPRI_B p2b priB 50
-LSEC secOut 0 12
+* Peerless 16402 output transformer: spec-anchored LINEAR approximation.
+* Peerless original turns ratio 6.2:1; Sowter 1232 replacement 23kCT/600R,
+* ~80H total primary inductance and ~650R total primary winding resistance.
+* This is a COUPLED-WINDING electrical proxy, not a core-saturation model.
+* Reference: https://www.sowter.co.uk/specs/1232.php
+* 20H each half, ~2.08H secondary gives series primary ratio 6.20:1.
+* 325 ohm per half gives ~650 ohm total primary DC resistance.
+RWP1 outputfeed priA 325
+RWP2 outputfeed priB 325
+LPRI_A priA p2a 20
+LPRI_B p2b priB 20
+LSEC secOut 0 2.08
 KPP LPRI_A LPRI_B 0.995
 KPSA LPRI_A LSEC 0.995
 KPSB LPRI_B LSEC 0.995
