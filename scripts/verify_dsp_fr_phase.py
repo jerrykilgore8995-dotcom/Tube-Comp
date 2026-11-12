@@ -70,9 +70,10 @@ summary=dict(cases=len(rows),failure_count=len(failed),
   worst_phase_error_deg=max(x["phase_error_deg"] for x in rows),
   worst_group_delay_error_pct=max(x["error_pct"] for x in delays),
   failures=failed[:50])
-(dest/"fr_phase_summary.json").write_text(json.dumps(summary,indent=2))
+(dest/"fr_phase_summary.json").write_text(json.dumps(summary,indent=2,
+ default=lambda x:x.item() if hasattr(x,"item") else str(x)))
 print("FR_PHASE_SUMMARY",json.dumps({k:v for k,v in summary.items()
-                                       if k!="failures"}),flush=True)
+                                       if k!="failures"},default=lambda x:x.item() if hasattr(x,"item") else str(x)),flush=True)
 for x in failed[:25]:print("FR_PHASE_FAILURE",x,flush=True)
 if failed:raise SystemExit(1)
 print("PASS 8% frequency, complex-phase and group-delay comparisons")
