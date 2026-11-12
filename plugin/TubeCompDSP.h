@@ -1,6 +1,6 @@
 #pragma once
 // TUBE COMP realtime DSP — intentionally NOT a SPICE solver.
-// 6BC8 remote-cutoff approximation -> rectified 6AL5 feedback control ->
+// 6BC8 remote-cutoff approximation -> sampled output-feedback control ->
 // 6CG7 output amplifier approximation. Factory Altec and reconstructed RS124.
 // Coefficients and all nominal stage values are source-labelled and must be
 // calibrated against legitimate ngspice/hardware measurements before claiming
@@ -140,6 +140,7 @@ public:
     void reset() noexcept {
         cv={0.f,0.f};
         detector={0.f,0.f};
+        feedbackAudio={0.f,0.f};
         inLevel=outLevel=1.f;wetLevel=1.f;
         lastProbe={};
         for(int c=0;c<2;++c){
@@ -185,7 +186,10 @@ public:
         // Rectifier envelope is derived from the signal before GR.
         for(int c=0;c<2;++c) {
             drive[c]=inputHP[(size_t)c].tick(source[c]);
-            const float value=std::fabs(drive[c]);
+            // 436B-type FEEDBACK sidechain: sample the preceding output stage,
+            // BEFORE output pad, instead of the incoming uncompressed signal.
+            // The 1-sample feedback path keeps processing causal and allocation-free.
+            const float value=std::fabs(feedbackAudio[(size_t)c]);
             detector[(size_t)c]+=peakCoef*(value-detector[(size_t)c]);
             const float measured=std::max(1.e-8f,detector[(size_t)c]);
             // Variable-mu soft knee. Fixed internal threshold; INPUT varies
@@ -199,7 +203,9 @@ public:
             const float ratio=3.0f+3.5f*compression+
                               (params.rs124?.3f:0.f)+
                               (params.rs124&&params.superfuse?1.5f:0.f);
-            targetGR[c]=clamp(softOver*(1.f-1.f/ratio),0.f,
+            // In a negative-feedback loop G=(ratio-1)*output_error;
+            // equilibrium gives the desired effective compression slope 1/ratio.
+            targetGR[c]=clamp(softOver*(ratio-1.f),0.f,
                               params.superfuse&&params.rs124?34.f:30.f);
         }
         const float joint=std::max(targetGR[0],targetGR[1]);
@@ -229,7 +235,9 @@ public:
                  coupling*internalOutputSwing,gr,params.balance,
                  params.rs124?params.outputOhms:600.f)/internalOutputSwing;
             if(c==0)lastProbe={drive[c],t1,vca,t2,gr};
-            const float filtered=outLP[(size_t)c].tick(t2)*outLevel;
+            const float beforeOutputPad=outLP[(size_t)c].tick(t2);
+            feedbackAudio[(size_t)c]=beforeOutputPad;
+            const float filtered=beforeOutputPad*outLevel;
             // Mix compensates preamp boost only at 100% wet; zero mix is
             // truly original input and unprocessed.
             wet[c]=dry[c]+wetLevel*(filtered-dry[c]);
@@ -253,7 +261,7 @@ private:
     Parameters params;
     Meter lastMeter {};
     StageProbe lastProbe {};
-    std::array<float,2> detector{},cv{};
+    std::array<float,2> detector{},cv{},feedbackAudio{};
     float peakCoef=.1f,inputSmooth=.001f,outputSmooth=.001f,bypassSmooth=.001f;
     float inLevel=1.f,outLevel=1.f,wetLevel=1.f;
     float targetInput=1.f,targetOutput=1.f,targetWet=1.f;
