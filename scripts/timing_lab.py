@@ -25,7 +25,11 @@ def make_deck(case,place):
     for k,v in d.items():
         source=re.sub(r"(?<![A-Za-z0-9_])"+re.escape(k)+r"=[^\s]+",
                       f"{k}={v}",source,count=1)
-    source=source.replace("tran 20u 0.20 0 20u","tran 20u 1.30 0 20u")
+    # Long release positions require multiple RC time constants to measure
+    # 63% and 90% recovery, not just the initial 850ms of a short trace.
+    duration=2.1 if case["hold"] else max(2.0,.45+2.8*d["REC_R"]*1e-6)
+    source=source.replace("tran 20u 0.20 0 20u",
+                          f"tran 50u {duration:.6f} 0 50u")
     (place/"case.cir").write_text(source)
     return source
 
@@ -57,11 +61,11 @@ def one(case,root):
     t10=crossing(t,cv,baseline+.1*size,t_start)
     t63=crossing(t,cv,baseline+.632*size,t_start)
     t90=crossing(t,cv,baseline+.9*size,t_start)
-    release_start=float(np.median(cv[(t>.454)&(t<.48)]))
+    release_start=float(np.median(cv[(t>.450)&(t<.457)]))
     release_size=release_start-baseline
     r63=crossing(t,cv,baseline+.368*release_size,t_off,above=False)
     r90=crossing(t,cv,baseline+.1*release_size,t_off,above=False)
-    final=float(np.median(cv[t>1.1]))
+    final=float(np.median(cv[t>t[-1]-.2]))
     return {**result,"status":"OK","CV_baseline_V":baseline,
             "CV_plateau_V":plateau,"CV_end_V":final,
             "attack_10_ms":(t10-t_start)*1000,
