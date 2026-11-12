@@ -1,0 +1,25 @@
+name: 6CG7 Output Stage Closed-Loop THD Comparison
+on:
+  push:
+    paths: [".github/workflows/6cg7-audio-comparison.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Compare RCA and GE 6CG7 valve models
+        run: python3 scripts/compare_6cg7_audio.py
+      - name: Archive harmonic and compression comparisons
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-6CG7-RCA-GE-output-comparison
+          path: output/6cg7_audio_comparison/comparison.csv
+          if-no-files-found: error
