@@ -49,11 +49,17 @@ RP1B_LOWER gb tsL {max(1,(1-GAIN)*50000)}
 * this node. Do not confuse the nominal grid idle bias with the dynamic
 * negative control voltage applied by 6AL5.
 VGRIDOFFSET gridcentre cv {BIAS}
+* 6BC8 now uses the SPICE A/B-tested semiremote cutoff candidate.
+* Compare against original single-Koren curve via V6BC8 in models/tube_cells.lib.
+* At forced CV=-30V with BPLUS=290V, compressed plates now ~283.98V
+* (factory 436C indication ~285V), versus 289.97V with old Koren.
+* At -6dBu closed loop the A/B test reports GR=19.90dB, THD=0.498%
+* versus 17.73dB and 0.839% using original curve. NOT hardware proof.
 * Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
 R3 platefeed pa 47k
 R4 platefeed pb 47k
-XU1A pa ga k1 V6BC8
-XU1B pb gb k1 V6BC8
+XU1A pa ga k1 V6BC8_REMOTE
+XU1B pb gb k1 V6BC8_REMOTE
 R8 k1 0 34
 * Coupling to push-pull 6CG7; R5 and R6 are historically 1M.
 C2 pa g2a 22n
