@@ -5,9 +5,16 @@ Altec 436B exploratory topology - NOT VERIFIED WIRING
 .include "models/tube_cells.lib"
 .param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
 .param ATTACK_R=47000 REC_R=1000000 OUTPAD=1 SCGAIN=0.22
-.param BPLUS=275 SRC_OHM=600
+.param BPLUS=372 SRC_OHM=600
 .option reltol=1e-4 abstol=1e-11 method=gear
+* User-specified power-supply variant: 372 V nominal before R13.
+* 150uF reservoir BEFORE 10k R13; 47uF decoupling AFTER R13.
+* This supply is a *candidate* pending matched idle/20-dB node measurements.
+* The ideal VHT source does not model rectifier impedance or mains ripple yet.
 VHT bplus 0 {BPLUS}
+CRES bplus 0 150u
+R13 bplus platefeed 10k
+CPLATE platefeed 0 47u
 VIN source 0 SIN(0 {AMP} {FREQ}) AC 1
 RSOURCE source in 600
 RBRIDGE in 0 15k
@@ -15,8 +22,8 @@ RBRIDGE in 0 15k
 BGA ga 0 V={BIAS+V(cv)+GAIN*V(in)}
 BGB gb 0 V={BIAS+V(cv)-GAIN*V(in)}
 * Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
-R3 bplus pa 47k
-R4 bplus pb 47k
+R3 platefeed pa 47k
+R4 platefeed pb 47k
 XU1A pa ga k1 V6BC8
 XU1B pb gb k1 V6BC8
 R8 k1 0 34
@@ -50,7 +57,7 @@ set wr_singlescale
 set wr_vecnames
 op
 echo OP_BEGIN
-print v(bplus) v(pa) v(pb) v(k1) v(g2a) v(g2b) v(p2a) v(p2b) v(k2) v(cv) v(out)
+print v(bplus) v(platefeed) v(pa) v(pb) v(k1) v(g2a) v(g2b) v(p2a) v(p2b) v(k2) v(cv) v(out)
 echo OP_END
 ac dec 16 20 20000
 wrdata ac.txt v(out)
