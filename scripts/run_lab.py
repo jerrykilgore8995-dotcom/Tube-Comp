@@ -189,7 +189,7 @@ def analyze_ac(file):
     }
 
 
-def simulate(case,root):
+def simulate(case,root,compact=False):
     tag=(f"{case['mode']}_F{case['hz']}_L{case['dbu']}_"
          f"A{case['attack']}_R{case['recovery']}_H{int(case['hold'])}_"
          f"I{int(100*case['input_knob'])}").replace("-","m")
@@ -237,6 +237,12 @@ def simulate(case,root):
         h["status"]="OK";h["provenance"]="NGSPICE_EXPLORATORY"
         h["model_sha256"]=sha256(LIB)
         h["deck_sha256"]=sha256(deck)
+        if compact:
+            # Preserve every computed harmonic, CV, operating point, AC/phase
+            # and error field in cases.json but avoid vast raw waveform archives.
+            for f in ("tran.txt","ac.txt","frequency_phase.csv"):
+                p=wd/f
+                if p.exists():p.unlink()
         return {**case,**h}
     except Exception as e:
         return {**case,"status":"ANALYSIS_FAILED","message":str(e)}
@@ -299,13 +305,15 @@ def main():
     grp.add_argument("--quick",action="store_true")
     grp.add_argument("--broad",action="store_true")
     parser.add_argument("--output",default="output")
+    parser.add_argument("--compact",action="store_true",
+        help="Delete bulky raw waveforms after analysis but retain full metrics")
     args=parser.parse_args()
     root=Path(args.output).resolve()
     cases=mk_cases(args.broad)
     results=[]
     print(f"Running {len(cases)} genuine ngspice circuit analysis cases",flush=True)
     for i,case in enumerate(cases,1):
-        result=simulate(case,root)
+        result=simulate(case,root,args.compact)
         results.append(result)
         print(f"{i:3}/{len(cases)} {case['mode']:7} {case['hz']:5}Hz "
               f"{case['dbu']:+4}dBu : {result['status']}",flush=True)
