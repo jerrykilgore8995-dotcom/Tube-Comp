@@ -20,6 +20,8 @@ public:
 
     TubeCompFaceplate() { setSize(1600, 350); }
     std::function<void(Mode)> onModeSelected;
+    std::function<void(bool)> onPowerSelected;
+    void setPowerOn(bool isOn) {powerOn=isOn;repaint();}
     void setControlPositions(float input,float output,float attack,float recovery) {
         inPosition=juce::jlimit(0.f,1.f,input);
         outPosition=juce::jlimit(0.f,1.f,output);
@@ -41,6 +43,17 @@ public:
 
     void mouseDown(const juce::MouseEvent& e) override
     {
+        // The painted physical power switch is an actual DAW bypass control.
+        const auto point=e.position;
+        const bool touchedPower=(mode==Mode::rs124)
+            ? (point.x>1360&&point.x<1451&&point.y>185&&point.y<263)
+            : (point.x>1180&&point.x<1263&&point.y>176&&point.y<251);
+        if(touchedPower) {
+            powerOn=!powerOn;
+            if(onPowerSelected)onPowerSelected(powerOn);
+            repaint();
+            return;
+        }
         if (e.position.y >= 313.0f) {
             if (e.position.x >= 1292.0f && e.position.x < 1440.0f) {
                 setMode(Mode::rs124);
@@ -57,6 +70,7 @@ private:
     static constexpr float pi = 3.14159265358979323846f;
     Mode mode = Mode::rs124;
     float meterDb = 8.0f;
+    bool powerOn=true;
     float inPosition=.50f,outPosition=1.f,attackPosition=.375f,recPosition=.60f;
 
     static C col(int r, int g, int b) {
@@ -151,7 +165,7 @@ private:
         stamp(g,green?"1/2 A":"FUSE",cx-17,cy-7,34,14,9.5f,
               green?col(231,230,219):col(226,225,220),true);
     }
-    static void powerToggle(juce::Graphics& g,float cx,float cy)
+    static void powerToggle(juce::Graphics& g,float cx,float cy,bool isOn)
     {
         g.setColour(col(24,26,26));g.fillEllipse(cx-20,cy-20,40,40);
         g.setGradientFill(juce::ColourGradient(col(209,213,212),cx-16,cy-17,
@@ -159,7 +173,7 @@ private:
         g.fillEllipse(cx-16,cy-16,32,32);
         g.setColour(col(24,26,27));g.fillEllipse(cx-9,cy-9,18,18);
         juce::Graphics::ScopedSaveState save(g);
-        g.addTransform(juce::AffineTransform::rotation(-.48f,cx,cy));
+        g.addTransform(juce::AffineTransform::rotation(isOn?-.48f:.48f,cx,cy));
         juce::Path arm;
         arm.addRoundedRectangle(cx-5.4f,cy-23.0f,11.0f,28.0f,3.5f);
         g.setGradientFill(juce::ColourGradient(col(30,31,31),cx-6,cy,
@@ -167,7 +181,7 @@ private:
         g.fillPath(arm);
         g.setColour(col(10,11,12));g.strokePath(arm,juce::PathStrokeType(1.2f));
     }
-    static void powerRotary(juce::Graphics& g,float cx,float cy)
+    static void powerRotary(juce::Graphics& g,float cx,float cy,bool isOn)
     {
         g.setColour(col(18,21,18));g.fillEllipse(cx-25,cy-25,50,50);
         g.setGradientFill(juce::ColourGradient(col(86,92,85),cx-20,cy-20,
@@ -182,6 +196,11 @@ private:
         g.setColour(col(23,24,22));
         juce::Path tab;
         tab.addRoundedRectangle(cx-6,cy-28,12,26,2);
+        if(!isOn) {
+            juce::Graphics::ScopedSaveState rotate(g);
+            g.addTransform(juce::AffineTransform::rotation(pi*.65f,cx,cy));
+            g.fillPath(tab);
+        }
         g.fillPath(tab);
         line(g,cx-2,cy-19,cx-2,cy-7,col(147,146,138),1.7f);
     }
@@ -287,7 +306,7 @@ private:
     static void recoveryMarks(juce::Graphics& g,float cx,float cy,C ink)
     {
         const std::array<juce::String,11> marks={
-            "1","H","2","H","3","H","4","H","5","H","6"};
+            "6","H","5","H","4","H","3","H","2","H","1"};
         for(int i=0;i<11;++i){
             float a=-2.38f+4.76f*i/10.f;
             float x=cx+std::sin(a)*57,y=cy-std::cos(a)*58;
@@ -424,7 +443,7 @@ private:
         fuse(g,1421,101,false);
         stamp(g,"OFF",1330,168,57,17,11,ink,true);
         stamp(g,"ON",1449,168,48,17,11,ink,true);
-        powerToggle(g,1406,225);
+        powerToggle(g,1406,225,powerOn);
         stamp(g,"C O M P R E S S O R",1453,192,118,17,10.1f,ink,true);
         stamp(g,"T Y P E   R S 1 2 4",1453,211,118,16,9.8f,ink,true);
         stamp(g,"T U B E   C O M P",1453,232,118,15,9.4f,ink,true);
@@ -454,7 +473,7 @@ private:
         stamp(g,"AMPLIFIER",965,138,181,22,14,cream,true);
         pilot(g,1218,111);
         stamp(g,"P O W E R",1170,154,102,20,13,cream,true);
-        powerRotary(g,1224,211);
+        powerRotary(g,1224,211,powerOn);
         stamp(g,"ON",1273,202,45,17,10.7f,cream);
         stamp(g,"OFF",1131,202,51,17,10.7f,cream);
         stamp(g,"FUSE",1377,76,103,21,13,cream,true);
