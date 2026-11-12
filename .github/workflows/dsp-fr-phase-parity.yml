@@ -1,0 +1,46 @@
+name: VST3 8 Percent Frequency Phase Group Delay Parity
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tests/TubeCompFRPhaseSurvey.cpp"
+      - "scripts/verify_dsp_fr_phase.py"
+      - ".github/workflows/dsp-fr-phase-parity.yml"
+      - "plugin/TubeCompDSP.h"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve independently measured SPICE CV-conditioned AC response
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43265955293
+          name: TubeComp-30Hz-20kHz-frequency-phase-acceptance
+          github-token: ${{ github.token }}
+          path: golden/fr
+      - name: Compile actual 44.1kHz native DSP phase survey
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompFRPhaseSurvey.cpp -o TubeCompFRPhaseSurvey
+      - name: Render 2 modes x 5 control biases x 17 frequencies
+        run: ./TubeCompFRPhaseSurvey dsp_fr_phase.csv
+      - name: Enforce independent 8 percent amplitude, phase and group-delay gate
+        run: |
+          python3 -m pip install numpy --break-system-packages -q
+          python3 scripts/verify_dsp_fr_phase.py \
+            golden/fr/frequency_phase_all_points.csv dsp_fr_phase.csv output/dsp_fr_phase
+      - name: Archive all measurements including any failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-DSP-vs-SPICE-frequency-phase-8pct
+          path: |
+            dsp_fr_phase.csv
+            output/dsp_fr_phase/
+          if-no-files-found: warn
