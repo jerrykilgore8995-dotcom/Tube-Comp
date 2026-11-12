@@ -24,7 +24,7 @@ def run_case(output,mode,knob,source_ohms):
 set wr_singlescale
 set wr_vecnames
 op
-ac lin 1 1000 1000
+ac lin 4 999 1002
 let zin = v(in)/(-i(VIN))
 let gridgain = v(ga,gb)/v(source)
 wrdata input_load.txt zin gridgain
@@ -40,7 +40,7 @@ quit
     if p.returncode!=0 or not (wd/"input_load.txt").exists():
         raise RuntimeError("ngspice AC failed "+log[-1500:])
     table=parse_wrdata(wd/"input_load.txt",4)
-    v=table[0]
+    v=table[int(np.argmin(np.abs(table[:,0]-1000)))]]
     zin=complex(v[1],v[2])
     gain=complex(v[3],v[4])
     return dict(mode=mode,knob_fraction=knob,source_ohms=source_ohms,
