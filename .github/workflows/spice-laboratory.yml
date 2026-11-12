@@ -48,6 +48,13 @@ jobs:
           fi
       - name: 6BC8 and 6CG7 nonlinear plate and transconductance curves
         run: python3 scripts/tube_curves.py --out output/tube_curves
+      - name: 6BC8 grid-bias-conditioned AC phase, FR and group delay
+        run: |
+          if [ "${{ github.event.inputs.sweep }}" = "broad" ]; then
+            python3 scripts/static_cv_ac.py --broad --output output/static_bias_ac
+          else
+            python3 scripts/static_cv_ac.py --output output/static_bias_ac
+          fi
       - name: Regression tests and historical calibration status
         run: python3 scripts/verify_results.py output
       - name: Upload raw ngspice results, harmonics and report
