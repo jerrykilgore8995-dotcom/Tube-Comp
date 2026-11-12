@@ -1,273 +1,470 @@
 #pragma once
-// True JUCE-rendered front-panel studies for Tube Comp.
-// Layout references: Chandler RS124 and 436B original hardware.
-// No vendor logos or raster copies; paint everything with JUCE vector primitives.
+// TUBE COMP / hardware-faithful dual faceplate.
+// Geometry traced from photographic Chandler RS124 reference and original
+// Altec 436B specification / original-unit imagery, not a generic rack concept.
+// Original brand logos have intentionally been substituted by RS124 / A-436B.
+//
+// Pure JUCE vector artwork: movable meter, real physical-looking pointer knobs,
+// numbered switch legends, painted anodized chassis, indicator and fuse.
+// These faceplates are still GUI studies, not the VST3 compression engine.
 #include <juce_gui_basics/juce_gui_basics.h>
-#include <cmath>
 #include <algorithm>
+#include <array>
+#include <cmath>
 
-class TubeCompFaceplate final: public juce::Component {
+class TubeCompFaceplate final : public juce::Component
+{
 public:
     enum class Mode { rs124, altec436b };
-    void setMode(Mode m) {mode=m;repaint();}
-    Mode getMode() const noexcept {return mode;}
-    void setMeterDb(float db) noexcept {meterDb=juce::jlimit(0.f,30.f,db);repaint();}
-    TubeCompFaceplate(){setSize(1600,350);}
-    void paint(juce::Graphics& g) override {
-        auto r=getLocalBounds().toFloat();
-        g.fillAll(juce::Colour::fromRGB(19,22,25));
-        // Stable 19-inch equivalent 2U aspect ratio; separate narrow mode rail.
-        const auto panel=juce::Rectangle<float>(12,16,1576,280);
-        if(mode==Mode::rs124)paintRS124(g,panel);
-        else paintAltec(g,panel);
-        drawModeRail(g);
+
+    TubeCompFaceplate() { setSize(1600, 350); }
+    void setMode(Mode m) { mode = m; repaint(); }
+    Mode getMode() const noexcept { return mode; }
+    void setMeterDb(float db) { meterDb = juce::jlimit(0.0f, 30.0f, db); repaint(); }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(col(17, 19, 22));
+        if (mode == Mode::rs124) renderRS124(g);
+        else render436B(g);
+        renderChooser(g);
     }
-    void mouseDown(const juce::MouseEvent& e) override {
-        if(e.position.y>308.f) {
-            if(e.position.x>1178.f&&e.position.x<1590.f)
-                setMode(mode==Mode::rs124?Mode::altec436b:Mode::rs124);
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        if (e.position.y >= 313.0f) {
+            if (e.position.x >= 1292.0f && e.position.x < 1440.0f)
+                setMode(Mode::rs124);
+            else if (e.position.x >= 1440.0f && e.position.x <= 1582.0f)
+                setMode(Mode::altec436b);
         }
     }
+
 private:
-    Mode mode=Mode::rs124;
-    float meterDb=5.f;
-    static constexpr float pi=3.14159265358979323846f;
-    using C=juce::Colour;
-    static juce::Font f(float px,bool heavy=false) {
-        return juce::Font(juce::FontOptions(px,heavy?juce::Font::bold:juce::Font::plain));
+    using C = juce::Colour;
+    static constexpr float pi = 3.14159265358979323846f;
+    Mode mode = Mode::rs124;
+    float meterDb = 8.0f;
+
+    static C col(int r, int g, int b) {
+        return C::fromRGB((juce::uint8) r,(juce::uint8) g,(juce::uint8) b);
     }
-    static C rgb(unsigned r,unsigned g,unsigned b) {return C::fromRGB((juce::uint8)r,(juce::uint8)g,(juce::uint8)b);}
-    static void label(juce::Graphics& g,juce::String str,float x,float y,float w,float h,
-                      float size,C color,bool bold=true,
-                      juce::Justification j=juce::Justification::centred) {
-        g.setColour(color);g.setFont(f(size,bold));
-        g.drawFittedText(str,juce::Rectangle<int>((int)x,(int)y,(int)w,(int)h),j,1);
+    static juce::Font font(float size, bool bold = false) {
+        return juce::Font(juce::FontOptions(size,
+                   bold ? juce::Font::bold : juce::Font::plain));
     }
-    static void screw(juce::Graphics& g,float x,float y,float radius=9) {
-        g.setColour(rgb(16,19,21));g.fillEllipse(x-radius-1,y-radius-1,2*radius+2,2*radius+2);
-        g.setGradientFill(juce::ColourGradient(rgb(198,201,201),x-radius,y-radius,
-                            rgb(66,69,73),x+radius,y+radius,false));
-        g.fillEllipse(x-radius,y-radius,2*radius,2*radius);
-        g.setColour(rgb(26,27,28));g.drawLine(x-radius*.62f,y-radius*.32f,
-                        x+radius*.62f,y+radius*.32f,2.2f);
+    static void stamp(juce::Graphics& g,const juce::String& content,
+                      float x,float y,float w,float h,float size,C colour,
+                      bool bold=false,juce::Justification justify=juce::Justification::centred)
+    {
+        g.setColour(colour);g.setFont(font(size,bold));
+        g.drawFittedText(content,juce::Rectangle<int>((int)std::round(x),
+                         (int)std::round(y),(int)std::round(w),
+                         (int)std::round(h)),justify,1);
     }
-    static void mountSlots(juce::Graphics& g,const juce::Rectangle<float>& p) {
-        const float xx[2]={p.getX()+19,p.getRight()-19};
-        const float yy[2]={p.getY()+17,p.getBottom()-17};
-        for(float x:xx)for(float y:yy) {
-            g.setColour(rgb(31,33,34));g.fillRoundedRectangle(x-12,y-6,24,12,6);
-            g.setColour(rgb(234,236,236));g.fillRoundedRectangle(x-9,y-4,18,8,4);
+    static void line(juce::Graphics& g,float x1,float y1,float x2,float y2,
+                     C c,float thick=1.0f) {
+        g.setColour(c);g.drawLine(x1,y1,x2,y2,thick);
+    }
+    static void metal(juce::Graphics& g,float x,float y,float w,float h,
+                      bool green)
+    {
+        C start=green?col(51,65,52):col(166,170,172);
+        C middle=green?col(42,57,46):col(176,177,176);
+        C end=green?col(30,43,35):col(134,139,139);
+        g.setGradientFill(juce::ColourGradient(start,x,y,end,x,y+h,false));
+        g.fillRoundedRectangle(x,y,w,h,2.0f);
+        g.setGradientFill(juce::ColourGradient(start,x,y,
+                           middle,x+w*.85f,y+h*.5f,false));
+        g.fillRoundedRectangle(x+2,y+2,w-4,h-4,1.0f);
+        for (int k=0;k<(int)h;k+=2) {
+            const float yy=y+k+1;
+            g.setColour(C::fromRGBA(250,250,250,(juce::uint8)(green?4:7)));
+            g.drawHorizontalLine((int)yy,x+3,x+w-3);
         }
-        for(float x:{p.getX()+75,p.getRight()-75}) for(float y:{p.getY()+23,p.getBottom()-23})
-            screw(g,x,y,7.f);
+        line(g,x+3,y+3,x+w-3,y+3,C::fromRGBA(248,249,246,56));
+        line(g,x+3,y+h-3,x+w-3,y+h-3,
+             green?col(20,29,22):col(93,99,102),1.5f);
+        g.setColour(green?col(14,23,16):col(73,78,81));
+        g.drawRoundedRectangle(x+1,y+1,w-2,h-2,2,1.4f);
     }
-    static void plate(juce::Graphics& g,juce::Rectangle<float> p,C top,C bottom,bool silver) {
-        g.setGradientFill(juce::ColourGradient(top,p.getX(),p.getY(),bottom,
-                           p.getRight(),p.getBottom(),false));
-        g.fillRoundedRectangle(p,4.f);
-        // Subtle brushed surface and engraved outer seam.
-        for(int i=0;i<(int)p.getHeight();i+=3) {
-            g.setColour(C::fromRGBA(255,255,255,(juce::uint8)(silver?12:6)));
-            g.drawHorizontalLine((int)p.getY()+i,p.getX()+4,p.getRight()-4);
+
+    static void panHead(juce::Graphics& g,float cx,float cy,float r=7.0f)
+    {
+        g.setColour(col(27,29,30));g.fillEllipse(cx-r-1,cy-r-1,2*r+2,2*r+2);
+        g.setGradientFill(juce::ColourGradient(col(221,222,220),cx-r,cy-r,
+                                             col(78,82,84),cx+r,cy+r,false));
+        g.fillEllipse(cx-r,cy-r,2*r,2*r);
+        line(g,cx-r*.60f,cy-r*.17f,cx+r*.60f,cy+r*.17f,col(31,33,32),1.8f);
+    }
+    static void ovalHole(juce::Graphics& g,float x,float y,bool green)
+    {
+        g.setColour(green?col(9,16,10):col(39,41,42));
+        g.fillRoundedRectangle(x-13,y-7,26,14,6.0f);
+        g.setColour(green?col(96,104,95):col(231,229,221));
+        g.drawRoundedRectangle(x-12,y-6,24,12,5.0f,2.1f);
+        g.setColour(col(23,26,25));
+        g.fillRoundedRectangle(x-7,y-3,14,6,3.0f);
+    }
+    static void fittings(juce::Graphics& g,bool green)
+    {
+        for(float x : {31.0f,1569.0f})
+            for(float y : {43.0f,279.0f})ovalHole(g,x,y,green);
+        // On the original RS124 four countersunk screws are visible by the ears.
+        for(float x : {91.0f,1509.0f})
+            for(float y : {43.0f,279.0f})panHead(g,x,y,7.5f);
+    }
+    static void pilot(juce::Graphics& g,float cx,float cy)
+    {
+        g.setColour(col(18,21,23));g.fillEllipse(cx-23,cy-23,46,46);
+        g.setGradientFill(juce::ColourGradient(col(233,235,229),cx-19,cy-19,
+                    col(72,75,76),cx+18,cy+18,false));
+        g.fillEllipse(cx-18,cy-18,36,36);
+        g.setColour(col(79,17,10));g.fillEllipse(cx-13,cy-13,26,26);
+        g.setGradientFill(juce::ColourGradient(col(255,216,175),cx-9,cy-10,
+                                    col(225,28,13),cx+11,cy+11,false));
+        g.fillEllipse(cx-11,cy-11,22,22);
+        g.setColour(C::fromRGBA(255,106,58,75));g.fillEllipse(cx-16,cy-16,32,32);
+        g.setColour(C::fromRGBA(255,249,225,186));g.fillEllipse(cx-6,cy-9,7,6);
+    }
+    static void fuse(juce::Graphics& g,float cx,float cy,bool green)
+    {
+        g.setColour(col(11,13,13));g.fillEllipse(cx-26,cy-26,52,52);
+        g.setGradientFill(juce::ColourGradient(col(124,127,123),cx-22,cy-23,
+                                             col(35,37,38),cx+23,cy+24,false));
+        g.fillEllipse(cx-22,cy-22,44,44);
+        g.setColour(col(18,19,20));g.fillEllipse(cx-18,cy-18,36,36);
+        g.setColour(col(74,74,73));g.drawEllipse(cx-18,cy-18,36,36,1.2f);
+        stamp(g,green?"1/2 A":"FUSE",cx-17,cy-7,34,14,9.5f,
+              green?col(231,230,219):col(226,225,220),true);
+    }
+    static void powerToggle(juce::Graphics& g,float cx,float cy)
+    {
+        g.setColour(col(24,26,26));g.fillEllipse(cx-20,cy-20,40,40);
+        g.setGradientFill(juce::ColourGradient(col(209,213,212),cx-16,cy-17,
+                                             col(58,61,63),cx+16,cy+17,false));
+        g.fillEllipse(cx-16,cy-16,32,32);
+        g.setColour(col(24,26,27));g.fillEllipse(cx-9,cy-9,18,18);
+        juce::Graphics::ScopedSaveState save(g);
+        g.addTransform(juce::AffineTransform::rotation(-.48f,cx,cy));
+        juce::Path arm;
+        arm.addRoundedRectangle(cx-5.4f,cy-23.0f,11.0f,28.0f,3.5f);
+        g.setGradientFill(juce::ColourGradient(col(30,31,31),cx-6,cy,
+                                             col(88,88,85),cx+6,cy-22,false));
+        g.fillPath(arm);
+        g.setColour(col(10,11,12));g.strokePath(arm,juce::PathStrokeType(1.2f));
+    }
+    static void powerRotary(juce::Graphics& g,float cx,float cy)
+    {
+        g.setColour(col(18,21,18));g.fillEllipse(cx-25,cy-25,50,50);
+        g.setGradientFill(juce::ColourGradient(col(86,92,85),cx-20,cy-20,
+                                           col(13,17,16),cx+20,cy+20,false));
+        g.fillEllipse(cx-21,cy-21,42,42);
+        for(int i=0;i<17;++i) {
+            float a=2*pi*i/17.f;
+            line(g,cx+std::cos(a)*18,cy+std::sin(a)*18,
+                    cx+std::cos(a)*23,cy+std::sin(a)*23,
+                    i%2?col(20,22,20):col(99,101,95),1.6f);
         }
-        g.setColour(silver?rgb(63,67,68):rgb(9,14,12));
-        g.drawRoundedRectangle(p.reduced(1),4.f,1.8f);
-        g.setColour(C::fromRGBA(255,255,255,55));
-        g.drawHorizontalLine((int)p.getY()+3,p.getX()+4,p.getRight()-4);
-        mountSlots(g,p);
+        g.setColour(col(23,24,22));
+        juce::Path tab;
+        tab.addRoundedRectangle(cx-6,cy-28,12,26,2);
+        g.fillPath(tab);
+        line(g,cx-2,cy-19,cx-2,cy-7,col(147,146,138),1.7f);
     }
-    static void jewel(juce::Graphics& g,float x,float y) {
-        g.setColour(rgb(37,35,33));g.fillEllipse(x-17,y-17,34,34);
-        g.setGradientFill(juce::ColourGradient(rgb(241,246,245),x-13,y-13,
-            rgb(73,77,80),x+14,y+14,false));
-        g.fillEllipse(x-13,y-13,26,26);
-        g.setColour(rgb(103,18,15));g.fillEllipse(x-9,y-9,18,18);
-        g.setGradientFill(juce::ColourGradient(rgb(255,241,192),x-5,y-7,
-            rgb(239,30,14),x+8,y+9,false));
-        g.fillEllipse(x-7,y-7,14,14);
-        g.setColour(C::fromRGBA(255,116,52,78));g.fillEllipse(x-14,y-14,28,28);
-        g.setColour(C::fromRGBA(255,255,255,175));g.fillEllipse(x-4,y-7,5,5);
+    static void escutcheon(juce::Graphics& g,float cx,float cy,float radius)
+    {
+        g.setColour(col(30,31,32));g.fillEllipse(cx-radius-4,cy-radius-4,
+                                                 2*radius+8,2*radius+8);
+        g.setGradientFill(juce::ColourGradient(col(120,124,122),
+                         cx-radius,cy-radius,col(30,33,34),
+                         cx+radius,cy+radius,false));
+        g.fillEllipse(cx-radius,cy-radius,2*radius,2*radius);
+        g.setColour(C::fromRGBA(255,255,255,78));
+        g.drawEllipse(cx-radius+3,cy-radius+3,2*radius-6,2*radius-6,1.1f);
     }
-    static void knob(juce::Graphics& g,float x,float y,float r,float val,
-                     int ticks,bool metal=false) {
-        const float a0=pi*.78f,a1=pi*2.22f;
-        g.setColour(rgb(33,36,37));g.fillEllipse(x-r-9,y-r-9,2*r+18,2*r+18);
-        g.setColour(rgb(115,118,119));g.drawEllipse(x-r-9,y-r-9,2*r+18,2*r+18,1.8f);
-        // Knurled physical edge.
-        for(int i=0;i<34;++i){
-            const float a=2*pi*i/34.f;
-            const float aX=x+std::cos(a)*r*.91f,aY=y+std::sin(a)*r*.91f;
-            const float bX=x+std::cos(a)*r*1.07f,bY=y+std::sin(a)*r*1.07f;
-            g.setColour(i%2?rgb(27,28,29):rgb(99,100,102));
-            g.drawLine(aX,aY,bX,bY,2.f);
+    static void pointerKnob(juce::Graphics& g,float cx,float cy,float radius,float normalized)
+    {
+        // The RS124 uses tall, dark phenolic pointer/levers on input/output,
+        // not a generic round aluminum potentiometer.
+        escutcheon(g,cx,cy,radius*.73f);
+        g.setColour(col(11,12,13));
+        g.fillEllipse(cx-radius*.73f,cy-radius*.73f,1.46f*radius,1.46f*radius);
+        const float angle=(-2.25f+normalized*4.50f);
+        {
+            juce::Graphics::ScopedSaveState save(g);
+            g.addTransform(juce::AffineTransform::rotation(angle,cx,cy));
+            juce::Path body;
+            // tapered body / projecting ivory-ended lever pointing UP
+            body.startNewSubPath(cx-13,cy+radius*.67f);
+            body.cubicTo(cx-24,cy+radius*.31f,cx-27,cy-radius*.18f,cx-19,cy-radius*.55f);
+            body.lineTo(cx-14,cy-radius*1.10f);
+            body.quadraticTo(cx,cy-radius*1.30f,cx+14,cy-radius*1.10f);
+            body.lineTo(cx+19,cy-radius*.55f);
+            body.cubicTo(cx+27,cy-radius*.19f,cx+24,cy+radius*.31f,
+                         cx+13,cy+radius*.67f);
+            body.quadraticTo(cx,cy+radius*.88f,cx-13,cy+radius*.67f);
+            body.closeSubPath();
+            g.setColour(C::fromRGBA(3,4,6,135));
+            g.fillPath(body,juce::AffineTransform::translation(3,4));
+            g.setGradientFill(juce::ColourGradient(col(117,119,113),
+                  cx-19,cy-radius*.95f,col(10,11,13),cx+23,cy+radius*.7f,false));
+            g.fillPath(body);
+            g.setColour(col(12,13,14));
+            g.strokePath(body,juce::PathStrokeType(2.5f));
+            line(g,cx-12,cy-radius*.93f,cx-8,cy+radius*.36f,
+                 C::fromRGBA(237,239,233,112),1.5f);
+            line(g,cx+7,cy-radius*.97f,cx+11,cy-radius*.34f,
+                 C::fromRGBA(0,0,0,150),2);
+            // engraved indicator in bright gray on pointed tip.
+            line(g,cx,cy-radius*1.13f,cx,cy-radius*.80f,
+                 col(233,233,226),2.8f);
         }
-        g.setGradientFill(juce::ColourGradient(
-            metal?rgb(218,223,224):rgb(91,94,96),x-r,y-r,
-            metal?rgb(86,93,94):rgb(17,19,21),x+r,y+r,false));
-        g.fillEllipse(x-r,y-r,2*r,2*r);
-        g.setColour(metal?rgb(90,94,96):rgb(9,11,12));
-        g.drawEllipse(x-r+5,y-r+5,2*r-10,2*r-10,2.4f);
-        // Molded finger grip and tapered marker.
-        const float a=a0+(a1-a0)*juce::jlimit(0.f,1.f,val);
-        const float dx=std::cos(a),dy=std::sin(a);
-        g.setColour(rgb(240,241,230));
-        g.drawLine(x+dx*r*.26f,y+dy*r*.26f,
-                   x+dx*r*.86f,y+dy*r*.86f,3.f);
-        g.setColour(C::fromRGBA(255,255,255,48));
-        juce::Path highlight;
-        highlight.addCentredArc(x,y,r-8.f,r-8.f,0.f,
-                                pi*.90f,pi*1.50f,true);
-        g.strokePath(highlight,juce::PathStrokeType(1.5f));
-        // Control index ticks form period-correct stamped legends.
-        for(int i=0;i<ticks;++i){
-            const float t=float(i)/float(ticks-1);
-            const float theta=a0+(a1-a0)*t;
-            const float cx=std::cos(theta),cy=std::sin(theta);
-            const float rr=r+15.f;
-            g.setColour(rgb(41,42,42));
-            g.drawLine(x+cx*rr,y+cy*rr,x+cx*(rr+4),y+cy*(rr+4),1.3f);
-        }
+        g.setColour(C::fromRGBA(245,245,242,28));
+        g.drawEllipse(cx-radius*.57f,cy-radius*.60f,1.1f*radius,1.1f*radius,1.1f);
     }
-    static void knobNumbers(juce::Graphics& g,float x,float y,float r,int max,
-                            C inkColor) {
-        const float a0=pi*.78f,a1=pi*2.22f;
-        for(int i=0;i<=max;++i){
-            const float a=a0+(a1-a0)*i/max;
-            const float rr=r+32;
-            label(g,juce::String(i),x+std::cos(a)*rr-10,y+std::sin(a)*rr-7,
-                  20,14,12,inkColor);
-        }
+    static void selectKnob(juce::Graphics& g,float cx,float cy,float radius,float normalized)
+    {
+        escutcheon(g,cx,cy,radius*.88f);
+        const float angle=-2.45f+4.9f*normalized;
+        juce::Graphics::ScopedSaveState save(g);
+        g.addTransform(juce::AffineTransform::rotation(angle,cx,cy));
+        juce::Path shape;
+        shape.startNewSubPath(cx-8,cy+radius*.58f);
+        shape.quadraticTo(cx-19,cy+radius*.10f,cx-11,cy-radius*.5f);
+        shape.lineTo(cx-6,cy-radius*1.28f);
+        shape.quadraticTo(cx,cy-radius*1.55f,cx+6,cy-radius*1.28f);
+        shape.lineTo(cx+11,cy-radius*.50f);
+        shape.quadraticTo(cx+19,cy+radius*.10f,cx+8,cy+radius*.58f);
+        shape.closeSubPath();
+        g.setGradientFill(juce::ColourGradient(col(95,98,96),
+                   cx-13,cy-radius,col(12,13,14),cx+12,cy+radius,false));
+        g.fillPath(shape);
+        g.setColour(col(12,12,13));g.strokePath(shape,juce::PathStrokeType(2.4f));
+        line(g,cx-3,cy-radius*1.24f,cx-3,cy-radius*.79f,
+             col(238,240,228),2.2f);
     }
-    static void dial(juce::Graphics& g,float x,float y,float r,float val,
-                     C inkColor,bool numbered=true) {
-        knob(g,x,y,r,val,11);
-        if(numbered)knobNumbers(g,x,y,r,10,inkColor);
-    }
-    static void vu(juce::Graphics& g,juce::Rectangle<float> p,float db,bool rs) {
-        g.setColour(rgb(20,23,24));g.fillRoundedRectangle(p.expanded(7),6.f);
-        g.setGradientFill(juce::ColourGradient(rgb(59,59,58),p.getX(),p.getY(),
-                             rgb(8,10,11),p.getRight(),p.getBottom(),false));
-        g.fillRoundedRectangle(p.expanded(3),3.f);
-        auto window=p.reduced(8);
-        g.setGradientFill(juce::ColourGradient(rgb(255,253,240),
-                             window.getX(),window.getY(),
-                             rgb(220,216,197),window.getRight(),window.getBottom(),false));
-        g.fillRoundedRectangle(window,2.f);
-        const float cx=window.getCentreX(),base=window.getBottom()+13;
-        const float sweep0=pi*1.22f,sweep1=pi*1.78f;
-        for(int i=0;i<=6;++i){
-            const float pos=(float)i/6.f;
-            const float ang=sweep0+(sweep1-sweep0)*pos;
-            const float x1=cx+std::cos(ang)*108,y1=base+std::sin(ang)*108;
-            const float x2=cx+std::cos(ang)*117,y2=base+std::sin(ang)*117;
-            g.setColour(rgb(58,57,55));g.drawLine(x1,y1,x2,y2,i%2?1.1f:1.8f);
-            const int n=30-5*i;
-            label(g,juce::String(n),cx+std::cos(ang)*95-11,
-                  base+std::sin(ang)*95-7,22,14,11,rgb(43,43,42));
-        }
-        label(g,"dB  COMPRESSION",window.getX()+25,window.getY()+104,
-              window.getWidth()-50,16,12,rgb(55,54,50));
-        const float angle=sweep0+(sweep1-sweep0)*(1.f-db/30.f);
-        const float tipX=cx+std::cos(angle)*121,tipY=base+std::sin(angle)*121;
-        g.setColour(rgb(30,26,26));g.drawLine(cx,base,tipX,tipY,2.1f);
-        g.setColour(rgb(11,13,14));g.fillEllipse(cx-7,base-7,14,14);
-        g.setColour(C::fromRGBA(255,255,255,55));
-        g.drawRoundedRectangle(window,2.f,1.0f);
-        if(!rs) {
-            // Classic Altec-style protruding bottom meter housing.
-            g.setColour(rgb(19,22,21));
-            g.fillRoundedRectangle(cx-34,p.getBottom()-8,68,44,11.f);
-            screw(g,cx,p.getBottom()+17,6);
+    static void dialScale(juce::Graphics& g,float cx,float cy,float radius,
+                          const std::array<juce::String,11>& labels,
+                          C ink,float textSize=13.5f)
+    {
+        // Unlike the old GUI: values are individually stamped around the
+        // circumference, with correct period control sequence and no overlaps.
+        constexpr float a0=-2.50f,a1=2.50f;
+        for(int i=0;i<11;++i){
+            const float a=a0+(a1-a0)*i/10.f;
+            const float rr=radius+21;
+            const float tx=cx+std::sin(a)*rr,ty=cy-std::cos(a)*rr;
+            line(g,cx+std::sin(a)*(radius+5),cy-std::cos(a)*(radius+5),
+                    cx+std::sin(a)*(radius+11),cy-std::cos(a)*(radius+11),
+                    ink,1.2f);
+            stamp(g,labels[(size_t)i],tx-16,ty-10,32,20,textSize,ink,true);
         }
     }
-    static void smallSwitch(juce::Graphics& g,float x,float y,
-                            juce::String labelText,bool up=true) {
-        g.setColour(rgb(26,28,29));g.fillEllipse(x-18,y-18,36,36);
-        g.setGradientFill(juce::ColourGradient(rgb(171,175,175),x-9,y-9,
-                           rgb(58,59,60),x+8,y+8,false));
-        g.fillEllipse(x-12,y-12,24,24);
-        g.setColour(rgb(26,27,28));g.drawLine(x,y,
-            x+(up?3.f:5.f),y+(up?-12.f:11.f),4.f);
-        label(g,labelText,x-42,y+23,84,16,11,rgb(28,29,29));
-    }
-    void paintRS124(juce::Graphics& g,juce::Rectangle<float> p) {
-        plate(g,p,rgb(173,172,169),rgb(125,127,127),true);
-        const C ink=rgb(36,38,39);
-        // Hardware controls in the approximate real Chandler 2U locations.
-        g.setColour(rgb(71,73,74));g.drawRect(143,155,61,23,1);
-        label(g,"BAL.",143,157,61,19,13,ink);
-        screw(g,168,103,8);
-        g.setGradientFill(juce::ColourGradient(rgb(227,234,235),161,189,
-                           rgb(64,71,75),179,216,false));
-        g.fillEllipse(155,191,34,34);
-        g.setColour(rgb(21,23,25));g.drawEllipse(155,191,34,34,2.f);
-        label(g,"INPUT",283,38,118,20,14,ink);
-        label(g,"CONTROL",283,57,118,15,12,ink);
-        dial(g,342,163,52,.56f,ink,true);
-        label(g,"ATTACK",546,35,120,18,14,ink);
-        knob(g,605,94,29,.36f,9);
-        label(g,"RECOVERY",548,274,120,17,13,ink);
-        knob(g,605,207,29,.52f,11);
-        label(g,"SLOW",541,167,43,16,12,ink);
-        label(g,"FAST",625,165,43,16,12,ink);
-        label(g,"HOLD",581,238,46,15,11,rgb(175,36,31));
-        vu(g,{728,67,250,163},meterDb,true);
-        label(g,"OUTPUT",1029,37,130,21,14,ink);
-        label(g,"ATTENUATOR  (dB)",1014,55,160,17,12,ink);
-        dial(g,1094,164,50,.27f,ink,false);
-        for(int i=0;i<=10;i+=2){
-            const float a=pi*.78f+(pi*2.22f-pi*.78f)*float(i)/10.f;
-            label(g,i==0?"0":("-"+juce::String(i)),
-                  1094+std::cos(a)*83-13,164+std::sin(a)*83-8,
-                  27,14,12,ink);
+    static void attackMarks(juce::Graphics& g,float cx,float cy,C ink)
+    {
+        const std::array<juce::String,9> nums={
+            "1","2","3","4","5","6","7","8","9"};
+        for(int i=0;i<9;++i){
+            float a=-2.48f+4.96f*i/8.f;
+            float x=cx+std::sin(a)*64,y=cy-std::cos(a)*59;
+            stamp(g,nums[(size_t)i],x-13,y-9,26,18,11.3f,ink,true);
         }
-        jewel(g,1250,93);
-        label(g,"FUSE",1320,57,92,18,13,ink);
-        g.setColour(rgb(23,24,25));g.fillEllipse(1347,87,38,38);
-        g.setColour(rgb(123,126,127));g.drawEllipse(1347,87,38,38,2.f);
-        label(g,"FUSE",1351,98,30,14,10,rgb(227,225,223));
-        smallSwitch(g,1367,210,"POWER",true);
-        label(g,"OFF",1323,169,33,16,10,ink);
-        label(g,"ON",1393,169,33,16,10,ink);
-        label(g,"COMPRESSOR",1435,137,130,19,13,ink);
-        label(g,"TYPE RS124",1436,156,130,22,16,ink);
-        label(g,"TUBE COMP",1437,181,126,16,11,ink);
     }
-    void paintAltec(juce::Graphics& g,juce::Rectangle<float> p) {
-        plate(g,p,rgb(56,69,62),rgb(29,41,37),false);
-        const C bone=rgb(236,231,208);
-        label(g,"A-436B",150,67,300,65,48,bone);
-        label(g,"COMPRESSOR AMPLIFIER",150,120,300,24,18,bone);
-        label(g,"INPUT LEVEL",332,199,145,23,15,bone);
-        dial(g,239,232,43,.64f,bone,true);
-        vu(g,{655,65,272,161},meterDb,false);
-        label(g,"GAIN REDUCTION",699,263,188,20,14,bone);
-        jewel(g,1118,92);
-        label(g,"POWER",1057,124,120,17,14,bone);
-        smallSwitch(g,1122,193,"ON / OFF",true);
-        label(g,"FUSE",1332,101,95,18,13,bone);
-        g.setColour(rgb(16,22,18));g.fillEllipse(1355,131,48,48);
-        g.setColour(rgb(132,138,131));g.drawEllipse(1355,131,48,48,2);
-        label(g,"1/2A",1364,145,31,16,11,bone);
-        label(g,"A-436B",1190,244,280,21,15,bone);
-        label(g,"STOCK FIXED ATTACK & RECOVERY",1156,265,340,14,10,bone);
+    static void recoveryMarks(juce::Graphics& g,float cx,float cy,C ink)
+    {
+        const std::array<juce::String,11> marks={
+            "1","H","2","H","3","H","4","H","5","H","6"};
+        for(int i=0;i<11;++i){
+            float a=-2.38f+4.76f*i/10.f;
+            float x=cx+std::sin(a)*57,y=cy-std::cos(a)*58;
+            stamp(g,marks[(size_t)i],x-12,y-8,24,18,10.8f,
+                  i%2?col(165,42,43):ink,true);
+        }
     }
-    void drawModeRail(juce::Graphics& g) {
-        auto rail=juce::Rectangle<float>(12,303,1576,33);
-        g.setColour(rgb(29,32,35));g.fillRoundedRectangle(rail,2.f);
-        g.setColour(rgb(71,78,84));g.drawRoundedRectangle(rail.reduced(.7f),2.f,1.3f);
-        label(g,"MODEL / CIRCUIT SELECT",50,311,270,15,11,rgb(170,180,187),
+    static void meterRS124(juce::Graphics& g,float x,float y)
+    {
+        const float w=257,h=171;
+        g.setColour(col(20,20,21));g.fillRoundedRectangle(x-10,y-11,w+20,h+22,5);
+        g.setGradientFill(juce::ColourGradient(col(33,35,35),x,y,
+                           col(6,7,8),x+w,y+h,false));
+        g.fillRoundedRectangle(x-4,y-4,w+8,h+8,2);
+        g.setColour(col(89,91,89));g.drawRoundedRectangle(x-2,y-2,w+4,h+4,2,1.8f);
+        g.setGradientFill(juce::ColourGradient(col(252,248,238),x+6,y+5,
+                           col(220,215,204),x+w-5,y+h-9,false));
+        g.fillRoundedRectangle(x+7,y+7,w-14,h-14,2);
+        const float c=x+w*.5f, pivotY=y+h+24;
+        const std::array<int,7> values={30,25,20,15,10,5,0};
+        for(size_t i=0;i<values.size();++i){
+            // right-to-left zero compression scale as in the hardware.
+            const float a=pi*1.20f+(pi*.60f)*i/(values.size()-1);
+            const float px=c+std::cos(a)*133,py=pivotY+std::sin(a)*133;
+            const float qx=c+std::cos(a)*144,qy=pivotY+std::sin(a)*144;
+            line(g,px,py,qx,qy,col(45,44,43),i%2?1.5f:2.2f);
+            stamp(g,juce::String(values[i]),c+std::cos(a)*114-15,
+                  pivotY+std::sin(a)*114-11,30,18,11.4f,col(44,44,41),true);
+        }
+        // The needle direction is left with GR; zero lives on the right.
+        float needle=pi*1.80f-(pi*.60f)*meterDb/30.f;
+        float tx=c+std::cos(needle)*151,ty=pivotY+std::sin(needle)*151;
+        line(g,c,pivotY,tx,ty,col(27,25,22),2.2f);
+        line(g,c+2,pivotY,tx+2,ty+1,C::fromRGBA(40,34,26,70));
+        stamp(g,"dB",x+78,y+102,100,17,12,col(44,44,41));
+        stamp(g,"COMPRESSION",x+43,y+119,170,16,11.8f,col(39,39,37));
+        g.setColour(col(20,22,22));g.fillEllipse(c-7,pivotY-7,14,14);
+        // Lower-right chrome screw for the black meter frame.
+        panHead(g,x+w-12,y+h-12,5);
+        g.setColour(C::fromRGBA(255,255,255,80));
+        g.drawRoundedRectangle(x+7,y+7,w-14,h-14,2,1);
+    }
+    static void meterAltec(juce::Graphics& g,float x,float y)
+    {
+        // Distinctive original Altec 6049 round-topped Bakelite meter,
+        // NOT the modern rectangular VU housing.
+        const float w=235,h=195;
+        juce::Path housing;
+        housing.startNewSubPath(x+28,y);
+        housing.lineTo(x+w-28,y);
+        housing.quadraticTo(x+w+8,y+9,x+w+7,y+46);
+        housing.lineTo(x+w+5,y+h-43);
+        housing.quadraticTo(x+w-2,y+h+4,x+w-42,y+h);
+        housing.lineTo(x+42,y+h);
+        housing.quadraticTo(x-4,y+h+4,x-5,y+h-43);
+        housing.lineTo(x-7,y+46);
+        housing.quadraticTo(x-8,y+9,x+28,y);
+        housing.closeSubPath();
+        g.setColour(col(10,13,12));g.fillPath(housing,juce::AffineTransform::translation(3,5));
+        g.setGradientFill(juce::ColourGradient(col(28,31,28),x,y,
+                                             col(5,8,7),x+w,y+h,false));
+        g.fillPath(housing);
+        g.setColour(col(91,92,82));g.strokePath(housing,juce::PathStrokeType(2));
+        auto paper=juce::Rectangle<float>(x+12,y+10,w-24,h-60);
+        g.setGradientFill(juce::ColourGradient(col(252,251,242),paper.getX(),paper.getY(),
+                         col(216,212,198),paper.getRight(),paper.getBottom(),false));
+        g.fillRoundedRectangle(paper,32);
+        g.setColour(col(49,53,49));g.drawRoundedRectangle(paper,32,1.4f);
+        const float cx=x+w/2,py=y+h-26;
+        const std::array<int,5> ticks={30,20,15,10,5};
+        for(size_t i=0;i<ticks.size();++i){
+            const float a=pi*1.17f+pi*.63f*i/(ticks.size()-1);
+            float xx=cx+std::cos(a)*116,yy=py+std::sin(a)*117;
+            float tx=cx+std::cos(a)*103,ty=py+std::sin(a)*103;
+            line(g,xx,yy,tx,ty,col(46,45,39),1.4f);
+            stamp(g,juce::String(ticks[i]),cx+std::cos(a)*89-13,
+                  py+std::sin(a)*92-8,26,17,11,col(51,49,42));
+        }
+        stamp(g,"DB COMPRESSION",x+32,y+65,w-64,18,10.9f,col(55,50,46));
+        stamp(g,"A-436B",x+48,y+86,w-96,22,19,col(57,60,51),true);
+        const float angle=pi*1.80f-pi*.63f*meterDb/30.f;
+        line(g,cx,py,cx+std::cos(angle)*114,py+std::sin(angle)*114,
+             col(42,38,33),1.8f);
+        g.setColour(col(13,15,14));g.fillEllipse(cx-7,py-7,14,14);
+        g.setGradientFill(juce::ColourGradient(col(33,35,32),x+48,y+h-53,
+                                             col(10,12,11),x+w-47,y+h-2,false));
+        g.fillRoundedRectangle(x+47,y+h-56,w-94,53,15);
+        panHead(g,cx,y+h-25,7);
+    }
+
+    static void renderRS124(juce::Graphics& g)
+    {
+        metal(g,13,17,1574,283,false);
+        fittings(g,false);
+        const C ink=col(37,39,40);
+        // Panel layout follows Chandler RS124 frontal photo, with only
+        // names/identity adapted. No extra front-panel controls are inserted.
+        panHead(g,159,81,8); // balance-adjust trimmer screw
+        stamp(g,"BAL.",118,143,88,21,13.5f,ink,true);
+        g.setGradientFill(juce::ColourGradient(col(239,242,238),152,182,
+                                             col(108,115,118),188,218,false));
+        g.fillEllipse(150,185,39,39); 
+        g.setColour(col(42,45,46));g.drawEllipse(150,185,39,39,1.5f);
+        // Tiny depressed central balancing button.
+        g.setColour(col(215,216,212));g.fillEllipse(161,196,17,17);
+
+        stamp(g,"I N P U T",280,29,160,19,13,ink,true);
+        stamp(g,"C O N T R O L",270,46,180,17,11.5f,ink,true);
+        const std::array<juce::String,11> ints={"0","1","2","3","4","5","6","7","8","9","10"};
+        dialScale(g,356,166,48,ints,ink,12.4f);
+        pointerKnob(g,356,166,46,.53f);
+
+        stamp(g,"A T T A C K",541,29,152,18,14,ink,true);
+        attackMarks(g,617,105,ink);
+        selectKnob(g,617,105,28,.24f);
+        stamp(g,"60070B",523,72,65,15,9.9f,col(166,39,34),true);
+        stamp(g,"60050A",650,69,66,15,9.9f,col(166,39,34),true);
+
+        stamp(g,"S L O W",536,157,68,15,11.1f,ink,true);
+        stamp(g,"F A S T",636,157,72,15,11.1f,ink,true);
+        recoveryMarks(g,617,217,ink);
+        selectKnob(g,617,217,27,.45f);
+        stamp(g,"R E C O V E R Y",542,274,148,17,11.7f,ink,true);
+
+        meterRS124(g,744,66);
+
+        stamp(g,"O U T P U T",1048,29,159,19,13.5f,ink,true);
+        stamp(g,"A T T E N U A T O R  (dB)",1004,48,255,17,11.7f,ink,true);
+        const std::array<juce::String,11> out={"-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"};
+        dialScale(g,1119,169,46,out,ink,12.f);
+        pointerKnob(g,1119,169,45,.67f);
+        pilot(g,1294,101);
+        stamp(g,"FUSE",1376,56,91,17,13,ink,true);
+        fuse(g,1421,101,false);
+        stamp(g,"OFF",1330,168,57,17,11,ink,true);
+        stamp(g,"ON",1449,168,48,17,11,ink,true);
+        powerToggle(g,1406,225);
+        stamp(g,"C O M P R E S S O R",1453,192,118,17,10.1f,ink,true);
+        stamp(g,"T Y P E   R S 1 2 4",1453,211,118,16,9.8f,ink,true);
+        stamp(g,"T U B E   C O M P",1453,232,118,15,9.4f,ink,true);
+    }
+    static void render436B(juce::Graphics& g)
+    {
+        metal(g,13,17,1574,283,true);
+        fittings(g,true);
+        const C cream=col(235,237,216),thin=col(193,207,188);
+        stamp(g,"V O L U M E",129,58,203,22,14,cream,true);
+        // The original 436B has only one user variable input gain knob.
+        const std::array<juce::String,11> ints={"0","1","2","3","4","5","6","7","8","9","10"};
+        dialScale(g,234,181,49,ints,cream,12.6f);
+        // Vintage Altec black fluted skirt, bright chickenhead pointer.
+        pointerKnob(g,234,181,49,.42f);
+
+        // Replaces original brand name in its correct left-middle location.
+        stamp(g,"A-436B",390,105,258,53,42,cream,true);
+        line(g,404,158,636,158,thin,1.2f);
+        stamp(g,"COMPRESSOR",400,164,244,21,16,cream,true);
+        stamp(g,"AMPLIFIER",413,184,219,19,12.6f,cream);
+
+        meterAltec(g,669,59);
+
+        stamp(g,"436B",967,84,116,26,22,cream,true);
+        stamp(g,"COMPRESSOR",965,114,181,22,14,cream,true);
+        stamp(g,"AMPLIFIER",965,138,181,22,14,cream,true);
+        pilot(g,1218,111);
+        stamp(g,"P O W E R",1170,154,102,20,13,cream,true);
+        powerRotary(g,1224,211);
+        stamp(g,"ON",1273,202,45,17,10.7f,cream);
+        stamp(g,"OFF",1131,202,51,17,10.7f,cream);
+        stamp(g,"FUSE",1377,76,103,21,13,cream,true);
+        fuse(g,1430,133,true);
+        stamp(g,".5 AMP",1375,170,110,18,10.5f,cream);
+        // Bottom-right factory model identity, not invented release controls.
+        stamp(g,"A-436B",1363,250,135,23,14.3f,cream,true);
+    }
+    static void renderChooser(juce::Graphics& g)
+    {
+        // Separate host UI strip OUTSIDE the historical faceplate geometry.
+        // The actual 19-inch rack remains a complete self-contained panel.
+        const float y=309.0f;
+        g.setColour(col(15,18,20));g.fillRoundedRectangle(13,y,1574,30,3);
+        g.setColour(col(55,65,69));g.drawRoundedRectangle(13,y,1574,30,3,1.0f);
+        stamp(g,"TUBE COMP  /  CIRCUIT",40,y+4,300,21,11.5f,col(177,188,192),
               true,juce::Justification::centredLeft);
-        label(g,"ALTEC 436B BASE + RS124 RECONSTRUCTION",355,311,570,15,11,rgb(136,145,150));
-        auto t=juce::Rectangle<float>(1200,308,356,23);
-        g.setColour(rgb(12,15,18));g.fillRoundedRectangle(t,6.f);
-        auto left=juce::Rectangle<float>(1202,310,174,19);
-        auto right=juce::Rectangle<float>(1377,310,177,19);
-        g.setColour(mode==Mode::rs124?rgb(60,122,153):rgb(49,56,57));
-        g.fillRoundedRectangle(left,5.f);
-        g.setColour(mode==Mode::altec436b?rgb(53,104,66):rgb(49,56,57));
-        g.fillRoundedRectangle(right,5.f);
-        label(g,"RS124",1208,312,162,15,12,rgb(229,236,234));
-        label(g,"A-436B",1383,312,167,15,12,rgb(229,236,234));
+        const float l=1291.f,w=145.f;
+        g.setColour(mode==Mode::rs124?col(76,108,124):col(48,53,56));
+        g.fillRoundedRectangle(l,y+3,w,24,3);
+        g.setColour(mode==Mode::altec436b?col(66,103,78):col(48,53,56));
+        g.fillRoundedRectangle(l+w+3,y+3,w,24,3);
+        stamp(g,"RS124",l+5,y+6,w-10,17,12,col(237,240,239),true);
+        stamp(g,"A-436B",l+w+8,y+6,w-10,17,12,col(237,240,239),true);
     }
 };
