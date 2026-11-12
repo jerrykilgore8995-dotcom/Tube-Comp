@@ -17,10 +17,34 @@ R13 bplus platefeed 10k
 CPLATE platefeed 0 47u
 VIN source 0 SIN(0 {AMP} {FREQ}) AC 1
 RSOURCE source in 600
-RBRIDGE in 0 15k
-* Ideal differential transformer proxy; voltage ratio/loading will be re-fitted.
-BGA ga 0 V={BIAS+V(cv)+GAIN*V(in)}
-BGB gb 0 V={BIAS+V(cv)-GAIN*V(in)}
+* T1 Peerless 4651A line input, physically coupled two-winding approximation.
+* The original 436B drawing specifies "15000 ohms bridging" at the PRIMARY:
+* This is a loaded INPUT IMPEDANCE, not a 15k physical shunt resistor.
+* Peerless original ratio reported 1:2.6 (Cinemag technical recollection).
+* Sowter 1231 replacement specifies 1:2.3, Lpri=220H, DCR=485/2800R.
+* This candidate uses 1:2.6 to reflect the actual two 50k pots:
+* 100k / (2.6^2) = 14.79k before losses; expected 15k bridging.
+* 220H primary / 1487.2H secondary, series DCR 485 / 2800R.
+* The ratio, DCR, leakage and winding capacitance need bench validation.
+RT1_PRIMARY in tp1 485
+LT1_PRIMARY tp1 0 220
+RT1_SEC_TOP tsH tsech 1400
+LT1_SECONDARY tsech tsecl 1487.2
+RT1_SEC_BOTTOM tsecl tsL 1400
+KT1 LT1_PRIMARY LT1_SECONDARY 0.995
+* Altec P1A and P1B: two 50k variable resistive divider sections.
+* Signal comes off BOTH wipers directly into the 6BC8 grids.
+* Pot midpoint is referenced to the negative 6AL5 control bias; no
+* ideal per-grid audio voltage sources and no fixed primary shunt.
+* GAIN=1 puts the wipers near the ends; GAIN=0 close to midpoint.
+RP1A_UPPER tsH ga {max(1,(1-GAIN)*50000)}
+RP1A_LOWER ga gridcentre {max(1,GAIN*50000)}
+RP1B_UPPER gridcentre gb {max(1,GAIN*50000)}
+RP1B_LOWER gb tsL {max(1,(1-GAIN)*50000)}
+* Provisional idle bias offset: factory drawing marks about -0.5V at
+* this node. Do not confuse the nominal grid idle bias with the dynamic
+* negative control voltage applied by 6AL5.
+VGRIDOFFSET gridcentre cv {BIAS}
 * Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
 R3 platefeed pa 47k
 R4 platefeed pb 47k
