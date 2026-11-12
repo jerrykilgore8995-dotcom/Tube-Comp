@@ -1,0 +1,50 @@
+name: Generate SPICE 11-Position Input Coefficients
+on:
+  push:
+    paths:
+      - ".github/workflows/generate-input-spice-coefficients.yml"
+      - "scripts/generate_spice_input_grid.py"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real Altec 1.6s ngspice input measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43280102313
+          name: TubeComp-SPICE-inputgrid-A-436B
+          github-token: ${{ github.token }}
+          path: reference/altec
+      - name: Real RS124 1.6s ngspice input measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43280102313
+          name: TubeComp-SPICE-inputgrid-RS124
+          github-token: ${{ github.token }}
+          path: reference/rs124
+      - name: Generate 66 independent source-locked points
+        run: |
+          python3 scripts/generate_spice_input_grid.py \
+            reference/altec/input_grid.csv reference/rs124/input_grid.csv \
+            plugin/SpiceInputGridMeasured.inc
+      - name: Preserve generated source
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-66-point-11-position-source-locked-input-grid
+          path: plugin/SpiceInputGridMeasured.inc
+          if-no-files-found: error
+      - name: Commit generated SPICE input curves
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugin/SpiceInputGridMeasured.inc
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Source-lock 66-case true dual 50k potentiometer curves"
+          git pull --rebase origin main
+          git push origin HEAD:main
