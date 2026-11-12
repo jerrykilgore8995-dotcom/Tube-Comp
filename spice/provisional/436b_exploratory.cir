@@ -56,9 +56,28 @@ KPSB LPRI_B LSEC 0.995
 * Keep the output attenuator outside the power stage.
 BOUT out 0 V={OUTPAD*V(secOut)}
 RLOAD secOut 0 600
-* 6AL5 full-wave rectification from opposite-phase signal into negative envelope.
-BSCA sca 0 V={SCGAIN*V(out)}
-BSCB scb 0 V={-SCGAIN*V(out)}
+* Correct plate-fed 6AL5 feedback topology: source is the two 6CG7
+* plates BEFORE the output attenuator, NOT a scaled sample of the 600R output.
+* C5 and C6 are real 22nF blocking capacitors: DC plate voltage must
+* never be injected into the control network. R10/R11 are 220k returns.
+* The original 436B threshold/bias network and 6AL5 diode curves still
+* need independent hardware-model calibration; +20V is the known drawing
+* nominal threshold supply but the exact source is provisionally ideal.
+* Two voltage-controlled AC sources set the sidechain gain before the
+* physical coupling capacitors. At SCGAIN=0 they isolate the detector for
+* matched-input reference measurements. UNITY is the desired hardware fit.
+BSCA scaDrive 0 V={SCGAIN*V(p2a)}
+BSCB scbDrive 0 V={SCGAIN*V(p2b)}
+C5 scaDrive sca 22n
+C6 scbDrive scb 22n
+VTHRESHOLD threshold 0 20
+R10 sca threshold 220k
+R11 scb threshold 220k
+* Sidechain drive SCGAIN is a tunable calibration multiplier; it must
+* eventually be unity after verifying actual diode network loading.
+* An optional differential AC coupling proxy allows level calibration
+* without bypassing C5/C6 or injecting the 150V DC plates into the CV.
+* Detector 6AL5 anodes collect the negative phase excursions.
 DDET1 detector sca D6AL5
 DDET2 detector scb D6AL5
 RATT detector cv {ATTACK_R}
