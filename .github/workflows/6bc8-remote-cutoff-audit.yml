@@ -1,0 +1,29 @@
+name: 6BC8 Remote Cutoff Factory Bias and THD Audit
+on:
+  push:
+    paths:
+      - ".github/workflows/6bc8-remote-cutoff-audit.yml"
+      - "scripts/compare_6bc8_remote_cutoff.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  a-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Syntax check both physical tube models
+        run: python3 -m py_compile scripts/compare_6bc8_remote_cutoff.py scripts/run_lab.py
+      - name: Compare remote-cutoff 6BC8 idle and +20dB GR compressed plate bias, K2-K20 and true GR
+        run: python3 scripts/compare_6bc8_remote_cutoff.py
+      - name: Archive circuit simulation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-6BC8-remote-cutoff-factory-vs-Koren
+          path: output/6bc8_remote_compare/comparison.csv
+          if-no-files-found: error
