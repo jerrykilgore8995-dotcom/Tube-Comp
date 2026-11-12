@@ -1,7 +1,7 @@
 #pragma once
 // TubeComp reference values are independent fully-settled 1.6s ngspice
-// measurements at 1kHz (NOT vintage hardware). This is still a sparse
-// 80/100% input-control grid, NOT verified 8%-all-controls calibration.
+// measurements at 1kHz (NOT vintage hardware). Both 600Ω and 200Ω loaded
+// circuits now use an 11-point 50k input dial grid (three levels per point).
 // Source: TubeComp 2026-11-12 SPICE workflow artifacts. Do not edit values
 // merely to make a software test pass; regenerate from reference CSV instead.
 #include <array>
@@ -46,8 +46,12 @@ inline Point blend(Point a,Point b,float t) noexcept {
 #include "SpiceReferenceMeasured.inc"
 // Real 0..100% dual-section 50k input attenuator curves at three levels.
 #include "SpiceInputGridMeasured.inc"
-inline Point measuredInputAt(bool rs,int index,float inputDbu) noexcept {
-    const auto& bank=rs?measuredRSInput:measuredAltecInput;
+// Separate 200Ω secondary load: measured actual transformer, 6CG7 and 6AL5.
+#include "SpiceInputGrid200Measured.inc"
+inline Point measuredInputAt(bool rs,int index,float inputDbu,float loadOhms=600.f) noexcept {
+    const auto& bank=(loadOhms<=300.f)?
+          (rs?measuredRS200Input:measuredAltec200Input):
+          (rs?measuredRSInput:measuredAltecInput);
     const auto& points=bank[static_cast<size_t>(std::clamp(index,0,10))];
     Point result=at(points,inputDbu);
     // Below/above the measured -18..+7dBu range use explicit EXTRAPOLATION,
@@ -68,8 +72,20 @@ inline Point measuredInputAt(bool rs,int index,float inputDbu) noexcept {
     result.inputDbu=inputDbu;
     return result;
 }
-inline Point lookup(bool rs,float inputKnob,float inputDbu) noexcept {
+inline Point lookup(bool rs,float inputKnob,float inputDbu,
+                    float loadOhms=600.f) noexcept {
     const float k=std::clamp(inputKnob,0.f,10.f);
+    if(loadOhms<=300.f){
+        // The 200Ω transformer is a separate, source-locked 11x3 physical
+        // operating condition, NOT a level reduction from the 600Ω stage.
+        const int index=std::clamp(int(k),0,10);
+        const Point a=measuredInputAt(rs,index,inputDbu,200.f);
+        if(index>=10)return a;
+        const Point b=measuredInputAt(rs,index+1,inputDbu,200.f);
+        auto p=blend(a,b,std::clamp(k-index,0.f,1.f));
+        p.inputDbu=inputDbu;
+        return p;
+    }
     // Measured independent ngspice 11-position 50k dual-pot loading.
     // Below 80% use actual 0..70% SPICE, not a 20log(k/8) estimate.
     if(k<8.f){
@@ -131,10 +147,23 @@ inline float detectorCvFromOutput(const std::array<Point,N>& a,float outputDbu) 
     return std::clamp(end.cvMagnitude+
                    2.0f*(outputDbu-end.outputDbu),0.f,39.f);
 }
-inline float feedbackCv(bool rs,float knob,float outputDbu) noexcept {
+inline float feedbackCv(bool rs,float knob,float outputDbu,
+                        float loadOhms=600.f) noexcept {
     // Detector follows the 6CG7 plate outputs before the RS124 output pad.
     // The pad-independent output measurement is mapped back to the SPICE
     // detector response. At non-sinusoidal input this is a proxy.
+    if(loadOhms<=300.f){
+        const auto& bank=rs?measuredRS200Input:measuredAltec200Input;
+        const float dial=std::clamp(knob,0.f,10.f);
+        const int index=std::clamp(int(dial),0,10);
+        const float lower=detectorCvFromOutput(
+                       bank[static_cast<std::size_t>(index)],outputDbu);
+        if(index>=10)return std::max(0.f,lower);
+        const float upper=detectorCvFromOutput(
+                       bank[static_cast<std::size_t>(index+1)],outputDbu);
+        return std::max(0.f,lower+(upper-lower)*
+                             std::clamp(dial-index,0.f,1.f));
+    }
     if(knob<8.f){
         const auto& bank=rs?measuredRSInput:measuredAltecInput;
         const int index=std::clamp(int(knob),0,7);
