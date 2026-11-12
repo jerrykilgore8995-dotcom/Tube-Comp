@@ -1,0 +1,61 @@
+Altec 436B exploratory topology - NOT VERIFIED WIRING
+* This is NOT an exact tracing of the 436B drawing.
+* Actual BOM values are used where known. Unknown connections are explicit guesses.
+* Sidechain is rectified by 6AL5 diode proxies. Differential triodes truly conduct.
+.include "models/tube_cells.lib"
+.param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
+.param ATTACK_R=47000 REC_R=1000000 OUTPAD=1 SCGAIN=0.22
+.param BPLUS=275 SRC_OHM=600
+.option reltol=1e-4 abstol=1e-11 method=gear
+VHT bplus 0 {BPLUS}
+VIN source 0 SIN(0 {AMP} {FREQ}) AC 1
+RSOURCE source in 600
+RBRIDGE in 0 15k
+* Ideal differential transformer proxy; voltage ratio/loading will be re-fitted.
+BGA ga 0 V={BIAS+V(cv)+GAIN*V(in)}
+BGB gb 0 V={BIAS+V(cv)-GAIN*V(in)}
+* Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
+R3 bplus pa 47k
+R4 bplus pb 47k
+XU1A pa ga k1 V6BC8
+XU1B pb gb k1 V6BC8
+R8 k1 0 34
+* Coupling to push-pull 6CG7; R5 and R6 are historically 1M.
+C2 pa g2a 22n
+C3 pb g2b 22n
+R5 g2a 0 1Meg
+R6 g2b 0 1Meg
+XU2A p2a g2a k2 V6CG7
+XU2B p2b g2b k2 V6CG7
+R7 k2 0 220
+* DC resistances of output winding remain UNKNOWN.
+RWP1 bplus p2a 18k
+RWP2 bplus p2b 18k
+* Linear differential output transformer proxy; NO hysteresis or iron distortion.
+BOUT out 0 V={OUTPAD*0.12*V(p2a,p2b)}
+RLOAD out 0 600
+* 6AL5 full-wave rectification from opposite-phase signal into negative envelope.
+BSCA sca 0 V={SCGAIN*V(out)}
+BSCB scb 0 V={-SCGAIN*V(out)}
+DDET1 detector sca D6AL5
+DDET2 detector scb D6AL5
+RATT detector cv {ATTACK_R}
+CREC cv 0 1u
+RREC cv 0 {REC_R}
+RDC detector 0 50Meg
+* Simulations are not hardware-calibrated until the source-locked drawing
+* and valve plate curves are verified against reference data.
+.control
+set wr_singlescale
+set wr_vecnames
+op
+echo OP_BEGIN
+print v(bplus) v(pa) v(pb) v(k1) v(g2a) v(g2b) v(p2a) v(p2b) v(k2) v(cv) v(out)
+echo OP_END
+ac dec 16 20 20000
+wrdata ac.txt v(out)
+tran 20u 0.20 0 20u
+wrdata tran.txt v(out) v(in) v(cv) v(pa) v(pb) v(p2a) v(p2b) v(k1) v(k2)
+quit
+.endc
+.end
