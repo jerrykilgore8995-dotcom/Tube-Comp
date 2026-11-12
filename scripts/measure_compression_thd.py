@@ -21,7 +21,7 @@ def measure(case, workdir, disable_feedback=False):
     deck=prepare(case,workdir)
     if disable_feedback:
         source=deck.read_text()
-        modified,n=re.subn(r"^(DDET[12]\\s+.*)$",r"* \\1",source,
+        modified,n=re.subn(r"^(DDET[12]\s+.*)$",r"* \1",source,
                            count=2,flags=re.MULTILINE)
         if n!=2:raise RuntimeError("Failed to isolate both 6AL5 detector diodes")
         deck.write_text(modified)
@@ -55,7 +55,7 @@ def main():
     root.mkdir(parents=True,exist_ok=True)
     results=[]
     for mode in ("A-436B","RS124"):
-        for level in (-36,-24,-18,-12,-6,0,6,12):
+        for level in (-36,-24,-18,-12,-6,0,6):
             case=dict(mode=mode,hz=1000,dbu=level,attack=0,recovery=0,
                       hold=False,input_knob=.8)
             prefix=f"{mode.replace('-','')}_L{str(level).replace('-','m')}"
