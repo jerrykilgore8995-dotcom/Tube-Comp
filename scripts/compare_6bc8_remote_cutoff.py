@@ -18,8 +18,9 @@ def run(model,dbu,detector=True,cv_override=None,bplus_override=None):
  wd=ROOT/suffix
  deck=prepare(case,wd)
  s=deck.read_text()
- if model=="REMOTE":
-  s,n=re.subn(r"\bk1 V6BC8(?=\n)","k1 V6BC8_REMOTE",s)
+ if model in ("REMOTE","REMOTE_EXP"):
+  actual="V6BC8_REMOTE" if model=="REMOTE" else "V6BC8_REMOTE_EXP"
+  s,n=re.subn(r"\bk1 V6BC8(?=\n)","k1 "+actual,s)
   if n!=2:raise RuntimeError("6BC8 two-device replacement failed")
  if not detector:
   s,n=re.subn(r"^DDET[12]\s+.*$",lambda m:"* "+m.group(0),s,count=2,flags=re.M)
@@ -62,7 +63,7 @@ def run(model,dbu,detector=True,cv_override=None,bplus_override=None):
  return row
 
 rows=[]
-for model in ("KOREN","REMOTE"):
+for model in ("KOREN","REMOTE","REMOTE_EXP"):
  for condition in ("IDLE","COMPRESSED"):
   if condition=="IDLE":
    row=run(model,-36,detector=False,cv_override=0,bplus_override=272)
@@ -86,7 +87,7 @@ for model in ("KOREN","REMOTE"):
         f"GR={gr:.3f}dB THD={x['output_THD_percent']:.3f}% "
         f"6BC8_THD={x['varimu_THD_percent']:.3f}% "
         f"CV={x['late_CV_V']:.3f}V",flush=True)
-if len(rows)<8:raise RuntimeError(f"Only {len(rows)} points. Expected at least 8")
+if len(rows)<12:raise RuntimeError(f"Only {len(rows)} points. Expected at least 12")
 headers=sorted(set().union(*(set(x.keys()) for x in rows)))
 with (ROOT/"comparison.csv").open("w",newline="") as fp:
  w=csv.DictWriter(fp,fieldnames=headers)
