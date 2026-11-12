@@ -1,0 +1,24 @@
+* TUBE COMP - PROVISIONAL NONLINEAR CELL LIBRARY (NOT YET HARDWARE-CALIBRATED)
+* First engineering guesses for qualitative behavior and numeric methods.
+* Triode space-charge equations are original engineering approximations motivated
+* by Child-Langmuir / Koren modeling; parameters NOT fitted to 6BC8/6CG7 curves.
+* Never cite predicted absolute THD or operating points as measured hardware.
+.subckt V6BC8 P G K
+* Dual triode half. Remote cutoff sensitivity is grid-bias dependent.
+BPL P K I={5.0e-4*pow(uramp(V(G,K)+uramp(V(P,K))/32),1.5)*(uramp(V(P,K))/(18+uramp(V(P,K))))}
+Rleak P K 1000Meg
+CGK G K 2.4p
+CGA G P 2.1p
+CPK P K 2.2p
+.ends V6BC8
+
+.subckt V6CG7 P G K
+BPL P K I={9.0e-4*pow(uramp(V(G,K)+uramp(V(P,K))/21),1.5)*(uramp(V(P,K))/(28+uramp(V(P,K))))}
+Rleak P K 1000Meg
+CGK G K 2.3p
+CGA G P 3p
+CPK P K 2.5p
+.ends V6CG7
+
+* Dual diode 6AL5: preliminary valve-diode characteristic; NOT calibrated.
+.model D6AL5 D(Is=3n N=1.55 Rs=600 Cjo=2.5p M=0.40 Tt=65n)
