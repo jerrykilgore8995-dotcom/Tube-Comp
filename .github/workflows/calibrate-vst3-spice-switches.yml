@@ -1,0 +1,101 @@
+name: Calibrate RS124 Nine Attack Six Recovery HOLD Against Actual SPICE
+on:
+  workflow_run:
+    workflows:
+      - "SPICE Accurate Nine Attack Six Recovery Five HOLD Curves"
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  measured-timing:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download measured actual 6AL5 SPICE attack data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43287439318
+          name: TubeComp-SPICE-switch-timing-attack
+          github-token: ${{ github.token }}
+          path: actual_spice/attack
+      - name: Download measured actual 6AL5 SPICE recovery data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43287439318
+          name: TubeComp-SPICE-switch-timing-recovery
+          github-token: ${{ github.token }}
+          path: actual_spice/recovery
+      - name: Download measured actual 6AL5 SPICE HOLD data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43287439318
+          name: TubeComp-SPICE-switch-timing-hold
+          github-token: ${{ github.token }}
+          path: actual_spice/hold
+      - name: Download independently rendered DSP attack data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-attack
+          github-token: ${{ github.token }}
+          path: initial_dsp/attack
+      - name: Download independently rendered DSP recovery data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-recovery
+          github-token: ${{ github.token }}
+          path: initial_dsp/recovery
+      - name: Download independently rendered DSP HOLD data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-hold
+          github-token: ${{ github.token }}
+          path: initial_dsp/hold
+      - name: Fit RS124 attack and recovery and Altec equivalent times to measured SPICE
+        run: |
+          python3 scripts/fit_spice_switch_timing.py \
+            --reference-dir actual_spice --dsp-dir initial_dsp
+      - name: Compile actual realtime compressor timing renderer
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompSwitchTimingSurvey.cpp -o measure_timing
+      - name: Render updated DSP for every actual switch position
+        run: |
+          mkdir -p rerendered/attack rerendered/recovery rerendered/hold
+          ./measure_timing rerendered/attack/measured_dsp_timing.csv attack
+          ./measure_timing rerendered/recovery/measured_dsp_timing.csv recovery
+          ./measure_timing rerendered/hold/measured_dsp_timing.csv hold
+      - name: Fail-closed independent SPICE timing parity 8 percent
+        run: |
+          python3 scripts/verify_spice_dsp_switch_timing.py \
+            --reference-dir actual_spice --dsp-dir rerendered --tolerance 8
+      - name: Check native DSP regression / no NaNs / stereo / bypass
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompDSPTests.cpp -o smoke
+          ./smoke
+      - name: Preserve candidate controls and measured results including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-measured-SPICE-timing-calibration-attempt
+          path: |
+            output/timing_fitted/
+            output/switch_timing_parity/
+            rerendered/
+          if-no-files-found: warn
+      - name: Commit corrected timing only after ACTUAL 8 percent matching passes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugin/TubeCompDSP.h
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "SPICE calibrated nine RS124 attack and six recovery curves and Altec timing"
+          git pull --rebase origin main
+          git push origin HEAD:main
