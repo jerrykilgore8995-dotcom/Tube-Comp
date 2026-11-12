@@ -30,6 +30,15 @@ jobs:
           $file = Get-ChildItem -Path plugin/build -Recurse -Directory -Filter "Tube Comp RS124.vst3" |
             Select-Object -First 1
           if (-not $file) { throw "Compiled Tube Comp RS124.vst3 not found" }
+          # Some JUCE 8 builds emit legacy trailing commas in VST3 moduleinfo.
+          # Normalize to strict JSON without changing the compiled VST3 binary.
+          $metadata = Join-Path $file.FullName "Contents/Resources/moduleinfo.json"
+          if (Test-Path $metadata) {
+            $raw = [System.IO.File]::ReadAllText($metadata)
+            $normalized = [System.Text.RegularExpressions.Regex]::Replace($raw, ',(?=\s*[}\]])', '')
+            $null = ConvertFrom-Json -InputObject $normalized -ErrorAction Stop
+            [System.IO.File]::WriteAllText($metadata, $normalized)
+          }
           Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_RS124_A436B_v0.1_Windows_x64_VST3.zip" -Force
           $zip = Get-Item "TubeComp_RS124_A436B_v0.1_Windows_x64_VST3.zip"
           if ($zip.Length -lt 100000) { throw "VST3 archive suspiciously small" }
