@@ -1,0 +1,40 @@
+name: Fast Altec Plate-Feedback Audit
+on:
+  push:
+    paths:
+      - ".github/workflows/fast-spice-audit.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Measure 6CG7 bias and actual 6AL5 feedback effect
+        run: |
+          python3 - <<'PY'
+          import sys, tempfile
+          from pathlib import Path
+          sys.path.insert(0,"scripts")
+          from measure_compression_thd import measure
+          root=Path(tempfile.mkdtemp(prefix="spice-audit-"))
+          for mode in ("A-436B","RS124"):
+              for dbu in (-18,-6):
+                  c=dict(mode=mode,hz=1000,dbu=dbu,attack=0,recovery=0,
+                         hold=False,input_knob=.8)
+                  stem=mode.replace("-","")+str(dbu).replace("-","m")
+                  on=measure(c,root/(stem+"on"),False)
+                  off=measure(c,root/(stem+"off"),True)
+                  print(f"{mode} {dbu:+} dBu: 6CG7 plate idle {on['plate_6cg7_a_V']:.2f} V; "
+                        f"6BC8 plate idle {on['plate_6bc8_a_V']:.2f} V; "
+                        f"CV {on['cv_V']:.2f} V; "
+                        f"GR {off['output_dBu']-on['output_dBu']:.2f}dB; "
+                        f"THD {on['thd_percent']:.3f}%; "
+                        f"out {on['output_dBu']:.2f}dBu",flush=True)
+          PY
