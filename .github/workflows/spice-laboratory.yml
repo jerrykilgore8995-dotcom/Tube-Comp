@@ -57,6 +57,25 @@ jobs:
           fi
       - name: Regression tests and historical calibration status
         run: python3 scripts/verify_results.py output
+      - name: Upload compact summary of real measured numbers
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-compact-measurements
+          path: |
+            output/manifest.json
+            output/cases.json
+            output/measurement_table.csv
+            output/transfer_1k.png
+            output/thd_1k.png
+            output/timing/timing.csv
+            output/timing/timing.json
+            output/tube_curves/plate_curves.csv
+            output/tube_curves/transconductance.csv
+            output/static_bias_ac/bias_operating_points.csv
+            output/static_bias_ac/bias_operating_points.json
+            output/static_bias_ac/frequency_phase_vs_control.csv
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload raw ngspice results, harmonics and report
         uses: actions/upload-artifact@v4
         with:
