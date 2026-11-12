@@ -1,0 +1,32 @@
+name: Full 11 Input Position SPICE Calibration
+on:
+  push:
+    paths: [".github/workflows/spice-input-grid.yml", "scripts/input_knob_grid.py"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  input-knob:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ["A-436B","RS124"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TUBECOMP_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice, numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Actual 1.6s SPICE measurement over ALL 11 input dial positions
+        run: python3 scripts/input_knob_grid.py
+      - name: Archive 33 measured inputs and complete K2-K20 / CV / output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-inputgrid-${{ matrix.mode }}
+          path: output/input_knob_grid/${{ matrix.mode }}/input_grid.csv
+          if-no-files-found: warn
