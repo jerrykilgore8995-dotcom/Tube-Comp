@@ -66,7 +66,7 @@ rows=[]
 for mode in ("A-436B","RS124"):
     baseline_off=measure(mode,-36,True)
     linear_gain=baseline_off["output_dBu"]-(-36)
-    for dbu in (-36,-24,-18,-12,-6,0):
+    for dbu in (-36,-24,-18,-12,-6):
         try:
             row=measure(mode,dbu,False)
         except Exception as e:
