@@ -1,0 +1,16 @@
+* ALTERNATE DEVICE CANDIDATE: Sylvania 6BC8 5-parameter Koren plate curves
+* Parameter origin: Wayne Clay 2014 Sylvania datasheet fit as quoted on diyAudio.
+* https://www.diyaudio.com/community/threads/vacuum-tube-spice-models.243950/page-115
+* Published fit reports mean error 0.36045mA to scanned Sylvania plate curves.
+* This is an independent SPICE implementation of a published parameter set;
+* not a validated 436B installed tube or evidence of authentic RS124 output.
+.subckt V6BC8_ALT P G K
+* Vp/Vg and three empirical Koren terms: KG=54.16463004,
+* KP=1.794225622, KV=0.9222704089k, EX=1.439822572,
+* G=0.02019891536m.
+BPL P K I={20.19891536u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+54.16463004*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)}
+RPK P K 1G
+CGK G K 3.9p
+CGP G P 3.7p
+CPK P K 1.8p
+.ends V6BC8_ALT
