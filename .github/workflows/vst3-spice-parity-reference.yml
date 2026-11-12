@@ -1,0 +1,31 @@
+name: VST3 5 Percent SPICE Reference Data
+on:
+  push:
+    paths: [".github/workflows/vst3-spice-parity-reference.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  golden:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ["A-436B","RS124"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TUBECOMP_PARITY_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and numpy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: 1.6 second settled SPICE K2-K20 / CV / outputs, both knob positions
+        run: python3 scripts/long_steady_compression.py
+      - name: Archive SPICE golden measured target
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-parity-${{ matrix.mode }}
+          path: output/long_steady_compression/${{ matrix.mode }}/long_steady.csv
+          if-no-files-found: error
