@@ -18,9 +18,9 @@ def simulate(mode,cv,root):
     # Freeze sidechain charge at a supplied bias. This is not a true compressed
     # transient simulation, but a valid small-signal AC linearization around
     # the corresponding nonlinearly biased tube operating point.
-    s=re.sub(r'^R12 detector cv \{ATTACK_R\},'* fixed-bias AC removes RATT',s,flags=re.M)
-    s=re.sub(r'^C4 cv 0 1u,'* fixed-bias AC removes CREC',s,flags=re.M)
-    s=re.sub(r'^R9 cv 0 \{REC_R\},'* fixed-bias AC removes RREC',s,flags=re.M)
+    s=re.sub(r'^R12 detector cv \{ATTACK_R\}$','* forced-bias AC removes R12',s,flags=re.M)
+    s=re.sub(r'^C4 cv 0 1u$','* forced-bias AC removes C4',s,flags=re.M)
+    s=re.sub(r'^R9 cv 0 \{REC_R\}$','* forced-bias AC removes R9',s,flags=re.M)
     s=s.replace('* Simulations are not hardware-calibrated',
         f'VFORCE cv 0 {cv}\n* Simulations are not hardware-calibrated')
     s=s.replace('BIAS=-0.8',f'BIAS={-0.8 if mode=="A-436B" else -1.0}')
