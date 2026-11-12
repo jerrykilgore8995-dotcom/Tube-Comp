@@ -59,7 +59,9 @@ tubecomp::Parameters TubeCompProcessor::parametersFromState() const noexcept {
 void TubeCompProcessor::prepareToPlay(double sampleRate,int samplesPerBlock) {
     engine.prepare((float)sampleRate,samplesPerBlock);
     engine.setParameters(parametersFromState(),true);
-    setLatencySamples(0);
+    // Accurate SPICE phase FIR has a fixed 16-sample group-delay offset.
+    // Report this to the DAW for sample-accurate plugin delay compensation.
+    setLatencySamples(tubecomp::phasefit::kLatency);
     grMeter.store(0.f);inputMeter.store(0.f);outputMeter.store(0.f);
 }
 void TubeCompProcessor::processBlock(juce::AudioBuffer<float>& audio,
