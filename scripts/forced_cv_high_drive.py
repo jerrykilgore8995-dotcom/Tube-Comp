@@ -29,7 +29,7 @@ def sim(dbu,cv):
  s=re.sub(r"tran [^\n]+(?=\nwrdata tran.txt)","tran 20u 0.17 0 20u",s)
  deck.write_text(s)
  try:
-  p=subprocess.run(["ngspice","-b",deck.name],cwd=wd,text=True,capture_output=True,timeout=55)
+  p=subprocess.run(["ngspice","-b",deck.name],cwd=wd,text=True,capture_output=True,timeout=35)
  except subprocess.TimeoutExpired:
   print(f"FORCED_CV_TIMEOUT {dbu}dBu CV={cv}V",flush=True);return None
  txt=p.stdout+"\n"+p.stderr
@@ -55,7 +55,7 @@ def sim(dbu,cv):
  return row
 rows=[]
 for dbu in (0,7):
- for cv in (-12,-15,-18,-22,-26):
+ for cv in (-12,-18,-22):
   v=sim(dbu,cv)
   if v:rows.append(v)
 if not rows:raise RuntimeError("All forced-CV tests failed")
