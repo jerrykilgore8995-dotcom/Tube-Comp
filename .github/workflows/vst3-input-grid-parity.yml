@@ -1,0 +1,49 @@
+name: VST3 8 Percent All Input Dial Position Parity
+on:
+  push:
+    paths: [".github/workflows/vst3-input-grid-parity.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  grid:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Independent 11-position Altec SPICE grid
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43280102313
+          name: TubeComp-SPICE-inputgrid-A-436B
+          github-token: ${{ github.token }}
+          path: reference/altec
+      - name: Independent 11-position RS124 SPICE grid
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43280102313
+          name: TubeComp-SPICE-inputgrid-RS124
+          github-token: ${{ github.token }}
+          path: reference/rs124
+      - name: Build exact native JUCE DSP core without simulated data
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompParitySurvey.cpp -o TubeCompParitySurvey
+      - name: Render each input setting and source level for both modes
+        run: ./TubeCompParitySurvey input_dsp.csv --input-grid
+      - name: Fail-closed 8 percent parity test
+        run: |
+          python3 scripts/verify_input_grid_parity.py \
+            --spice-altec reference/altec/input_grid.csv \
+            --spice-rs124 reference/rs124/input_grid.csv \
+            --dsp input_dsp.csv
+      - name: Preserve output even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-all-input-knobs-8pct-parity
+          path: |
+            input_dsp.csv
+            output/input_grid_parity/
+          if-no-files-found: warn
