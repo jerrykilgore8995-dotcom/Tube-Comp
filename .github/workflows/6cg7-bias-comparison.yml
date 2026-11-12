@@ -1,0 +1,53 @@
+name: 6CG7 Bias and Plate-Curve Comparison
+on:
+  push:
+    paths: [".github/workflows/6cg7-bias-comparison.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  op-points:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Compare RCA / GE 6CG7 models and B+ droppers with real ngspice OP
+        run: |
+          python3 - <<'PY'
+          import re,subprocess,tempfile,sys
+          from pathlib import Path
+          sys.path.insert(0,"scripts")
+          from run_lab import prepare,op_nodes
+          base=Path(tempfile.mkdtemp(prefix="triode-bias-"))
+          for valve in ("V6CG7","V6CG7_GE"):
+              for drop in (15000,18000,20000,22000):
+                  for mode in ("A-436B","RS124"):
+                      c=dict(mode=mode,hz=1000,dbu=-36,attack=0,recovery=0,hold=False,input_knob=.8)
+                      wd=base/(valve+"_"+str(drop)+"_"+mode)
+                      f=prepare(c,wd)
+                      s=f.read_text()
+                      s=s.replace("R6CG7_DROP=15000",f"R6CG7_DROP={drop}")
+                      if valve=="V6CG7_GE":
+                          s=s.replace("k2 V6CG7\n","k2 V6CG7_GE\n")
+                      assert "XU2B" in s
+                      s,n=re.subn(r"\.control\n.*?\.endc",
+                         ".control\nop\nprint v(bplus) v(platefeed) v(outputfeed) v(pa) v(k1) v(k2) v(p2a) v(p2b)\nquit\n.endc",
+                         s,flags=re.S)
+                      assert n==1
+                      f.write_text(s)
+                      p=subprocess.run(["ngspice","-b",f.name],cwd=wd,
+                         capture_output=True,text=True,timeout=15)
+                      assert p.returncode==0,(p.stdout+p.stderr)[-700:]
+                      n=op_nodes(p.stdout+"\n"+p.stderr)
+                      def v(key):return n.get(f"v({key})",float("nan"))
+                      print(f"VALVE={valve} DROPPER={drop} MODE={mode} "
+                            f"OUTPUT_PLATE={v('p2a'):.3f}V "
+                            f"OUTPUT_CATHODE={v('k2'):.3f}V "
+                            f"OUTPUT_FEED={v('outputfeed'):.3f}V "
+                            f"6BC8_PLATE={v('pa'):.3f}V "
+                            f"6BC8_FEED={v('platefeed'):.3f}V",flush=True)
+          PY
