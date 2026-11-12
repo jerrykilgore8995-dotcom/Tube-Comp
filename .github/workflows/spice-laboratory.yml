@@ -39,6 +39,13 @@ jobs:
           else
             python3 scripts/run_lab.py --quick --output output
           fi
+      - name: Rectified 6AL5 attack / recovery / HOLD time sweeps
+        run: |
+          if [ "${{ github.event.inputs.sweep }}" = "broad" ]; then
+            python3 scripts/timing_lab.py --broad --out output/timing
+          else
+            python3 scripts/timing_lab.py --out output/timing
+          fi
       - name: Regression tests and historical calibration status
         run: python3 scripts/verify_results.py output
       - name: Upload raw ngspice results, harmonics and report
