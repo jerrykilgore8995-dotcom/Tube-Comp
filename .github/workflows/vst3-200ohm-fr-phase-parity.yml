@@ -1,0 +1,48 @@
+name: VST3 8 Percent 200 Ohm Frequency Phase Group Delay
+on:
+  push:
+    paths:
+      - ".github/workflows/vst3-200ohm-fr-phase-parity.yml"
+      - "tests/TubeCompFRPhaseSurvey.cpp"
+      - "plugin/TubeCompDSP.h"
+      - "plugin/SpicePhaseFIR200Measured.inc"
+      - "scripts/verify_dsp_fr_phase.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  phase200:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve independently measured 200Ω SPICE .AC data
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283226539
+          name: TubeComp-SPICE-200ohm-frequency-phase
+          github-token: ${{ github.token }}
+          path: reference/200ohm
+      - name: Compile native 44.1kHz 200Ω complex response
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompFRPhaseSurvey.cpp -o TubeCompFRPhaseSurvey
+      - name: Render 170 DSP phase and frequency points at 200Ω
+        run: ./TubeCompFRPhaseSurvey dsp_200_phase.csv --load-200
+      - name: Enforce 8 percent output amplitude, phase and group delay parity
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3-numpy
+          python3 scripts/verify_dsp_fr_phase.py \
+            reference/200ohm/frequency_phase_all_points.csv \
+            dsp_200_phase.csv output/phase200_parity
+      - name: Archive raw phase measurements and errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-200ohm-phase-frequency-170point-parity
+          path: |
+            dsp_200_phase.csv
+            output/phase200_parity/
+          if-no-files-found: warn
