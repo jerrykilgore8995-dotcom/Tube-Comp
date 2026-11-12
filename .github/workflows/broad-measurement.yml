@@ -1,0 +1,36 @@
+name: Broad Component Interaction Study
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/run_lab.py"
+      - ".github/workflows/broad-measurement.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SPICE and scientific analysis tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy python3-matplotlib
+      - name: Full level-frequency-attack-recovery-control study
+        run: python3 scripts/run_lab.py --broad --compact --output broad
+      - name: Verify every simulation, K2-K20 and operating points
+        run: python3 scripts/verify_results.py broad
+      - name: Publish measured controls and stage harmonics
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-Broad-Parametric-SPICE-Results
+          path: |
+            broad/manifest.json
+            broad/cases.json
+            broad/measurement_table.csv
+            broad/transfer_1k.png
+            broad/thd_1k.png
+          if-no-files-found: error
+          retention-days: 30
