@@ -14,6 +14,29 @@ CGA G P 3.7p
 CPK P K 1.8p
 .ends V6BC8
 
+* 6BC8 semiremote-cutoff candidate, fitted at TWO operating conditions.
+* This optional variant adds a very weak low-gm plate-current branch,
+* representing the low-mu sections of the semiremote-cutoff grid.
+* Numerical fit anchors:
+*  - RCA sheet at Va=150V and Rk=220R: Ip approx 10mA and gm=6200umho,
+*    grid grounded -> Vgk approx -2.2V; rp approx 5.3k.
+*  - factory 436C drawing at idle: 65V plates, (210-65)/47k=3.085mA,
+*    grid-cathode about -1V with 34R shared cathode.
+*  - RCA -13V sensitivity: gm about 50umho.
+*  - factory 20dB compressed: 285V plates, 290V plate-feed, 47k loads
+*    => (290-285)/47k = 0.1064mA PER HALF at about -30V bias.
+* Single-Koren V6BC8 yields only 0.000172mA at this last anchor (x618 low).
+* Fitted monotonic remote tail is NOT a manufacturer's plate curve;
+* independently verify against a real 6BC8 at the deep-negative bias.
+* DC positive grid current, heaters, and alternate supply sag are unmodeled.
+.subckt V6BC8_REMOTE P G K
+BPL P K I={20.2365654u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+59.22382604*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)+0.96348024m*pow(uramp(V(P,K)/150),1.69329672)/(1+exp(-(V(G,K)+14.76054299)/4.6849283))}
+Rleak P K 1000Meg
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
+.ends V6BC8_REMOTE
+
 * 6CG7: CC0 model fitted by Circuit Codex to published RCA anchor:
 * Va=250V / Vg=-8V -> 9mA, 2600umho, mu=20.
 * Further checkpoints at 90V/0V and 250V/-12.5V are approximate.
