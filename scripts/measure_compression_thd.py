@@ -44,6 +44,10 @@ def measure(case, workdir, disable_feedback=False):
         outfeed_V=ops.get("v(outputfeed)"),
         plate_6cg7_a_V=ops.get("v(p2a)"),
         plate_6cg7_b_V=ops.get("v(p2b)"),
+        cathode_6cg7_V=ops.get("v(k2)"),
+        cathode_6bc8_V=ops.get("v(k1)"),
+        supply_6bc8_V=ops.get("v(platefeed)"),
+        supply_6cg7_V=ops.get("v(outputfeed)"),
         plate_6bc8_a_V=ops.get("v(pa)"),
         plate_6bc8_b_V=ops.get("v(pb)"),
         )
