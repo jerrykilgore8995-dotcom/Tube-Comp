@@ -37,6 +37,24 @@ CGA G P 3.7p
 CPK P K 1.8p
 .ends V6BC8_REMOTE
 
+* Improved semiremote 6BC8 tail, EXPONENTIAL over negative-grid range.
+* Current V6BC8_REMOTE candidate (sigmoid tail) has an unacceptable
+* nonmonotonic gain-vs-CV interval near -12..-18V despite lower THD.
+* An exponential tail has strictly positive gm that decreases monotonically
+* as Vg becomes more negative; the normal Koren cell behaves the same.
+* Fitted anchors as V6BC8_REMOTE (see above), but do NOT use as hardware
+* certification without measured published plate curves beyond -13V.
+* At Va=150/Vgk=-2.2: 10.06mA, gm=6214uS; at Va=65/Vgk=-1:
+* 3.09mA; at Va=150/Vgk=-13: gm=50uS; at Va=285/Vgk=-30:
+* 0.10638mA. Positive grid current and core magnetics remain unmodeled.
+.subckt V6BC8_REMOTE_EXP P G K
+BPL P K I={19.65702722u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+61.17656889*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)+0.35980862m*pow(uramp(V(P,K)/150),1.76348216)*exp((V(G,K)+13)/7.23198212)}
+Rleak P K 1000Meg
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
+.ends V6BC8_REMOTE_EXP
+
 * 6CG7: CC0 model fitted by Circuit Codex to published RCA anchor:
 * Va=250V / Vg=-8V -> 9mA, 2600umho, mu=20.
 * Further checkpoints at 90V/0V and 250V/-12.5V are approximate.
