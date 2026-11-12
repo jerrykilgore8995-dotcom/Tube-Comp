@@ -1,0 +1,30 @@
+name: TubeComp Frequency Phase Group Delay Acceptance
+on:
+  push:
+    paths:
+      - ".github/workflows/frequency-phase-acceptance.yml"
+      - "scripts/frequency_phase_acceptance.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ac-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and math libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Check 30Hz-15kHz gain phase group delay across 0 to -17V
+        run: python3 scripts/frequency_phase_acceptance.py
+      - name: Upload measured response and acceptance limits
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-30Hz-20kHz-frequency-phase-acceptance
+          path: |
+            output/frequency_phase_acceptance/frequency_phase_all_points.csv
+            output/frequency_phase_acceptance/acceptance_summary.csv
+            output/frequency_phase_acceptance/acceptance_summary.json
+          if-no-files-found: error
