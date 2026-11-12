@@ -133,8 +133,8 @@ public:
         setParameters(params,true);
     }
     void reset() noexcept {
-        peak={};cv={};
-        detector={0,0};hold={0,0};
+        cv={0.f,0.f};
+        detector={0.f,0.f};
         inLevel=outLevel=1.f;wetLevel=1.f;
         for(int c=0;c<2;++c){
             inputHP[(size_t)c].reset();
@@ -238,7 +238,7 @@ private:
     float fs=44100.f;
     Parameters params;
     Meter lastMeter {};
-    std::array<float,2> detector{},cv{},hold{};
+    std::array<float,2> detector{},cv{};
     float peakCoef=.1f,inputSmooth=.001f,outputSmooth=.001f,bypassSmooth=.001f;
     float inLevel=1.f,outLevel=1.f,wetLevel=1.f;
     float targetInput=1.f,targetOutput=1.f,targetWet=1.f;
