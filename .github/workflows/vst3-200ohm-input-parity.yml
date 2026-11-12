@@ -1,0 +1,56 @@
+name: VST3 8 Percent Physical 200 Ohm Loaded Input Parity
+on:
+  push:
+    paths:
+      - ".github/workflows/vst3-200ohm-input-parity.yml"
+      - "plugin/TubeCompDSP.h"
+      - "plugin/SpiceReference.h"
+      - "plugin/SpiceInputGrid200Measured.inc"
+      - "plugin/SpicePhaseFIR200Measured.inc"
+      - "tests/TubeCompParitySurvey.cpp"
+      - "scripts/verify_input_grid_parity.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  load200:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve 200Ω loaded Altec SPICE K2-K20 baseline
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283042777
+          name: TubeComp-SPICE-200ohm-allinputs-A-436B
+          github-token: ${{ github.token }}
+          path: reference/altec
+      - name: Retrieve 200Ω loaded RS124 SPICE K2-K20 baseline
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283042777
+          name: TubeComp-SPICE-200ohm-allinputs-RS124
+          github-token: ${{ github.token }}
+          path: reference/rs124
+      - name: Compile actual DSP engine 44.1kHz 200Ω
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Iplugin \
+            tests/TubeCompParitySurvey.cpp -o TubeCompParitySurvey
+      - name: Render 66 actual loaded JUCE DSP scenarios
+        run: ./TubeCompParitySurvey dsp_200.csv --input-grid --load-200
+      - name: Enforce 8 percent SPICE parity for 200Ω output load
+        run: |
+          python3 scripts/verify_input_grid_parity.py \
+            --spice-altec reference/altec/input200.csv \
+            --spice-rs124 reference/rs124/input200.csv \
+            --dsp dsp_200.csv --output output/input_grid200_parity
+      - name: Archive every measured actual DSP result and failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-200ohm-input-control-66-case-parity
+          path: |
+            dsp_200.csv
+            output/input_grid200_parity/
+          if-no-files-found: warn
