@@ -269,6 +269,7 @@ public:
         lastMeter.outputPeak=std::max(std::fabs(left),std::fabs(right));
     }
     Meter meters() const noexcept{return lastMeter;}
+    float controlVolts() const noexcept{return std::max(cv[0],cv[1]);}
     StageProbe stageProbe() const noexcept{return lastProbe;}
 private:
     float fs=44100.f;
