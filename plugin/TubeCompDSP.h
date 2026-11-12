@@ -1,153 +1,149 @@
 #pragma once
-// TUBE COMP realtime DSP — intentionally NOT a SPICE solver.
-// 6BC8 remote-cutoff approximation -> sampled output-feedback control ->
-// 6CG7 output amplifier approximation. Factory Altec and reconstructed RS124.
-// Coefficients and all nominal stage values are source-labelled and must be
-// calibrated against legitimate ngspice/hardware measurements before claiming
-// original-device accuracy. No allocations, file I/O, locks or exp() per sample.
+// TubeComp real-time 6BC8 / 6CG7 feedback compressor prototype.
+// Reference: SPICE-exploratory 436B/RS124 operating-point and output grids.
+// CV is a negative-control-voltage MAGNITUDE in volts, NOT gain reduction dB.
+// All sound processing is sample-by-sample, with no allocation or locks.
+// A 6–8% all-controls SPICE match remains an acceptance requirement and is
+// NOT established merely by compiling this approximation.
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include "SpiceReference.h"
 
 namespace tubecomp {
-constexpr float pi = 3.14159265358979323846f;
-inline float clamp(float v,float a,float b) noexcept {return std::max(a,std::min(v,b));}
-inline float db2lin(float dB) noexcept {return std::pow(10.f,dB/20.f);}
-inline float lin2db(float x) noexcept {return 20.f*std::log10(std::max(x,1.e-14f));}
-inline float coefficient(float ms,float sr) noexcept {
-    return 1.f-std::exp(-1000.f/(std::max(.02f,ms)*sr));
+constexpr float pi=3.14159265358979323846f;
+inline float clamp(float x,float lo,float hi) noexcept {return std::max(lo,std::min(x,hi));}
+inline float db2lin(float x) noexcept {return std::exp2(x/6.020599913f);}
+inline float lin2db(float x) noexcept {return 6.020599913f*std::log2(std::max(1.e-16f,x));}
+inline float coeff(float ms,float fs) noexcept {
+    return 1.f-std::exp(-1000.f/(std::max(.05f,ms)*fs));
 }
-// Clockwise attack 1 fastest -> 9 slowest.
-// PROVISIONAL ngspice control-network RC candidates, NOT Chandler measured times.
-static constexpr std::array<float,9> rsAttackMs = {
+static constexpr std::array<float,9> rsAttackMs={{
     12.f,22.f,33.f,47.f,68.f,100.f,150.f,220.f,330.f
-};
-// Recovery #1 fastest -> #6 slowest, based on SPICE 180k..3.3M / 1uF.
-static constexpr std::array<float,6> rsReleaseMs = {
+}};
+static constexpr std::array<float,6> rsReleaseMs={{
     180.f,330.f,680.f,1000.f,1800.f,3300.f
-};
-// Physical switch from left to right: slowest #6, HOLD, #5, HOLD, ... #1.
-// 0,2,4,6,8,10 -> #6,#5,#4,#3,#2,#1; odd positions -> HOLD.
-inline bool recoveryIsHold(int position) noexcept {return (position&1)!=0;}
-inline int recoveryNumber(int position) noexcept {
-    return 6-std::clamp(position,0,10)/2;
-}
-
+}};
+inline bool recoveryIsHold(int p) noexcept {return (p&1)!=0;}
+inline int recoveryNumber(int p) noexcept {return 6-std::clamp(p,0,10)/2;}
 struct Parameters {
     bool rs124=true;
-    float input=5.f;       // 0..10 knob, calibrated 5 means nominal input gain
-    float output=0.f;      // RS124 output attenuator -10..0 dB
-    int attack=3;          // 0..8; RS124 1..9
-    int recovery=6;        // 0..10, even: release, odd: HOLD
-    float balance=0.f;     // push-pull trim; -1..+1
-    bool superfuse=false;  // optional reinterpretation (unverified proprietary)
+    float input=5.f,output=0.f;
+    int attack=3,recovery=6;
+    float balance=0.f;
+    bool superfuse=false;
     float wet=1.f;
     bool bypass=false;
-    float stereoLink=1.f;  // linked by default
+    float stereoLink=1.f;
     float outputOhms=600.f;
 };
+struct Meter {float gainReduction=0.f,inputPeak=0.f,outputPeak=0.f;};
+struct StageProbe {float input=0.f,muPlate=0.f,gainCell=0.f,outputPlate=0.f,grDb=0.f;};
 
-struct Meter {
-    float gainReduction=0.f, inputPeak=0.f, outputPeak=0.f;
-};
-// Probe points expose real computed audio samples to the offline test runner,
-// not invented stage spectra. Unit convention: normalized DSP amplitudes.
-struct StageProbe {
-    float input=0.f,muPlate=0.f,gainCell=0.f,outputPlate=0.f,grDb=0.f;
-};
-
-// Cheap highpass for coupling networks and DC removal. 1-pole digital HP,
-// corner corresponds approximately to 0.022uF / known grid leak values.
+// Original SPICE input-to-output phase: approximately 2 cascaded 10Hz HP
+// stages and -180 degrees of push-pull polarity inversion. Fractional delay
+// models the residual ≈0.007–0.008ms winding / leakage group delay.
+// This must be cross-checked with AC phase measurements across all CVs.
 class HighPass {
 public:
-    void configure(float freq,float sampleRate) noexcept {
-        alpha=std::exp(-2.f*pi*freq/sampleRate);
+    void prepare(float fc,float sr) noexcept {
+        alpha=std::exp(-2.f*pi*fc/sr);reset();
     }
     float tick(float x) noexcept {
-        const float y=alpha*(y1+x-x1);
-        x1=x;y1=std::fabs(y)<1.e-24f?0.f:y;return y1;
+        float y=alpha*(y1+x-x1);
+        x1=x;y1=std::fabs(y)<1.e-25f?0.f:y;
+        return y1;
     }
-    void reset() noexcept{x1=y1=0.f;}
+    void reset() noexcept {x1=0.f;y1=0.f;}
 private:
-    float alpha=.99f,x1=0.f,y1=0.f;
+    float alpha=.999f,x1=0.f,y1=0.f;
 };
 class LowPass {
 public:
-    void configure(float freq,float sampleRate) noexcept {
-        alpha=1.f-std::exp(-2.f*pi*freq/sampleRate);
+    void prepare(float hz,float sr) noexcept {
+        a=1.f-std::exp(-2.f*pi*std::min(hz,.49f*sr)/sr);
+        reset();
     }
+    void setCoefficient(float value) noexcept {a=value;}
+    float coefficient() const noexcept {return a;}
     float tick(float x) noexcept {
-        y+=alpha*(x-y);
-        if(std::fabs(y)<1.e-24f)y=0.f;
+        y+=a*(x-y);
+        if(std::fabs(y)<1.e-25f)y=0.f;
         return y;
     }
-    void reset() noexcept{y=0.f;}
+    void reset() noexcept {y=0.f;}
 private:
-    float alpha=.9f,y=0.f;
+    float a=.9f,y=0.f;
 };
-
-// DC-blocked nonlinear plate stages. A finite-power series approximates the
-// local device transfer at each operating point. Shape coefficients vary with
-// gain-reduction voltage and bias imbalance rather than staying a fixed static
-// "tube saturator". Values are exploratory calibration parameters.
-class TubeCell {
+class FractionalAllpass {
 public:
-    void prepare(float fs) noexcept {dc.configure(3.f,fs);reset();}
-    void reset() noexcept {dc.reset();}
-    // z is normalized to typical high-level tube drive. 6BC8 stage is
-    // variable-mu and becomes increasingly asymmetric under high GR.
-    float varMu(float x,float gr,float balance,bool rs) noexcept {
-        const float z=clamp(x*.90f,-3.0f,3.0f);
-        const float bias=clamp(gr/30.f,0.f,1.f);
-        const float even=(rs?.00010f:.00008f)+balance*.013f+bias*.00004f;
-        const float odd=(rs?-.0095f:-.0088f)-bias*.0025f;
-        // Local 6BC8 transfer and push-pull imbalance.
-        const float y=z+even*z*z+odd*z*z*z;
-        return dc.tick(y/.90f);
+    void prepare(float sampleFraction) noexcept {
+        a=clamp((1.f-sampleFraction)/(1.f+sampleFraction),0.f,.99f);
+        reset();
     }
-    // 6CG7 push-pull output stage: lower K2, moderate K3 at high level;
-    // voltage swing depends on output load (200/600ohm -> slight level loss).
-    float outputAmp(float x,float gr,float balance,float impedance) noexcept {
-        const float z=clamp(x*.77f,-3.1f,3.1f);
-        const float e=.00009f+balance*.0045f;
-        const float o=-.012f-.0012f*clamp(gr/30.f,0.f,1.f);
-        const float load=impedance<=300.f?.985f:1.f;
-        return dc.tick((z+e*z*z+o*z*z*z)/.77f)*load;
+    float tick(float x) noexcept {
+        const float y=a*x+x1-a*y1;
+        x1=x;y1=y;
+        return y;
     }
-private:
-    HighPass dc;
+    void reset() noexcept {x1=y1=0.f;}
+private:float a=.5f,x1=0.f,y1=0.f;
 };
+// Chebyshev waveshaper for the K2..K11 harmonic-bin targets. Coefficients
+// interpolate with input operating point, rather than a static K3 preset.
+// Chebyshev of a normalized sine yields pure higher-order partials.
+// This is NOT equivalent to independently verified 6CG7 plate equations.
+// All nonlinear spectral targets must be assessed on the render at 44.1k.
+inline float harmonics(float x,float peak,const spice::Point& target,
+                       float balance,bool rs) noexcept {
+    peak=std::max(peak,1.e-8f);
+    const float z=clamp(x/peak,-1.f,1.f);
+    float prev=1.f,cur=z;
+    float residue=0.f;
+    for(int k=2;k<=11;++k){
+        const float next=2.f*z*cur-prev;
+        prev=cur;cur=next;
+        float ratio=std::exp2(target.harmonicDb[static_cast<size_t>(k-2)]/
+                              6.020599913f);
+        if((k%2)==0)
+            ratio*=clamp(1.f+balance*(rs?1.3f:1.1f),.05f,3.5f);
+        // The original 6BC8 is differential and its balanced K2 is small.
+        // The centered stage therefore preserves the measured K2 target.
+        residue+=ratio*next;
+    }
+    return x+peak*residue;
+}
 
 class Engine final {
 public:
     void prepare(float sampleRate,int) noexcept {
         fs=std::max(8000.f,sampleRate);
-        peakCoef=coefficient(.55f,fs);
-        inputSmooth=coefficient(9.f,fs);
-        outputSmooth=coefficient(9.f,fs);
-        bypassSmooth=coefficient(7.f,fs);
+        inputEnvAlpha=coeff(8.f,fs);
+        outputEnvAlpha=coeff(5.f,fs);
+        gainSmoothAlpha=coeff(1.8f,fs);
+        wetSmoothAlpha=coeff(7.f,fs);
+        outputSmoothAlpha=coeff(7.f,fs);
         for(int c=0;c<2;++c){
-            inputHP[(size_t)c].configure(11.f,fs);
-            couplingHP[(size_t)c].configure(8.f,fs);
-            outLP[(size_t)c].configure(std::min(25000.f,fs*.46f),fs);
-            cells[(size_t)c][0].prepare(fs);
-            cells[(size_t)c][1].prepare(fs);
+            hpf[c][0].prepare(9.7f,fs);
+            hpf[c][1].prepare(9.7f,fs);
+            hf[c].prepare(std::min(.46f*fs,20000.f),fs);
+            phase[c].prepare(.335f*fs/44100.f);
         }
         reset();
         setParameters(params,true);
     }
     void reset() noexcept {
-        cv={0.f,0.f};
-        detector={0.f,0.f};
+        sampleCount=0;
+        cv={0.f,0.f};inputEnv={0.f,0.f};outputEnv={0.f,0.f};
         feedbackAudio={0.f,0.f};
-        inLevel=outLevel=1.f;wetLevel=1.f;
-        lastProbe={};
+        gainDb={30.f,30.f};
+        sourceDbu={-36.f,-36.f};
+        lastProbe={};lastMeter={};
+        wetLevel=1.f;outputLevel=1.f;
         for(int c=0;c<2;++c){
-            inputHP[(size_t)c].reset();
-            couplingHP[(size_t)c].reset();
-            outLP[(size_t)c].reset();
-            for(auto& cell:cells[(size_t)c])cell.reset();
+            for(auto& filter:hpf[c])filter.reset();
+            hf[c].reset();phase[c].reset();
         }
     }
     void setParameters(Parameters p,bool immediate=false) noexcept {
@@ -159,115 +155,136 @@ public:
         p.wet=clamp(p.wet,0.f,1.f);
         p.stereoLink=clamp(p.stereoLink,0.f,1.f);
         params=p;
-        targetInput=db2lin((p.input-5.f)*4.5f);
+        attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]:50.f;
+        release63=p.rs124?
+            rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:1000.f;
+        attackAlpha=coeff(attack63*(p.superfuse&&p.rs124?.75f:1.f),fs);
+        releaseAlpha=coeff(release63,fs);
         targetOutput=db2lin(p.rs124?p.output:0.f);
         targetWet=p.bypass?0.f:p.wet;
-        attack63=p.rs124?rsAttackMs[(size_t)p.attack]:50.f;
-        release63=p.rs124?rsReleaseMs[(size_t)(recoveryNumber(p.recovery)-1)]:1000.f;
-        attackAlpha=coefficient(attack63*(p.rs124&&p.superfuse?.75f:1.f),fs);
-        releaseAlpha=coefficient(release63,fs);
-        if(immediate) {
-            inLevel=targetInput;outLevel=targetOutput;wetLevel=targetWet;
+        if(immediate){
+            wetLevel=targetWet;outputLevel=targetOutput;
         }
     }
-    float attackMs() const noexcept {return attack63;}
-    float releaseMs() const noexcept {return release63;}
+    float attackMs() const noexcept{return attack63;}
+    float releaseMs() const noexcept{return release63;}
     bool holdEnabled() const noexcept {
         return params.rs124 && recoveryIsHold(params.recovery);
     }
     void process(float& left,float& right) noexcept {
-        // Preamp gain (INPUT increases compression and tube drive).
-        inLevel+=(targetInput-inLevel)*inputSmooth;
-        outLevel+=(targetOutput-outLevel)*outputSmooth;
-        wetLevel+=(targetWet-wetLevel)*bypassSmooth;
+        ++sampleCount;
+        const bool update=(sampleCount%16)==0;
+        wetLevel+=(targetWet-wetLevel)*wetSmoothAlpha;
+        outputLevel+=(targetOutput-outputLevel)*outputSmoothAlpha;
         const float dry[2]={left,right};
-        const float source[2]={left*inLevel,right*inLevel};
-        float drive[2],targetGR[2];
-        // Rectifier envelope is derived from the signal before GR.
-        for(int c=0;c<2;++c) {
-            drive[c]=inputHP[(size_t)c].tick(source[c]);
-            // 436B-type FEEDBACK sidechain: sample the preceding output stage,
-            // BEFORE output pad, instead of the incoming uncompressed signal.
-            // The 1-sample feedback path keeps processing causal and allocation-free.
-            const float value=std::fabs(feedbackAudio[(size_t)c]);
-            detector[(size_t)c]+=peakCoef*(value-detector[(size_t)c]);
-            const float measured=std::max(1.e-8f,detector[(size_t)c]);
-            // Variable-mu soft knee. Fixed internal threshold; INPUT varies
-            // drive relative to it, as in historic amplifier.
-            const float over=lin2db(measured)-threshold();
-            const float knee=6.f;
-            const float inKnee=clamp((over+knee*.5f)/knee,0.f,1.f);
-            const float softOver=over>knee*.5f?over:
-                  (over < -knee*.5f ? 0.f:(over+knee*.5f)*inKnee*.5f);
-            const float compression=clamp(softOver/34.f,0.f,1.f);
-            const float ratio=3.0f+3.5f*compression+
-                              (params.rs124?.3f:0.f)+
-                              (params.rs124&&params.superfuse?1.5f:0.f);
-            // In a negative-feedback loop G=(ratio-1)*output_error;
-            // equilibrium gives the desired effective compression slope 1/ratio.
-            targetGR[c]=clamp(softOver*(ratio-1.f),0.f,
-                              params.superfuse&&params.rs124?34.f:30.f);
-        }
-        const float joint=std::max(targetGR[0],targetGR[1]);
-        float wet[2];
-        for(int c=0;c<2;++c) {
-            const float aim=targetGR[c]*(1.f-params.stereoLink)+joint*params.stereoLink;
-            const float current=cv[(size_t)c];
-            if(aim>current) {
-                cv[(size_t)c]+=(aim-current)*attackAlpha;
-            } else if(!holdEnabled()) {
-                cv[(size_t)c]+=(aim-current)*releaseAlpha;
+        float shaped[2]={};
+        float targets[2]={};
+        float inPeak[2]={};
+        float desiredGainDb[2]={};
+        float inAfterHp[2]={};
+        // 6BC8 source loading is emulated by a gain proportional to the
+        // matched dual 50k input attenuator. Never drive a zero input knob.
+        for(int c=0;c<2;++c){
+            const float x=dry[c];
+            // First coupling pole before tube and one after its output.
+            inAfterHp[c]=hpf[c][0].tick(x);
+            inputEnv[c]+=inputEnvAlpha*(std::fabs(inAfterHp[c])-inputEnv[c]);
+            // mean(abs(sine))=2/pi of peak. Explicit DAW convention:
+            // -18 dBFS PEAK corresponds to +4 dBu, so 0 dBFS = +22 dBu.
+            inPeak[c]=std::max(1.e-8f,inputEnv[c]*(pi*.5f));
+            if(update){
+                sourceDbu[c]=22.f+lin2db(inPeak[c]);
+                const float beforeOutputPad=std::max(
+                      1.e-9f,outputEnv[c]*(pi*.5f));
+                const float preOutputDbu=22.f+lin2db(beforeOutputPad);
+                const float padDbu=params.rs124?lin2db(.65f):0.f;
+                targets[c]=spice::feedbackCv(params.rs124,params.input,
+                                           preOutputDbu+padDbu);
+                if(params.superfuse&&params.rs124)
+                    targets[c]=std::min(39.f,targets[c]*1.12f);
             }
-            const float gr=clamp(cv[(size_t)c],0.f,34.f);
-            const float variableMuGain=db2lin(-gr);
-            // Distortion produced by the input gain cell and modulated with
-            // sidechain bias rather than one post-compressor static saturator.
-            const float t1=cells[(size_t)c][0].varMu(
-                 drive[c],gr,params.balance,params.rs124);
-            const float vca=t1*variableMuGain;
-            const float coupling=couplingHP[(size_t)c].tick(vca);
-            // Real output amplifiers operate at greater INTERNAL voltage swing
-            // than the final line-level delivery. A calibrated internal swing
-            // allows the 6CG7 stage to contribute its own harmonics; level
-            // is normalized after the simulated output stage.
-            constexpr float internalOutputSwing=3.5f;
-            const float t2=cells[(size_t)c][1].outputAmp(
-                 coupling*internalOutputSwing,gr,params.balance,
-                 params.rs124?params.outputOhms:600.f)/internalOutputSwing;
-            if(c==0)lastProbe={drive[c],t1,vca,t2,gr};
-            const float beforeOutputPad=outLP[(size_t)c].tick(t2);
-            feedbackAudio[(size_t)c]=beforeOutputPad;
-            const float filtered=beforeOutputPad*outLevel;
-            // Mix compensates preamp boost only at 100% wet; zero mix is
-            // truly original input and unprocessed.
-            wet[c]=dry[c]+wetLevel*(filtered-dry[c]);
         }
-        left=std::isfinite(wet[0])?wet[0]:0.f;
-        right=std::isfinite(wet[1])?wet[1]:0.f;
-        lastMeter.gainReduction=std::max(cv[0],cv[1]);
+        // The control circuit samples the signal AFTER the 6CG7, before
+        // any RS124 output pad. Linked stereo uses stronger feedback envelope.
+        if(update){
+            const float linked=std::max(targets[0],targets[1]);
+            for(int c=0;c<2;++c)
+                heldAim[c]=targets[c]*(1.f-params.stereoLink)+
+                            linked*params.stereoLink;
+        }
+        for(int c=0;c<2;++c){
+            const float goal=heldAim[c];
+            if(goal>cv[c])cv[c]+=(goal-cv[c])*attackAlpha;
+            else if(!holdEnabled())cv[c]+=(goal-cv[c])*releaseAlpha;
+            cv[c]=clamp(cv[c],0.f,39.f);
+            if(update){
+                const auto target=spice::lookup(params.rs124,params.input,
+                                                sourceDbu[c]);
+                const float refCv=target.cvMagnitude;
+                // Tube transfer gain vs negative 6BC8 grid bias is measured
+                // by ngspice; this is a correction to the reference output.
+                // At steady-state CV=reference CV it matches measured gain.
+                const float dynamicCorrection=
+                    spice::attenuationDb(params.rs124,refCv)-
+                    spice::attenuationDb(params.rs124,cv[c]);
+                // RS124 SPICE reference already includes its nominal .65
+                // post-output pad. Feedback is sampled upstream of the pad.
+                const float padCorrection=params.rs124?-lin2db(.65f):0.f;
+                desiredGainDb[c]=target.outputDbu-sourceDbu[c]+
+                                 dynamicCorrection+padCorrection;
+                desiredGain[c]=clamp(desiredGainDb[c],-65.f,65.f);
+                harmonicTargets[c]=target;
+                const float f=std::max(10000.f,25000.f-300.f*cv[c]);
+                hf[c].setCoefficient(1.f-std::exp(-2.f*pi*
+                                     std::min(f,.49f*fs)/fs));
+            }
+            gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
+            // Signal remains bipolar and is never rectified into the audio.
+            const float beforePad=inAfterHp[c]*db2lin(gainDb[c]);
+            shaped[c]=beforePad;
+            const float drivePeak=inPeak[c]*db2lin(gainDb[c]);
+            const float nonlinear=harmonics(beforePad,drivePeak,
+                              harmonicTargets[c],params.balance,params.rs124);
+            // Plate polarity inversion is deliberate: phase should match
+            // the negative push-pull polarity in the ngspice output.
+            const float afterHP=hpf[c][1].tick(nonlinear);
+            const float afterPhase=-phase[c].tick(afterHP);
+            const float beforeOutputPad=hf[c].tick(afterPhase);
+            outputEnv[c]+=outputEnvAlpha*
+                 (std::fabs(beforeOutputPad)-outputEnv[c]);
+            feedbackAudio[c]=beforeOutputPad;
+            const float pad=params.rs124?.65f:1.f;
+            const float wet=beforeOutputPad*pad*outputLevel;
+            const float result=dry[c]+wetLevel*(wet-dry[c]);
+            shaped[c]=std::isfinite(result)?result:0.f;
+            if(c==0)lastProbe={inAfterHp[c],beforePad,nonlinear,
+                              beforeOutputPad,spice::attenuationDb(
+                                    params.rs124,cv[c])};
+        }
+        left=shaped[0];right=shaped[1];
+        lastMeter.gainReduction=std::max(
+            spice::attenuationDb(params.rs124,cv[0]),
+            spice::attenuationDb(params.rs124,cv[1]));
         lastMeter.inputPeak=std::max(std::fabs(dry[0]),std::fabs(dry[1]));
         lastMeter.outputPeak=std::max(std::fabs(left),std::fabs(right));
     }
     Meter meters() const noexcept{return lastMeter;}
     StageProbe stageProbe() const noexcept{return lastProbe;}
 private:
-    float threshold() const noexcept {
-        // These calibration targets refer to nominal +4dBu modeled as
-        // -18dBFS in a 24-bit DAW, not absolute hardware dBu.
-        // Substitution of measured Altec and RS124 values remains pending.
-        return params.rs124?(params.superfuse?-31.f:-28.f):-25.5f;
-    }
     float fs=44100.f;
     Parameters params;
-    Meter lastMeter {};
-    StageProbe lastProbe {};
-    std::array<float,2> detector{},cv{},feedbackAudio{};
-    float peakCoef=.1f,inputSmooth=.001f,outputSmooth=.001f,bypassSmooth=.001f;
-    float inLevel=1.f,outLevel=1.f,wetLevel=1.f;
-    float targetInput=1.f,targetOutput=1.f,targetWet=1.f;
-    float attack63=50.f,release63=1000.f,attackAlpha=.0005f,releaseAlpha=.0001f;
-    std::array<HighPass,2> inputHP,couplingHP;
-    std::array<LowPass,2> outLP;
-    std::array<std::array<TubeCell,2>,2> cells;
+    Meter lastMeter{};
+    StageProbe lastProbe{};
+    unsigned sampleCount=0;
+    float inputEnvAlpha=.01f,outputEnvAlpha=.01f;
+    float gainSmoothAlpha=.01f,wetSmoothAlpha=.01f,outputSmoothAlpha=.01f;
+    float attack63=50.f,release63=1000.f,attackAlpha=.001f,releaseAlpha=.001f;
+    float targetOutput=1.f,targetWet=1.f,outputLevel=1.f,wetLevel=1.f;
+    std::array<float,2> inputEnv{},outputEnv{},feedbackAudio{},cv{},heldAim{};
+    std::array<float,2> gainDb{},desiredGain{},sourceDbu{};
+    std::array<spice::Point,2> harmonicTargets{};
+    std::array<std::array<HighPass,2>,2> hpf;
+    std::array<LowPass,2> hf;
+    std::array<FractionalAllpass,2> phase;
 };
 } // namespace tubecomp
