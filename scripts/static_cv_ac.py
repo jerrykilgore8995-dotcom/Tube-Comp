@@ -25,7 +25,6 @@ def simulate(mode,cv,root):
         f'VFORCE cv 0 {cv}\n* Simulations are not hardware-calibrated')
     s=s.replace('BIAS=-0.8',f'BIAS={-0.8 if mode=="A-436B" else -1.0}')
     s=s.replace('OUTPAD=1',f'OUTPAD={1.0 if mode=="A-436B" else 0.65}')
-    s=s.replace('SCGAIN=0.22', 'SCGAIN=0')
     s=s.replace('ac dec 16 20 20000','ac dec 36 20 20000')
     s=re.sub(r'\ntran 20u 0.20 0 20u\nwrdata tran.txt[^\n]+',
              '',s)
