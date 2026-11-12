@@ -69,7 +69,7 @@ Spectra measure(const Parameters& p,float hz,float peak) {
                 2*std::hypot(stageRe[(size_t)stage],stageIm[(size_t)stage])/count;
         if(k==1){
             // Input is a pure sine (phase -90 degrees).
-            float phase=(float)(std::atan2(im,re)+pi*.5f);
+            float phase=(float)(std::atan2(im,re)-pi*.5f);
             while(phase>pi)phase-=2*pi;
             while(phase<-pi)phase+=2*pi;
             result.phaseDeg=phase*180/pi;
