@@ -60,7 +60,7 @@ def values(case):
       "FREQ":case["hz"], "AMP":round(dbu_to_peak(case["dbu"]),9),
       "GAIN":max(.001,case["input_knob"]),
       "BIAS":-0.8 if mode=="A-436B" else -1.0,
-      "ATTACK_R":47_000 if mode=="A-436B" else rs_att[case["attack"]],
+      "ATTACK_R":33_000 if mode=="A-436B" else rs_att[case["attack"]],
       "REC_R":1_000_000 if mode=="A-436B" else
                  (1e12 if case["hold"] else rs_rec[case["recovery"]]),
       "OUTPAD":1.0 if mode=="A-436B" else 0.65,
