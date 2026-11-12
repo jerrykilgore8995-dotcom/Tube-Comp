@@ -1,0 +1,41 @@
+name: Build Tube Comp RS124 Windows VST3
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - "tests/TubeCompDSPTests.cpp"
+      - "gui/TubeCompFaceplate.h"
+      - ".github/workflows/tube-comp-vst3.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vst3:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure JUCE 8 / VS2022
+        run: cmake -S plugin -B plugin/build -G "Visual Studio 17 2022" -A x64
+      - name: Build realtime DSP measurements and regressions
+        run: cmake --build plugin/build --config Release --target TubeCompDSPTests --parallel 4
+      - name: Verify nine attack, eleven recovery/HOLD, real compression, THD, harmonics, CPU
+        run: ctest --test-dir plugin/build -C Release --output-on-failure
+      - name: Compile Windows VST3 with real JUCE rack GUI
+        run: cmake --build plugin/build --config Release --target TubeComp_VST3 --parallel 4
+      - name: Package actual plugin folder
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path plugin/build -Recurse -Directory -Filter "Tube Comp RS124.vst3" |
+            Select-Object -First 1
+          if (-not $file) { throw "Compiled Tube Comp RS124.vst3 not found" }
+          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_RS124_A436B_v0.1_Windows_x64_VST3.zip" -Force
+          $zip = Get-Item "TubeComp_RS124_A436B_v0.1_Windows_x64_VST3.zip"
+          if ($zip.Length -lt 100000) { throw "VST3 archive suspiciously small" }
+      - name: Upload working Windows VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-RS124-A436B-v0.1-Windows-VST3
+          path: TubeComp_RS124_A436B_v0.1_Windows_x64_VST3.zip
+          if-no-files-found: error
