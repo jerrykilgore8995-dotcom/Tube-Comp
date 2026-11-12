@@ -38,3 +38,35 @@ jobs:
                         f"THD {on['thd_percent']:.3f}%; "
                         f"out {on['output_dBu']:.2f}dBu",flush=True)
           PY
+
+      - name: Diagnose 436B rectifier bias against actual output compression
+        run: |
+          python3 - <<'PY'
+          import sys,tempfile,subprocess
+          from pathlib import Path
+          import numpy as np
+          sys.path.insert(0,"scripts")
+          from run_lab import prepare,parse_wrdata,harmonics,OUTFIELDS
+          root=Path(tempfile.mkdtemp(prefix="bias-probe-"))
+          for threshold in (0,2.3,10,20):
+              for dbu in (-18,-6):
+                  c=dict(mode="A-436B",hz=1000,dbu=dbu,attack=0,recovery=0,
+                         hold=False,input_knob=.8)
+                  wd=root/f"TH{threshold}_L{dbu}"
+                  deck=prepare(c,wd)
+                  raw=deck.read_text()
+                  key="VTHRESHOLD threshold 0 20"
+                  assert key in raw
+                  deck.write_text(raw.replace(key,f"VTHRESHOLD threshold 0 {threshold}"))
+                  p=subprocess.run(["ngspice","-b",deck.name],cwd=wd,
+                                   capture_output=True,text=True,timeout=60)
+                  if p.returncode or not (wd/"tran.txt").exists():
+                      print(f"threshold {threshold} dBu {dbu}: solver failed",flush=True)
+                      continue
+                  a=parse_wrdata(wd/"tran.txt",len(OUTFIELDS))
+                  h=harmonics(a[:,0],a[:,1],1000)
+                  cv=float(np.mean(a[-max(10,len(a)//10):,3]))
+                  print(f"THRESHOLD {threshold:>4}V INPUT {dbu:>3}dBu: "
+                        f"CV={cv:.2f}V, OUT={h['fundamental_output_dBu']:.2f}dBu, "
+                        f"THD={h['THD_percent']:.3f}%",flush=True)
+          PY
