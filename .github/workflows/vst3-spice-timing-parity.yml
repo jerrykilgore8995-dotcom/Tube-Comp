@@ -1,0 +1,70 @@
+name: VST3 8 Percent SPICE Attack Recovery HOLD Parity
+on:
+  workflow_run:
+    workflows:
+      - "SPICE Accurate Nine Attack Six Recovery Five HOLD Curves"
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download measured 6AL5 ngspice attack cases
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283800009
+          name: TubeComp-SPICE-switch-timing-attack
+          github-token: ${{ github.token }}
+          path: ref/attack
+      - name: Download measured 6AL5 ngspice recovery cases
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283800009
+          name: TubeComp-SPICE-switch-timing-recovery
+          github-token: ${{ github.token }}
+          path: ref/recovery
+      - name: Download measured 6AL5 ngspice HOLD cases
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43283800009
+          name: TubeComp-SPICE-switch-timing-hold
+          github-token: ${{ github.token }}
+          path: ref/hold
+      - name: Download independent realtime DSP attack measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-attack
+          github-token: ${{ github.token }}
+          path: dsp/attack
+      - name: Download independent realtime DSP recovery measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-recovery
+          github-token: ${{ github.token }}
+          path: dsp/recovery
+      - name: Download independent realtime DSP HOLD measurements
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43285259365
+          name: TubeComp-DSP-timing-hold
+          github-token: ${{ github.token }}
+          path: dsp/hold
+      - name: Compare every switch's actual attack and release curves
+        run: |
+          python3 scripts/verify_spice_dsp_switch_timing.py \
+            --reference-dir ref --dsp-dir dsp --tolerance 8
+      - name: Archive every timing metric and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-vs-VST3-complete-switch-timing-8pct
+          path: output/switch_timing_parity/
+          if-no-files-found: warn
