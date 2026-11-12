@@ -1,7 +1,7 @@
 name: Generate source-locked SPICE phase FIR
 on:
   push:
-    paths: [".github/workflows/generate-spice-phase-fir.yml"]
+    paths: [".github/workflows/generate-spice-phase-fir.yml", "scripts/fit_spice_phase_fir.py"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -21,14 +21,14 @@ jobs:
           path: golden/fr
       - name: Install numpy
         run: sudo apt-get update -qq && sudo apt-get install -y python3-numpy
-      - name: Fit 73-tap measured complex transfer for 10 mode/CV states
+      - name: Fit 33-tap measured complex transfer for 10 mode/CV states
         run: |
           python3 scripts/fit_spice_phase_fir.py \
              golden/fr/frequency_phase_all_points.csv plugin/SpicePhaseFIRMeasured.inc
       - name: Archive exact generated FIR coefficients
         uses: actions/upload-artifact@v4
         with:
-          name: TubeComp-SPICE-73tap-10bias-phase-FIR
+          name: TubeComp-SPICE-33tap-PDC16-10bias-phase-FIR
           path: plugin/SpicePhaseFIRMeasured.inc
           if-no-files-found: error
       - name: Commit generated source coefficient file
