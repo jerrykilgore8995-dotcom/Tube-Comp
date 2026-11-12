@@ -25,7 +25,7 @@ jobs:
           from measure_compression_thd import measure
           root=Path(tempfile.mkdtemp(prefix="spice-audit-"))
           for mode in ("A-436B","RS124"):
-              for dbu in (-18,-6,0):
+              for dbu in (-24,-18,-12,-6,0):
                   c=dict(mode=mode,hz=1000,dbu=dbu,attack=0,recovery=0,
                          hold=False,input_knob=.8)
                   stem=mode.replace("-","")+str(dbu).replace("-","m")
