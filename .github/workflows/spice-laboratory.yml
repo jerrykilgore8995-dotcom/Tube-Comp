@@ -55,6 +55,8 @@ jobs:
           else
             python3 scripts/static_cv_ac.py --output output/static_bias_ac
           fi
+      - name: Compare real 6BC8 Sylvania candidate vs initial engineering model
+        run: python3 scripts/compare_6bc8_models.py
       - name: Regression tests and historical calibration status
         run: python3 scripts/verify_results.py output
       - name: Upload compact summary of real measured numbers
@@ -74,6 +76,8 @@ jobs:
             output/static_bias_ac/bias_operating_points.csv
             output/static_bias_ac/bias_operating_points.json
             output/static_bias_ac/frequency_phase_vs_control.csv
+            output/6bc8_model_comparison/comparison.csv
+            output/6bc8_model_comparison/comparison.png
           if-no-files-found: error
           retention-days: 30
       - name: Upload raw ngspice results, harmonics and report
