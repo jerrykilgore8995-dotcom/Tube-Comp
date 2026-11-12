@@ -65,7 +65,7 @@ def values(case):
                  (1e12 if case["hold"] else rs_rec[case["recovery"]]),
       "OUTPAD":1.0 if mode=="A-436B" else 0.65,
       "SCGAIN":.22 if mode=="A-436B" else .32,
-      "BPLUS":275
+      "BPLUS":372
     }
 
 
