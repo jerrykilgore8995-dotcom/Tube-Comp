@@ -1,7 +1,7 @@
 name: TubeComp Static Control Voltage vs Gain
 on:
   push:
-    paths: [".github/workflows/control-voltage-gain-audit.yml", "scripts/static_cv_ac.py"]
+    paths: [".github/workflows/control-voltage-gain-audit.yml", "scripts/static_cv_ac.py", "spice/provisional/436b_exploratory.cir", "spice/models/tube_cells.lib"]
   workflow_dispatch:
 permissions:
   contents: read
