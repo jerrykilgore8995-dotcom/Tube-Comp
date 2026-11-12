@@ -5,12 +5,12 @@ Altec 436B exploratory topology - NOT VERIFIED WIRING
 .include "models/tube_cells.lib"
 .param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
 .param ATTACK_R=47000 REC_R=1000000 OUTPAD=1
-.param BPLUS=372 SRC_OHM=600 R6CG7_DROP=20000
+.param BPLUS=272 SRC_OHM=600 R6CG7_DROP=11000
 .option reltol=1e-4 abstol=1e-11 method=gear
-* User-specified power-supply variant: 372 V nominal before R13.
-* 150uF reservoir BEFORE 10k R13; 47uF decoupling AFTER R13.
-* This supply is a *candidate* pending matched idle/20-dB node measurements.
-* The ideal VHT source does not model rectifier impedance or mains ripple yet.
+* Documented idle voltage: 272V before R13, vs 210V after R13 (Altec drawing).
+* Preserve user-specified 150uF reservoir before 10k R13 and 47uF after it.
+* The 290V downstream marking is under 20dB compression, NOT the idle 272V condition.
+* The constant VHT source still lacks voltage rise under GR, ripple and rectifier impedance.
 VHT bplus 0 {BPLUS}
 CRES bplus 0 150u
 R13 bplus platefeed 10k
@@ -64,12 +64,10 @@ XU2A p2a g2a k2 V6CG7_GE
 XU2B p2b g2b k2 V6CG7_GE
 R7 k2 0 220
 * Independent 6CG7 B+ supply: dedicated dropping resistor and 47uF cap.
-* User requested 372V upstream, so the dropper here is a fitted stand-in.
-* The original 436B parts list identifies R14 as 6.8k from a lower
-* upstream voltage. GE-curves at 372V candidate give about 149.3V plates
-* and 2.43V cathodes using 20k from this artificially high source;
-* this is NOT a factory value. In a stock-supply run use R14=6.8k
-* and a source connected at the original ~272V node.
+* An 11k dropper fits 149.0V at plates with 272V and GE tube curve; still provisional.
+* Original 436B R14=6.8k, NOT 11k. This unresolved discrepancy requires
+* checking source loading and other branch current before claiming exactness.
+* Preserved user's 372V configuration in spice/variants/436b_372V_user_supply.cir.
 R6CG7DROP bplus outputfeed {R6CG7_DROP}
 C6CG7FILTER outputfeed 0 47u
 * Peerless 16402 output transformer: spec-anchored LINEAR approximation.
