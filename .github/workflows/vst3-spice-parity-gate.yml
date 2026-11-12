@@ -1,0 +1,56 @@
+name: VST3 versus SPICE 8 Percent Parity Gate
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/TubeCompDSP.h"
+      - "plugin/SpiceReference.h"
+      - "tests/TubeCompParitySurvey.cpp"
+      - "scripts/verify_dsp_spice_parity.py"
+      - ".github/workflows/vst3-spice-parity-gate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download measured, independent ngspice Altec reference
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43270685026
+          name: TubeComp-SPICE-parity-A-436B
+          github-token: ${{ github.token }}
+          path: golden/altec
+      - name: Download measured, independent ngspice RS124 reference
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 43270685026
+          name: TubeComp-SPICE-parity-RS124
+          github-token: ${{ github.token }}
+          path: golden/rs124
+      - name: Compile native render path of the VST3 DSP
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -Werror=return-type \
+            -Iplugin tests/TubeCompParitySurvey.cpp -o TubeCompParitySurvey
+      - name: Render all 36 reference cases at 44.1kHz
+        run: |
+          ./TubeCompParitySurvey dsp_parity.csv
+      - name: Compare 8% amplitude, THD, CV and resolvable harmonics
+        run: |
+          python3 scripts/verify_dsp_spice_parity.py \
+            --reference-altec golden/altec/long_steady.csv \
+            --reference-rs124 golden/rs124/long_steady.csv \
+            --dsp dsp_parity.csv --tolerance 8
+      - name: Always archive actual measured results and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-VST3-SPICE-8pct-parity-report
+          path: |
+            dsp_parity.csv
+            output/vst3_spice_parity/
+          if-no-files-found: warn
