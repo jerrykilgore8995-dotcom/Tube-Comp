@@ -4,6 +4,9 @@ on:
     paths:
       - ".github/workflows/stage-distortion-audit.yml"
       - "scripts/audit_transfer_and_stages.py"
+      - "spice/provisional/436b_exploratory.cir"
+      - "spice/models/tube_cells.lib"
+      - "scripts/run_lab.py"
   workflow_dispatch:
 permissions:
   contents: read
