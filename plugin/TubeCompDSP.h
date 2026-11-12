@@ -95,7 +95,7 @@ public:
     float varMu(float x,float gr,float balance,bool rs) noexcept {
         const float z=clamp(x*.90f,-3.0f,3.0f);
         const float bias=clamp(gr/30.f,0.f,1.f);
-        const float even=(rs?.011f:.0095f)+balance*.013f+bias*.0034f;
+        const float even=(rs?.00010f:.00008f)+balance*.013f+bias*.00004f;
         const float odd=(rs?-.021f:-.019f)-bias*.005f;
         // Local 6BC8 transfer and push-pull imbalance.
         const float y=z+even*z*z+odd*z*z*z;
@@ -105,8 +105,8 @@ public:
     // voltage swing depends on output load (200/600ohm -> slight level loss).
     float outputAmp(float x,float gr,float balance,float impedance) noexcept {
         const float z=clamp(x*.77f,-3.1f,3.1f);
-        const float e=.0038f+balance*.0045f;
-        const float o=-.010f-.0012f*clamp(gr/30.f,0.f,1.f);
+        const float e=.00009f+balance*.0045f;
+        const float o=-.012f-.0012f*clamp(gr/30.f,0.f,1.f);
         const float load=impedance<=300.f?.985f:1.f;
         return dc.tick((z+e*z*z+o*z*z*z)/.77f)*load;
     }
