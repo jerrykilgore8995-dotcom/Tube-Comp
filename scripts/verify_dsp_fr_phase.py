@@ -4,7 +4,7 @@
 8% complex phasor error means amp error <=8% and angular error <=~4.59deg;
 the row report preserves each metric separately. Group delay is measured by
 the ±25Hz 1k native data and compared to SPICE differential group delay.
-An all-pass time shift must not be ignored unless host reports that latency.
+The exact 16-sample FIR delay IS reported to JUCE via setLatencySamples,\nso the frequency-domain comparison de-embeds only that host-compensated delay.
 """
 import csv,json,math,sys
 from pathlib import Path
@@ -29,7 +29,8 @@ for dr in dsp:
  mag=np.interp(v,xs,[float(p["relative_gain_dB"]) for p in r])
  ph=np.interp(v,xs,[float(p["phase_deg"]) for p in r])
  dspmag=float(dr["relative_gain_dB"])
- dspph=float(dr["phase_deg"])
+ # De-embed the host-reported 16-sample FIR latency, precisely.
+ dspph=float(dr["phase_deg"])+360.*hz*16./44100.
  errAmp=100*abs(10**((dspmag-mag)/20)-1)
  errPhase=abs((dspph-ph+180)%360-180)
  errPhasePct=200*math.sin(math.radians(errPhase)*.5)*100/2 # 100*2*sin(delta/2)
@@ -50,7 +51,8 @@ for (mode,cv) in groups:
  filt={float(r["frequency_hz"]):r for r in dsp
              if r["mode"]==mode and float(r["cv_V"])==cv}
  if 975. not in filt or 1025. not in filt:continue
- a=float(filt[975.]["phase_deg"]);b=float(filt[1025.]["phase_deg"])
+ a=float(filt[975.]["phase_deg"])+360.*975.*16./44100.
+ b=float(filt[1025.]["phase_deg"])+360.*1025.*16./44100.
  phaseDelta=(b-a+180)%360-180
  measured=-phaseDelta/(360.*50)*1000
  r=groups[(mode,cv)]
