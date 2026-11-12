@@ -1,0 +1,29 @@
+name: TubeComp Stage THD and True GR Verification
+on:
+  push:
+    paths:
+      - ".github/workflows/stage-distortion-audit.yml"
+      - "scripts/audit_transfer_and_stages.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice and scientific tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Measure K2/K3/THD at every tube stage and true gain reduction
+        run: python3 scripts/audit_transfer_and_stages.py
+      - name: Save stage analysis and GR tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-stage-THD-and-linear-reference-GR
+          path: |
+            output/transfer_stage_audit/stages_and_real_GR.csv
+            output/transfer_stage_audit/stages_and_real_GR.json
+          if-no-files-found: error
