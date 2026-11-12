@@ -9,12 +9,18 @@ import argparse,csv,json,re,shutil,subprocess
 import numpy as np
 from run_lab import BASE_DECK,LIB,parse_wrdata,op_nodes
 
-def simulate(mode,cv,root):
-    tag=f"{mode}_CV{cv:.2f}".replace("-","m")
+def simulate(mode,cv,root,load_ohms=600):
+    tag=f"{mode}_CV{cv:.2f}_Z{load_ohms}".replace("-","m")
     wd=root/tag;wd.mkdir(parents=True,exist_ok=True)
     (wd/"models").mkdir(exist_ok=True)
     shutil.copy2(LIB,wd/"models/tube_cells.lib")
     s=BASE_DECK.read_text()
+    if load_ohms not in (200,600):
+        raise ValueError("Output load must be 200 or 600ohm")
+    old_load="RLOAD secOut 0 600"
+    if old_load not in s:
+        raise RuntimeError("Missing transformer secondary resistor in netlist")
+    s=s.replace(old_load,f"RLOAD secOut 0 {load_ohms}",1)
     # Freeze sidechain charge at a supplied bias. This is not a true compressed
     # transient simulation, but a valid small-signal AC linearization around
     # the corresponding nonlinearly biased tube operating point.
