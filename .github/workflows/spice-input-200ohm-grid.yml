@@ -1,0 +1,34 @@
+name: SPICE Full 200 Ohm Input Dial Calibrations
+on:
+  push:
+    paths:
+      - ".github/workflows/spice-input-200ohm-grid.yml"
+      - "scripts/input_knob_grid_200ohm.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-secondary:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ["A-436B","RS124"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TUBECOMP_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ngspice solver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Run 11 x 3 physical 200ohm loaded transformer ngspice cases
+        run: python3 scripts/input_knob_grid_200ohm.py
+      - name: Archive loaded input transfer and K2-K20 per case
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-200ohm-allinputs-${{ matrix.mode }}
+          path: output/input_grid_200ohm/${{ matrix.mode }}/input200.csv
+          if-no-files-found: warn
