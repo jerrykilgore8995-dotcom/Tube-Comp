@@ -49,5 +49,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TubeComp-input-transformer-loading
-          path: output/input_transformer/input_loading_1khz.csv
+          path: output/input_transformer/input_loading_frequency.csv
           if-no-files-found: error
