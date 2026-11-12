@@ -11,6 +11,7 @@
 #include <cstdint>
 #include "SpiceReference.h"
 #include "SpicePhaseFIRMeasured.inc"
+#include "SpicePhaseFIR200Measured.inc"
 
 namespace tubecomp {
 constexpr float pi=3.14159265358979323846f;
@@ -48,8 +49,11 @@ struct StageProbe {float input=0.f,muPlate=0.f,gainCell=0.f,outputPlate=0.f,grDb
 // This must be cross-checked with AC phase measurements across all CVs.
 class HighPass {
 public:
+    void setCorner(float fc,float sr) noexcept {
+        alpha=std::exp(-2.f*pi*fc/sr);
+    }
     void prepare(float fc,float sr) noexcept {
-        alpha=std::exp(-2.f*pi*fc/sr);reset();
+        setCorner(fc,sr);reset();
     }
     float tick(float x) noexcept {
         float y=alpha*(y1+x-x1);
@@ -83,8 +87,12 @@ private:
 class SpicePhaseFilter {
 public:
     void reset() noexcept {hist.fill(0.f);pos=0;}
-    void configure(bool rs,float cv) noexcept {
-        const auto& bank=rs?phasefit::rs:phasefit::altec;
+    void configure(bool rs,float cv,float loadOhms=600.f) noexcept {
+        // The loaded transformer's complex response differs materially
+        // between physical 200Ω and 600Ω secondary terminations.
+        const auto& bank=(loadOhms<=300.f)?
+                  (rs?phasefit200::rs:phasefit200::altec):
+                  (rs?phasefit::rs:phasefit::altec);
         const auto& voltages=phasefit::cv;
         cv=clamp(cv,0.f,17.f);
         size_t hi=1;
@@ -176,7 +184,16 @@ public:
         p.balance=clamp(p.balance,-1.f,1.f);
         p.wet=clamp(p.wet,0.f,1.f);
         p.stereoLink=clamp(p.stereoLink,0.f,1.f);
+        p.outputOhms=p.outputOhms<=300.f?200.f:600.f;
+        const bool loadChanged=(params.outputOhms!=p.outputOhms);
         params=p;
+        if(loadChanged){
+            // 200Ω loading moves the actual low-frequency transformer pole.
+            // Both coupling filters are adjusted without clearing history.
+            const float corner=p.outputOhms==200.f?6.7f:9.7f;
+            for(auto& channel:hpf)for(auto& hp:channel)
+                hp.setCorner(corner,fs);
+        }
         attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]:50.f;
         release63=p.rs124?
             rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:1000.f;
@@ -229,7 +246,8 @@ public:
                 const float preOutputDbu=22.f+lin2db(beforeOutputPad);
                 const float padDbu=params.rs124?lin2db(.65f):0.f;
                 targets[c]=spice::feedbackCv(params.rs124,params.input,
-                                           preOutputDbu+padDbu);
+                                           preOutputDbu+padDbu,
+                                           params.outputOhms);
                 if(params.superfuse&&params.rs124)
                     targets[c]=std::min(39.f,targets[c]*1.12f);
             }
@@ -252,7 +270,8 @@ public:
             }
             if(update){
                 const auto target=spice::lookup(params.rs124,params.input,
-                                                sourceDbu[c]);
+                                                sourceDbu[c],
+                                                params.outputOhms);
                 const float refCv=target.cvMagnitude;
                 // Tube transfer gain vs negative 6BC8 grid bias is measured
                 // by ngspice; this is a correction to the reference output.
@@ -283,7 +302,7 @@ public:
                     ratio*=1.f+.085f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
                 }
-                phase[c].configure(params.rs124,cv[c]);
+                phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
             gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
             // Signal remains bipolar and is never rectified into the audio.
