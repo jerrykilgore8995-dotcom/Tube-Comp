@@ -1,0 +1,29 @@
+name: SPICE 200 Ohm Transformer Full Complex Response
+on:
+  push:
+    paths:
+      - ".github/workflows/spice-200ohm-fr-phase.yml"
+      - "scripts/frequency_phase_load200.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linearized:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SPICE solver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ngspice python3-numpy
+      - name: Run 10 loaded-output SPICE frequency-phase-control sweeps
+        run: python3 scripts/frequency_phase_load200.py
+      - name: Archive frequency phase and group delay
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-SPICE-200ohm-frequency-phase
+          path: |
+            output/frequency_phase_load200/frequency_phase_all_points.csv
+            output/frequency_phase_load200/phase200_summary.csv
+          if-no-files-found: error
