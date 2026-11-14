@@ -1,0 +1,54 @@
+name: Altec corrected full input grid half output
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-half-output-grid.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        input: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Measure entire circuit final output
+        env:
+          INPUT_PERCENT: ${{ matrix.input }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys, os, re, json, csv
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          original_prepare=audit.prepare
+          def half_output(case,wd):
+              f=original_prepare(case,wd)
+              s,n=re.subn(r'(?<![A-Za-z0-9_])OUTPAD=[^\s]+','OUTPAD=0.5',f.read_text(),count=1)
+              assert n==1
+              f.write_text(s)
+              return f
+          audit.prepare=half_output
+          percent=int(os.environ['INPUT_PERCENT'])
+          rows=audit.run(-18,percent/100,0.5,True,1000,False)
+          row=next(r for r in rows if r[4]=='output')
+          dbu=float(row[6])
+          result=dict(input_percent=percent,source_dBu=-18,output_pad=0.5,frequency_Hz=1000,THD_percent=row[5],fundamental_dBu=dbu,CV_V=row[7],harmonics_dBc={f'K{k}':row[7+k] for k in range(1,21)},harmonics_dBu={f'K{k}':dbu+row[7+k] for k in range(1,21)})
+          print('FINAL_OUTPUT',json.dumps(result),flush=True)
+          Path('final_output.json').write_text(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: final-output-I${{ matrix.input }}
+          path: |
+            final_output.json
+            audit/**/case.cir
+            audit/**/ngspice.log
+          if-no-files-found: warn
