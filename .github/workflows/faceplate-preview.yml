@@ -28,6 +28,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "JUCE panel capture failed" }
           if (-not (Test-Path "TubeComp_RS124_Actual_JUCE.png")) { throw "Missing RS124 screenshot" }
           if (-not (Test-Path "TubeComp_A-436B_Actual_JUCE.png")) { throw "Missing Altec screenshot" }
+          if (-not (Test-Path "TubeComp_A-436B_Mod_OFF_Actual_JUCE.png")) { throw "Missing Mod OFF screenshot" }
+          if (-not (Test-Path "TubeComp_A-436B_Mod_ON_Actual_JUCE.png")) { throw "Missing Mod ON screenshot" }
       - name: Publish actual JUCE screenshots
         uses: actions/upload-artifact@v4
         with:
@@ -35,4 +37,6 @@ jobs:
           path: |
             TubeComp_RS124_Actual_JUCE.png
             TubeComp_A-436B_Actual_JUCE.png
+            TubeComp_A-436B_Mod_OFF_Actual_JUCE.png
+            TubeComp_A-436B_Mod_ON_Actual_JUCE.png
           if-no-files-found: error
