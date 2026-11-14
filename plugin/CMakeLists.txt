@@ -44,3 +44,13 @@ else()
   target_compile_options(TubeCompDSPTests PRIVATE -O3 -Wall -Wextra -Wpedantic)
 endif()
 add_test(NAME TubeCompDSPTests COMMAND TubeCompDSPTests)
+
+
+# Screenshot the complete host editor (not the isolated faceplate).
+juce_add_console_app(TubeCompFullEditorPreview PRODUCT_NAME "Tube Comp Complete Editor Preview")
+target_sources(TubeCompFullEditorPreview PRIVATE PreviewFullEditor.cpp PluginProcessor.cpp PluginEditor.cpp)
+target_include_directories(TubeCompFullEditorPreview PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../gui)
+target_compile_definitions(TubeCompFullEditorPreview PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(TubeCompFullEditorPreview PRIVATE
+ juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags
+ juce::juce_recommended_warning_flags)
