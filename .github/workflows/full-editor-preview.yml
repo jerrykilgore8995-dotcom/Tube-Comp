@@ -1,7 +1,7 @@
 name: Capture Complete RS124 Plugin Editor
 on:
   push:
-    branches: [main]
+    branches: [main, gui-final-review]
     paths:
       - "plugin/**"
       - ".github/workflows/full-editor-preview.yml"
@@ -26,9 +26,12 @@ jobs:
           if (-not $exe) { throw "No complete GUI renderer" }
           & $exe.FullName
           if ($LASTEXITCODE -ne 0) { throw "Capture failed" }
-          if (-not (Test-Path "TubeComp_RS124_Full_Editor.png")) { throw "Screenshot missing" }
+          foreach ($name in @("RS124.png","A436B_Mod_OFF.png","A436B_Mod_ON.png")) { if (-not (Test-Path $name)) { throw "Screenshot missing: $name" } }
       - uses: actions/upload-artifact@v4
         with:
-          name: RS124-Full-Editor-GUI
-          path: TubeComp_RS124_Full_Editor.png
+          name: Complete-GUI-Review
+          path: |
+            RS124.png
+            A436B_Mod_OFF.png
+            A436B_Mod_ON.png
           if-no-files-found: error
