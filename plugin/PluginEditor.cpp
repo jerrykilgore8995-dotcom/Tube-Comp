@@ -129,14 +129,14 @@ void TubeCompEditor::timerCallback() {
 }
 void TubeCompEditor::resized() {
     face.setBounds(0,0,getWidth(),getHeight());
-    bypass.setBounds(421,312,95,23);
+    bypass.setBounds(822,312,95,23);
     superFuse.setBounds(539,312,124,23);
     outputLoad.setBounds(694,312,113,23);
-    altecModButton.setBounds(840,312,100,23);
+    altecModButton.setBounds(940,312,100,23);
     // Dedicated non-overlapping trim slots, with full-width readouts.
-    // Existing BYPASS, SUPERFUSE, impedance, and MOD bounds stay untouched.
-    inputTrimLabel.setBounds(950,313,42,21);
-    digitalInputTrim.setBounds(996,313,112,21);
-    outputTrimLabel.setBounds(1116,313,48,21);
-    digitalOutputTrim.setBounds(1168,313,112,21);
+    // BYPASS follows impedance; digital trims stay next to the logo.
+    inputTrimLabel.setBounds(168,313,42,21);
+    digitalInputTrim.setBounds(214,313,126,21);
+    outputTrimLabel.setBounds(348,313,48,21);
+    digitalOutputTrim.setBounds(400,313,126,21);
 }
