@@ -1,0 +1,60 @@
+name: Altec 1kHz upper harmonic root cause audit
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-upper-harmonic-root-cause.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        knob: [0.2, 0.8]
+        mismatch: [0, 1]
+        step: [0.5, 0.25]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Compare corrected and legacy extraction on identical waveforms and isolate stage spectra
+        env:
+          KNOB: ${{ matrix.knob }}
+          MISMATCH: ${{ matrix.mismatch }}
+          STEP: ${{ matrix.step }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys, os, json, csv, re, subprocess
+          from pathlib import Path
+          import numpy as np
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          import run_lab as legacy
+          knob=float(os.environ['KNOB']); mismatch=int(os.environ['MISMATCH']); step=float(os.environ['STEP'])
+          rows=audit.run(-18,knob,step,bool(mismatch),1000,False)
+          wd=Path('audit')/f'F1000_L-18_I{knob}_T{step}_M{mismatch}_C0'
+          z=np.loadtxt(wd/'tran.txt',skiprows=1)
+          results=[]
+          for row in rows:
+              result=dict(node=row[4],THD=row[5],output_dBu=row[6],CV=row[7],**{f'K{k}':row[7+k] for k in range(1,21)})
+              results.append(result); print('STAGE',json.dumps(result),flush=True)
+          old=legacy.harmonics(z[:,0],z[:,1],1000)
+          print('LEGACY_SAME_WAVEFORM',json.dumps(old),flush=True)
+          t=z[:,0]; cv=z[:,7]
+          h,thd,dbu=audit.spectrum(t,cv,1000)
+          # Report CV ripple absolute volts and harmonics from coherent fit.
+          print('CV_RIPPLE_VPP',float(np.ptp(cv)),flush=True)
+          Path('stage_results.json').write_text(json.dumps(dict(stages=results,legacy=old,cv_ripple_vpp=float(np.ptp(cv))),indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upper-audit-I${{ matrix.knob }}-M${{ matrix.mismatch }}-T${{ matrix.step }}
+          path: |
+            stage_results.json
+            audit/**/ngspice.log
+            audit/**/case.cir
+          if-no-files-found: warn
