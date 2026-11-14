@@ -1,4 +1,4 @@
-name: Full 11 Input Position SPICE Calibration
+name: Original stock SPICE exact 1kHz rerun
 on:
   push:
     paths: [".github/workflows/spice-input-grid.yml", "scripts/input_knob_grid.py"]
