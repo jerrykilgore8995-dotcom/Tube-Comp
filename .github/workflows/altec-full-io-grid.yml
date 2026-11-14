@@ -1,0 +1,83 @@
+name: Altec corrected 121 input output combinations
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-full-io-grid.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        input: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Measure all eleven output taps directly in SPICE
+        env:
+          INPUT_PERCENT: ${{ matrix.input }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys,os,re,json,csv
+          from pathlib import Path
+          import numpy as np
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          original_prepare=audit.prepare
+          original_run=audit.subprocess.run
+          def prepare(case,wd):
+              f=original_prepare(case,wd)
+              s=f.read_text()
+              # Parallel unloaded replicas of the existing ideal output attenuator.
+              # Each is a directly simulated node, with the same unchanged 600R load.
+              taps='\n'.join(f'BGRID{i} out{i} 0 V={{{i/100}*V(secOut)}}' for i in range(0,101,10))
+              s=s.replace('.control',taps+'\n.control',1)
+              f.write_text(s)
+              return f
+          def run(*args,**kwargs):
+              wd=Path(kwargs['cwd'])
+              f=wd/'case.cir'
+              s=f.read_text()
+              s,n=re.subn(r'(?m)^wrdata tran.txt .*',lambda m:m[0]+' '+' '.join(f'v(out{i})' for i in range(0,101,10)),s)
+              assert n==1
+              f.write_text(s)
+              return original_run(*args,**kwargs)
+          audit.prepare=prepare
+          audit.subprocess.run=run
+          percent=int(os.environ['INPUT_PERCENT'])
+          rows=audit.run(-18,percent/100,0.5,True,1000,False)
+          wd=next(Path('audit').iterdir())
+          z=np.loadtxt(wd/'tran.txt',skiprows=1)
+          assert z.shape[1]==19,z.shape
+          results=[]
+          for j,out in enumerate(range(0,101,10)):
+              y=z[:,8+j]
+              if out==0:
+                  assert np.max(np.abs(y))<1e-15
+                  dbu=None; thd=None; rel=[None]*20; absolute=[None]*20
+              else:
+                  h,thd,dbu=audit.spectrum(z[:,0],y,1000)
+                  rel=h.tolist(); absolute=[float(dbu+v) for v in h]
+              result=dict(input_percent=percent,output_percent=out,source_dBu=-18,frequency_Hz=1000,fundamental_dBu=dbu,THD_percent=thd,harmonics_dBc=rel,harmonics_dBu=absolute)
+              results.append(result)
+              print('FINAL_OUTPUT',json.dumps(result,allow_nan=False),flush=True)
+          Path('grid.json').write_text(json.dumps(results,indent=2))
+          with open('grid.csv','w') as f:
+              w=csv.writer(f);w.writerow(['input_percent','output_percent','source_dBu','fundamental_dBu','THD_percent']+[f'K{k}_dBc' for k in range(1,21)]+[f'K{k}_dBu' for k in range(1,21)])
+              for r in results:w.writerow([r[k] for k in ['input_percent','output_percent','source_dBu','fundamental_dBu','THD_percent']]+r['harmonics_dBc']+r['harmonics_dBu'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-grid-input-${{ matrix.input }}
+          path: |
+            grid.json
+            grid.csv
+            audit/**/case.cir
+            audit/**/ngspice.log
+          if-no-files-found: warn
