@@ -400,16 +400,20 @@ private:
         g.setColour(col(49,53,49));g.drawRoundedRectangle(paper,32,1.4f);
         const float cx=x+w/2,py=y+h-26;
         const std::array<int,7> ticks={30,25,20,15,10,5,0};
-        for(size_t i=0;i<ticks.size();++i){
-            const float a=pi*1.17f+pi*.63f*float(i)/float(ticks.size()-1);
-            float xx=cx+std::cos(a)*116,yy=py+std::sin(a)*117;
-            float tx=cx+std::cos(a)*103,ty=py+std::sin(a)*103;
+        // Symmetric arc about twelve o'clock; same radius and inset at both ends.
+        // Share this exact angular mapping with the needle.
+        const auto grAngle=[&](float db){return pi*(1.5f+.30f*(1.f-2.f*db/30.f));};
+        for(const int db:ticks){
+            const float a=grAngle(float(db));
+            const float xx=cx+std::cos(a)*116.f,yy=py+std::sin(a)*116.f;
+            const float tx=cx+std::cos(a)*105.f,ty=py+std::sin(a)*105.f;
             line(g,xx,yy,tx,ty,col(46,45,39),1.4f);
-            stamp(g,juce::String(ticks[i]),cx+std::cos(a)*89-13,
-                  py+std::sin(a)*92-8,26,17,11,col(51,49,42));
+            // Raise numerals uniformly, keep each centered under its graduation.
+            stamp(g,juce::String(db),cx+std::cos(a)*94.f-13.f,
+                  py+std::sin(a)*98.f-10.f,26,17,11,col(51,49,42));
         }
-        stamp(g,"DB COMPRESSION",x+30,y+93,w-60,15,10.3f,col(55,50,46));
-        const float angle=pi*1.80f-pi*.63f*meterDb/30.f;
+        stamp(g,"DB COMPRESSION",x+30,y+103,w-60,15,10.3f,col(55,50,46));
+        const float angle=grAngle(meterDb);
         line(g,cx,py,cx+std::cos(angle)*114,py+std::sin(angle)*114,
              col(42,38,33),1.8f);
         g.setColour(col(13,15,14));g.fillEllipse(cx-7,py-7,14,14);
