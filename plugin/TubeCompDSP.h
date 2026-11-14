@@ -196,11 +196,12 @@ public:
             for(auto& channel:hpf)for(auto& hp:channel)
                 hp.setCorner(corner,fs);
         }
-        // Altec only: scale existing 50ms DSP baseline by actual R12 / 33k.
+        // Altec only: empirical coefficient chosen to target 50ms measured Slow attack.
+        // Scale 33k / 16.5k / 7.67k R12 variants; measured timing is verified separately.
         // RS124 attack and release logic intentionally unchanged.
         constexpr float altecR12[3]={330.f/43.f,16.5f,33.f}; // kOhm
         attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]
-                         :50.f*altecR12[p.altecAttack]/33.f;
+                         :115.f*altecR12[p.altecAttack]/33.f;
         release63=p.rs124?
             rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:1000.f;
         attackAlpha=coeff(attack63*(p.superfuse&&p.rs124?.75f:1.f),fs);
