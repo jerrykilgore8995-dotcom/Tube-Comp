@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include "SpiceReference.h"
+#include "AltecHarmonicTargets.inc"
 #include "SpicePhaseFIRMeasured.inc"
 #include "SpicePhaseFIR200Measured.inc"
 
@@ -304,6 +305,7 @@ public:
                     float ratio=std::exp2(target.harmonicDb[
                                        static_cast<size_t>(k-2)]/
                                           6.020599913f);
+                    if(!params.rs124) ratio=altecHarmonicRatio(params.input,k,sourceDbu[c],ratio);
                     if((k%2)==0)
                         ratio*=clamp(1.f+params.balance*
                             (params.rs124?1.3f:1.1f),.05f,3.5f);
