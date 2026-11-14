@@ -295,24 +295,9 @@ private:
     }
     static void selectKnob(juce::Graphics& g,float cx,float cy,float radius,float normalized)
     {
-        escutcheon(g,cx,cy,radius*.88f);
-        const float angle=-2.45f+4.9f*normalized;
-        juce::Graphics::ScopedSaveState save(g);
-        g.addTransform(juce::AffineTransform::rotation(angle,cx,cy));
-        juce::Path shape;
-        shape.startNewSubPath(cx-8,cy+radius*.58f);
-        shape.quadraticTo(cx-19,cy+radius*.10f,cx-11,cy-radius*.5f);
-        shape.lineTo(cx-6,cy-radius*1.28f);
-        shape.quadraticTo(cx,cy-radius*1.55f,cx+6,cy-radius*1.28f);
-        shape.lineTo(cx+11,cy-radius*.50f);
-        shape.quadraticTo(cx+19,cy+radius*.10f,cx+8,cy+radius*.58f);
-        shape.closeSubPath();
-        g.setGradientFill(juce::ColourGradient(col(95,98,96),
-                   cx-13,cy-radius,col(12,13,14),cx+12,cy+radius,false));
-        g.fillPath(shape);
-        g.setColour(col(12,12,13));g.strokePath(shape,juce::PathStrokeType(2.4f));
-        line(g,cx-3,cy-radius*1.24f,cx-3,cy-radius*.79f,
-             col(238,240,228),2.2f);
+        // Identical scaled chickenhead geometry, retaining original selector sweep.
+        const float mapped=(4.9f*normalized-0.20f)/4.50f;
+        pointerKnob(g,cx,cy,radius,mapped);
     }
     static void dialScale(juce::Graphics& g,float cx,float cy,float radius,
                           const std::array<juce::String,11>& labels,
