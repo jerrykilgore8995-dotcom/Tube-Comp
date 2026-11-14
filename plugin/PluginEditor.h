@@ -28,6 +28,9 @@ private:
     std::vector<Dial> dials;
     juce::TextButton bypass,superFuse,altecModButton;
     juce::ComboBox outputLoad;
+    juce::Slider digitalInputTrim,digitalOutputTrim;
+    juce::Label inputTrimLabel,outputTrimLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> digitalInputAttach,digitalOutputAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttach,fuseAttach,altecModAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> loadAttach;
     void timerCallback() override;
