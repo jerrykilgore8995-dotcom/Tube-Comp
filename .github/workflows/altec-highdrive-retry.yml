@@ -1,0 +1,98 @@
+name: Altec high-drive retry at original harmonic points
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-highdrive-retry.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  retry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        hz: [100, 1000, 5000, 10000]
+        level: [6, 12]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Original high-drive operating point, coherent extraction
+        env:
+          HZ: ${{ matrix.hz }}
+          LEVEL: ${{ matrix.level }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys, re, os, json, csv, math, subprocess
+          import numpy as np
+          from scipy.interpolate import CubicSpline
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import run_lab as lab
+          import long_steady_compression as steady
+          original=lab.prepare
+          def prepare(case,wd):
+              f=original(case,wd)
+              s=f.read_text()
+              lib=wd/'models/tube_cells.lib'
+              l=lib.read_text()
+              for model,delta in [('V6BC8_REMOTE_EXP',.025),('V6CG7_GE',.05)]:
+                  block=re.search(r'(?im)^\.subckt '+model+r'\b[\s\S]*?^\.ends '+model+r'\b',l).group()
+                  for side,mult in [('A',1+delta),('B',1-delta)]:
+                      name=model+'_'+side
+                      replica=block.replace(model,name)
+                      replica,n=re.subn(r'(BPL P K I=)\{([^\n]+)\}',lambda m:m[1]+'{'+str(mult)+'*('+m[2]+')}',replica)
+                      assert n==1
+                      l+='\n'+replica+'\n'
+                      s,n=re.subn(r'(?m)^(XU[12]'+side+r' .* )'+model+r'$',lambda m:m[1]+name,s)
+                      assert n==1
+              s=s.replace('DDET1 detector sca D6AL5','DDET1 detector sca D6AL5 area=1.025').replace('DDET2 detector scb D6AL5','DDET2 detector scb D6AL5 area=0.975')
+              assert 'area=1.025' in s and 'area=0.975' in s
+              lib.write_text(l); f.write_text(s)
+              return f
+          lab.prepare=prepare
+          steady.prepare=prepare
+          hz=int(os.environ['HZ']); level=int(os.environ['LEVEL'])
+          case=next(c for c in lab.mk_cases(True) if c['mode']=='A-436B' and c['hz']==hz and c['dbu']==level)
+          rows=[]
+          for step in (min(1e-6,1/(hz*800)),min(.5e-6,1/(hz*1600))):
+              wd=Path('retry')/str(step)
+              f=prepare(case,wd)
+              s=f.read_text()
+              s=re.sub(r'(?m)^tran .*',f'tran {step:.12g} 0.22 0.12 {step:.12g}',s)
+              s=s.replace('set wr_singlescale','set numdgt=16\nset wr_singlescale')
+              f.write_text(s)
+              p=subprocess.run(['ngspice','-b','case.cir'],cwd=wd,capture_output=True,text=True,timeout=1200)
+              log=p.stdout+p.stderr
+              (wd/'ngspice.log').write_text(log)
+              assert p.returncode==0 and 'simulation(s) aborted' not in log and (wd/'tran.txt').exists(),log[-2000:]
+              z=lab.parse_wrdata(wd/'tran.txt',len(lab.OUTFIELDS))
+              assert z[-1,0]>=.219999 and np.all(np.diff(z[:,0])>0)
+              cycles=min(24,max(3,int(.08*hz)))
+              n=cycles*256
+              x=z[-1,0]-cycles/hz+np.arange(n)/(256*hz)
+              y=CubicSpline(z[:,0],z[:,1])(x)
+              a=np.abs(np.fft.rfft(y-y.mean()))*2/n
+              last=min(20,20000//hz)
+              h=a[np.arange(1,last+1)*cycles]
+              row={**case,'step_seconds':step,'output_dBu':float(20*np.log10(h[0]/np.sqrt(2)/.775)),'THD_in_band_percent':float(100*np.linalg.norm(h[1:])/h[0]),**{f'K{k}_dBc':float(20*np.log10(max(h[k-1]/h[0],1e-18))) for k in range(2,last+1)}}
+              rows.append(row); print(json.dumps(row),flush=True)
+              Path('results.json').write_text(json.dumps(rows,indent=2))
+              (wd/'tran.txt').unlink()
+          diff={k:abs(rows[1][k]-rows[0][k]) for k in rows[0] if k.startswith('K')}
+          Path('convergence.json').write_text(json.dumps(diff,indent=2))
+          print('CONVERGENCE',json.dumps(diff),flush=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: highdrive-F${{ matrix.hz }}-L${{ matrix.level }}
+          path: |
+            results.json
+            convergence.json
+            retry/**/ngspice.log
+            retry/**/case.cir
+            retry/**/models/tube_cells.lib
+          if-no-files-found: warn
