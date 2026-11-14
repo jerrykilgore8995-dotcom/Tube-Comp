@@ -316,6 +316,21 @@ public:
                     ratio*=1.f+.085f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=(!params.rs124 && k>7)?0.f:ratio;
                 }
+                if(!params.rs124){
+                    // User-specified saturation calibration, not a physical SPICE fit.
+                    // Retain the original K2-K7 proportions, normalize their combined
+                    // amplitude to a monotonic source/dial-dependent THD target.
+                    // Internal 0 dBFS = +22 dBu; +18 dBu is -4 dBFS.
+                    const float level=22.f+lin2db(std::max(1.e-8f,harmonicEnv[c]*(pi*.5f)));
+                    const float dial=clamp(params.input*.1f,0.f,1.f);
+                    const float t=clamp((level+18.f)/40.f,0.f,1.f);
+                    const float low=.00432f*db2lin(std::min(0.f,level+18.f));
+                    const float targetRatio=dial*(low+(.025f-.00432f)*t);
+                    float sum=0.f;
+                    for(int j=0;j<6;++j)sum+=harmonicLinear[c][j]*harmonicLinear[c][j];
+                    const float scale=targetRatio/std::max(1.e-12f,std::sqrt(sum));
+                    for(int j=0;j<6;++j)harmonicLinear[c][j]*=scale;
+                }
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
             gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
