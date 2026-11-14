@@ -317,15 +317,16 @@ public:
                     harmonicLinear[c][static_cast<size_t>(k-2)]=(!params.rs124 && k>7)?0.f:ratio;
                 }
                 if(!params.rs124){
-                    // User-specified saturation calibration, not a physical SPICE fit.
-                    // Retain the original K2-K7 proportions, normalize their combined
-                    // amplitude to a monotonic source/dial-dependent THD target.
-                    // Internal 0 dBFS = +22 dBu; +18 dBu is -4 dBFS.
+                    // Altec 436B factory distortion limits used as requested targets:
+                    // 25dB GR = 1.5%, 30dB GR = 2.5%. Below 25dB interpolate
+                    // through the measured stock K7-cut 11.17dB / 0.432% point.
+                    // These intermediate values are a design curve, not factory data.
+                    const float gr=clamp(spice::attenuationDb(false,cv[c]),0.f,30.f);
                     const float level=22.f+lin2db(std::max(1.e-8f,harmonicEnv[c]*(pi*.5f)));
-                    const float dial=clamp(params.input*.1f,0.f,1.f);
-                    const float t=clamp((level+18.f)/40.f,0.f,1.f);
                     const float low=.00432f*db2lin(std::min(0.f,level+18.f));
-                    const float targetRatio=dial*(low+(.025f-.00432f)*t);
+                    const float targetRatio=gr<=11.17f?low*gr/11.17f:
+                        (gr<=25.f?.00432f+(.015f-.00432f)*(gr-11.17f)/(25.f-11.17f):
+                        .015f+.010f*(gr-25.f)/5.f);
                     float sum=0.f;
                     for(int j=0;j<6;++j)sum+=harmonicLinear[c][j]*harmonicLinear[c][j];
                     const float scale=targetRatio/std::max(1.e-12f,std::sqrt(sum));
