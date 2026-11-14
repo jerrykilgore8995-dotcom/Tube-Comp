@@ -34,18 +34,20 @@ def run(level,knob,step,mismatch):
             s=re.sub(r"(?m)^(XU[12]B .* )"+model+r"$",r"\g<1>"+model+"_B",s)
         # Scale diode area: scales saturation current and junction capacitance,
         # inverse scales series resistance. Explicit physical proxy, not measured tube mismatch.
-        s=s.replace("DDET1 detector sca D6AL5","DDET1 detector sca D6AL5 1.025").replace("DDET2 detector scb D6AL5","DDET2 detector scb D6AL5 0.975")
+        s=s.replace("DDET1 detector sca D6AL5","DDET1 detector sca D6AL5 area=1.025").replace("DDET2 detector scb D6AL5","DDET2 detector scb D6AL5 area=0.975")
         assert all(x in s for x in ["V6BC8_REMOTE_EXP_A","V6BC8_REMOTE_EXP_B","V6CG7_GE_A","V6CG7_GE_B"])
         lib.write_text(l)
     s=s.replace("VIN source 0 SIN(0 {AMP} {FREQ}) AC 1","BINPUT source 0 V={AMP*sin(2*pi*FREQ*time)*(0.5-0.5*cos(pi*min(time/0.04,1)))}")
     s=re.sub(r"(?m)^tran .*",f"tran {step}u 3.2 3.0 {step}u",s)
-    s=s.replace(".option reltol=1e-4 abstol=1e-11 method=gear",".option reltol=1e-7 abstol=1e-13 vntol=1e-8 method=gear")
+    # Preserve the proven solver tolerances; convergence is checked across maxsteps.
+    # Tightening all tolerances caused a startup timestep collapse at the transformer.
     s=s.replace("set wr_singlescale","set numdgt=16\nset wr_singlescale")
     s=re.sub(r"(?m)^wrdata tran.txt .*","wrdata tran.txt v(out) v(source) v(pa) v(pb) v(p2a) v(p2b) v(cv)",s)
     f.write_text(s)
     p=subprocess.run(["ngspice","-b","case.cir"],cwd=wd,capture_output=True,text=True,timeout=1200)
     (wd/"ngspice.log").write_text(p.stdout+p.stderr)
-    if p.returncode: raise RuntimeError(str(wd)+p.stderr[-1000:])
+    if p.returncode or not (wd/"tran.txt").exists() or "simulation(s) aborted" in (p.stdout+p.stderr):
+        raise RuntimeError(str(wd)+"\n"+(p.stdout+p.stderr)[-2500:])
     z=np.loadtxt(wd/"tran.txt",skiprows=1)
     assert z[-1,0]>3.19999 and np.all(np.diff(z[:,0])>0)
     rows=[]
