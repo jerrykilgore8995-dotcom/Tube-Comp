@@ -25,6 +25,12 @@ int main() {
     panel.setMode(TubeCompFaceplate::Mode::rs124);
     if(!capture("TubeComp_RS124_Actual_JUCE.png"))return 1;
     panel.setMode(TubeCompFaceplate::Mode::altec436b);
+    panel.setAltecMod(false);
     if(!capture("TubeComp_A-436B_Actual_JUCE.png"))return 2;
+    if(!capture("TubeComp_A-436B_Mod_OFF_Actual_JUCE.png"))return 3;
+    panel.setAltecMod(true);
+    panel.setAltecAttack(2);
+    panel.setAltecRecovery(0);
+    if(!capture("TubeComp_A-436B_Mod_ON_Actual_JUCE.png"))return 4;
     return 0;
 }
