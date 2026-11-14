@@ -1,0 +1,40 @@
+name: Altec 436B tube and capacitor multifrequency audit
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-capacitor-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        level: [-18, -6, 7]
+        knob: [0.8, 1.0]
+        hz: [100, 1000, 5000, 10000, 20000]
+        step: [0.25, 0.125]
+        caps: [0, 1]
+        exclude:
+          - hz: 100
+            caps: 0
+          - hz: 1000
+            caps: 0
+      max-parallel: 12
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - run: /usr/bin/python3 scripts/altec_mismatch_audit.py --hz ${{ matrix.hz }} --caps ${{ matrix.caps }} --level ${{ matrix.level }} --knob ${{ matrix.knob }} --step ${{ matrix.step }} --mismatch 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: F${{ matrix.hz }}-L${{ matrix.level }}-I${{ matrix.knob }}-T${{ matrix.step }}-M1-C${{ matrix.caps }}
+          path: |
+            harmonics.csv
+            audit/**/ngspice.log
+            audit/**/case.cir
+            audit/**/models/tube_cells.lib
+          if-no-files-found: warn
