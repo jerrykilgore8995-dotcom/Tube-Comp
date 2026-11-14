@@ -68,6 +68,17 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
         p.state,"superfuse",superFuse);
     altecModAttach=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         p.state,"altecMod",altecModButton);
+    // Match the three RS124 host-strip boxes to the impedance selector's
+    // neutral JUCE palette; retain a distinct illuminated toggle-on state.
+    const auto boxBackground=outputLoad.findColour(juce::ComboBox::backgroundColourId);
+    const auto boxOutline=outputLoad.findColour(juce::ComboBox::outlineColourId);
+    const auto boxText=outputLoad.findColour(juce::ComboBox::textColourId);
+    for(auto* b:{&superFuse,&bypass}){
+        b->setColour(juce::TextButton::buttonColourId,boxBackground);
+        b->setColour(juce::TextButton::textColourOffId,boxText);
+        b->setColour(juce::ComboBox::outlineColourId,boxOutline);
+    }
+    outputLoad.setJustificationType(juce::Justification::centred);
     outputLoad.addItem("200 OHM",1);outputLoad.addItem("600 OHM",2);
     addAndMakeVisible(outputLoad);
     loadAttach=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
@@ -129,9 +140,9 @@ void TubeCompEditor::timerCallback() {
 }
 void TubeCompEditor::resized() {
     face.setBounds(0,0,getWidth(),getHeight());
-    bypass.setBounds(822,312,95,23);
     superFuse.setBounds(539,312,124,23);
-    outputLoad.setBounds(694,312,113,23);
+    outputLoad.setBounds(675,312,124,23);
+    bypass.setBounds(811,312,124,23);
     altecModButton.setBounds(940,312,100,23);
     // Dedicated non-overlapping trim slots, with full-width readouts.
     // BYPASS follows impedance; digital trims stay next to the logo.
