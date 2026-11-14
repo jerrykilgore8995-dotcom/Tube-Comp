@@ -1,7 +1,7 @@
-name: Stock cleaned harmonics calibrated Windows VST3
+name: Selective detector correction and stock THD verification
 on:
   push:
-    branches: [stock-clean-harmonics]
+    branches: [selective-detector-correction]
     paths: ['.github/workflows/stock-clean-build.yml']
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
         run: |
           gh run download 43572085333 --pattern 'paired-F1000-*' --dir paired-references
           gh run download 43582329899 --pattern 'paired-RS124-*' --dir paired-references
-      - name: Fit actual stock THD and measure full corrected spectrum
+      - name: Apply selective detector correction and measure actual stock THD
         run: python3 scripts/calibrate_clean_harmonics.py
       - uses: actions/upload-artifact@v4
         if: always()
