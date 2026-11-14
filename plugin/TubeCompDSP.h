@@ -314,7 +314,7 @@ public:
                     // not a claim about original 6CG7 plate physics.
                     const float kFraction=float(k)/20.f;
                     ratio*=1.f+.085f*kFraction*kFraction;
-                    harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
+                    harmonicLinear[c][static_cast<size_t>(k-2)]=(!params.rs124 && k>7)?0.f:ratio;
                 }
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
