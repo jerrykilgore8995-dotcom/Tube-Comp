@@ -166,6 +166,7 @@ public:
     }
     void reset() noexcept {
         sampleCount=0;
+        rsFrequency={1000.f,1000.f};rsPrevious={0.f,0.f};rsLastCross={0u,0u};
         dryDelayIndex=0;
         for(auto& channel:dryDelay)channel.fill(0.f);
         cv={0.f,0.f};inputEnv={0.f,0.f};harmonicEnv={0.f,0.f};outputEnv={0.f,0.f};
@@ -248,6 +249,18 @@ public:
             const float x=dry[c];
             // First coupling pole before tube and one after its output.
             inAfterHp[c]=hpf[c][0].tick(x);
+            if(params.rs124){
+                const float y=inAfterHp[c];
+                if(y>=0.f && rsPrevious[c]<0.f){
+                    const unsigned period=sampleCount-rsLastCross[c];
+                    if(rsLastCross[c]!=0u && period>=2u && period<=unsigned(fs/20.f)){
+                        const float hz=fs/float(period);
+                        rsFrequency[c]+=.2f*(hz-rsFrequency[c]);
+                    }
+                    rsLastCross[c]=sampleCount;
+                }
+                rsPrevious[c]=y;
+            }
             inputEnv[c]+=inputEnvAlpha*(std::fabs(inAfterHp[c])-inputEnv[c]);
             harmonicEnv[c]+=harmonicEnvAlpha*(std::fabs(inAfterHp[c])-harmonicEnv[c]);
             // mean(abs(sine))=2/pi of peak. Explicit DAW convention:
@@ -317,28 +330,21 @@ public:
                     harmonicLinear[c][static_cast<size_t>(k-2)]=(params.rs124 && k>7)?0.f:ratio;
                 }
                 if(params.rs124){
-                    // Match calibrated Altec even-order baseline, preserving
-                    // RS124 odd coefficients and its existing balance scaling.
-                    // Evaluate the Altec at the same dial and source, using
-                    // actual RS124 GR for the Altec normalization curve.
-                    const auto a=spice::lookup(false,params.input,sourceDbu[c],600.f);
-                    const float gr=clamp(spice::attenuationDb(true,cv[c]),0.f,30.f);
-                    const float level=22.f+lin2db(std::max(1.e-8f,harmonicEnv[c]*(pi*.5f)));
-                    const float low=.00432f*db2lin(std::min(0.f,level+18.f));
-                    const float targetRatio=gr<=11.17f?low*gr/11.17f:
-                        (gr<=25.f?.00432f+(.015f-.00432f)*(gr-11.17f)/(25.f-11.17f):
-                        .015f+.010f*(gr-25.f)/5.f);
-                    std::array<float,6> base{};
-                    float sum=0.f;
+                    // Preserve total K2-K7 coefficient power and within-family
+                    // proportions; redistribute power between even and odd.
+                    // 100 Hz: 60% even; 1 kHz: 40% even; log interpolation.
+                    float even=0.f,odd=0.f;
+                    const float bal=clamp(1.f+params.balance*1.3f,.05f,3.5f);
                     for(int k=2;k<=7;++k){
-                        const float frac=float(k)/20.f;
-                        base[k-2]=db2lin(a.harmonicDb[k-2])*(1.f+.085f*frac*frac);
-                        sum+=base[k-2]*base[k-2];
+                        auto& v=harmonicLinear[c][k-2];
+                        if(k%2==0){v/=bal;even+=v*v;}else odd+=v*v;
                     }
-                    const float scale=targetRatio/std::max(1.e-12f,std::sqrt(sum));
-                    for(int k=2;k<=6;k+=2)
-                        harmonicLinear[c][k-2]=base[k-2]*scale*
-                           clamp(1.f+params.balance*1.3f,.05f,3.5f);
+                    const float t=clamp(std::log10(std::max(100.f,rsFrequency[c])/100.f),0.f,1.f);
+                    const float share=.6f-.2f*t;
+                    const float total=even+odd;
+                    const float e=std::sqrt(total*share/std::max(1.e-30f,even))*bal;
+                    const float o=std::sqrt(total*(1.f-share)/std::max(1.e-30f,odd));
+                    for(int k=2;k<=7;++k)harmonicLinear[c][k-2]*=(k%2==0?e:o);
                 }
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
@@ -389,6 +395,8 @@ private:
     Meter lastMeter{};
     StageProbe lastProbe{};
     unsigned sampleCount=0;
+    std::array<float,2> rsFrequency{1000.f,1000.f},rsPrevious{};
+    std::array<unsigned,2> rsLastCross{};
     int dryDelayIndex=0;
     std::array<std::array<float,phasefit::kLatency+1>,2> dryDelay{};
     float inputEnvAlpha=.01f,harmonicEnvAlpha=.001f,outputEnvAlpha=.01f;
