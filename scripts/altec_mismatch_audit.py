@@ -40,7 +40,7 @@ def run(level,knob,step,mismatch,hz=1000,caps=False):
         assert all(x in s for x in ["V6BC8_REMOTE_EXP_A","V6BC8_REMOTE_EXP_B","V6CG7_GE_A","V6CG7_GE_B"])
         lib.write_text(l)
     if caps:
-        for name,value in [("C2",23.76),("C3",20.46),("C5",20.02),("C6",23.32)]:
+        for name,value in [("C2",22.88),("C3",21.12),("C5",20.90),("C6",22.88)]:
             s,n=re.subn(r"(?m)^("+name+r"\s+\S+\s+\S+\s+)22n\s*$",lambda m:m[1]+str(value)+"n",s)
             assert n==1, name
     s=s.replace("VIN source 0 SIN(0 {AMP} {FREQ}) AC 1","BINPUT source 0 V={AMP*sin(2*pi*FREQ*time)*(0.5-0.5*cos(pi*min(time/0.04,1)))}")
