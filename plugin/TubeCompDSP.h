@@ -33,6 +33,7 @@ struct Parameters {
     bool rs124=true;
     float input=5.f,output=0.f;
     int attack=3,recovery=6;
+    int altecAttack=2; // 0 Fast: 33k||10k, 1 Med: 33k||33k, 2 Slow: stock 33k
     float balance=0.f;
     bool superfuse=false;
     float wet=1.f;
@@ -180,6 +181,7 @@ public:
         p.input=clamp(p.input,0.f,10.f);
         p.output=clamp(p.output,-10.f,0.f);
         p.attack=std::clamp(p.attack,0,8);
+        p.altecAttack=std::clamp(p.altecAttack,0,2);
         p.recovery=std::clamp(p.recovery,0,10);
         p.balance=clamp(p.balance,-1.f,1.f);
         p.wet=clamp(p.wet,0.f,1.f);
@@ -194,7 +196,11 @@ public:
             for(auto& channel:hpf)for(auto& hp:channel)
                 hp.setCorner(corner,fs);
         }
-        attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]:50.f;
+        // Altec only: scale existing 50ms DSP baseline by actual R12 / 33k.
+        // RS124 attack and release logic intentionally unchanged.
+        constexpr float altecR12[3]={330.f/43.f,16.5f,33.f}; // kOhm
+        attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]
+                         :50.f*altecR12[p.altecAttack]/33.f;
         release63=p.rs124?
             rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:1000.f;
         attackAlpha=coeff(attack63*(p.superfuse&&p.rs124?.75f:1.f),fs);
