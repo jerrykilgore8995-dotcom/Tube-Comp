@@ -6,7 +6,9 @@ for p in pathlib.Path('paired-references').rglob('paired.json'):
     v=json.loads(p.read_text())
     if v['hz']!=1000 or v['output_load_ohm']!=600: continue
     mode=v.get('mode','A-436B')
-    refs[mode,v['source_dBu'],v['input_percent']]=[10**(x['dBc']/20) for x in v['corrected']['harmonics'][1:]]
+    full=v['full']['harmonics']
+    clean=v['corrected']['harmonics']
+    refs[mode,v['source_dBu'],v['input_percent']]=[(10**(c['dBc']/20) if k in (2,4,6) else abs(complex(c['real_peak_V'],c['imag_peak_V']))/max(1e-30,abs(complex(f['real_peak_V'],f['imag_peak_V'])))) for k,(f,c) in enumerate(zip(full[1:],clean[1:]),2)]
 for mode in ['A-436B','RS124']:
     for level in (levels if mode=='RS124' else [-18]):
         for k in range(11):
@@ -20,10 +22,7 @@ for mode in ['A-436B','RS124']:
         a=[]
         for k in range(11):
             h=refs[mode,level if mode=='RS124' else -18,k*10]
-            h=[x if x>=1e-7 else 0. for x in h]
-            norm=math.sqrt(sum(x*x for x in h))
-            assert norm>0, (mode,level,k)
-            a.append([x/norm for x in h])
+            a.append(h)
         m.append(a)
     shapes.append(m)
 scales=[[[1. for k in range(11)] for l in levels] for m in range(2)]
@@ -51,7 +50,9 @@ inline void apply(bool rs,float knob,float source,float balance,std::array<float
     const float scale=interp(correction[m][j][i],correction[m][j][i+1],correction[m][j+1][i],correction[m][j+1][i+1]);
     float norm=0.f;
     for(int k=0;k<19;++k){
-        v[k]=interp(shape[m][j][i][k],shape[m][j][i+1][k],shape[m][j+1][i][k],shape[m][j+1][i+1][k]);
+        const float measured=interp(shape[m][j][i][k],shape[m][j][i+1][k],shape[m][j+1][i][k],shape[m][j+1][i+1][k]);
+        const bool mismatch=(k==0||k==2||k==4);
+        v[k]=mismatch?measured:v[k]/((k%2==0)?b:1.f)*measured;
         norm+=v[k]*v[k];
     }
     const float gain=std::sqrt(power/std::max(1e-30f,norm))*scale;
@@ -71,7 +72,7 @@ header()
 base,raw=run(True)
 pathlib.Path('stock-harmonics.csv').write_text(raw)
 base={key(r):r for r in base}
-for iteration in range(4):
+for iteration in range(7):
     new,raw=run()
     errors=[]
     for r in new:
@@ -82,9 +83,9 @@ for iteration in range(4):
         assert meas>0 and target>0
         err=abs(meas/target-1)
         errors.append(err)
-        if iteration<3:scales[m][levels.index(l)][k//10]*=target/meas
+        if iteration<6:scales[m][levels.index(l)][k//10]*=target/meas
     print('Calibration iteration',iteration,'max relative error',max(errors),flush=True)
-    if iteration<3:header()
+    if iteration<6:header()
 pathlib.Path('corrected-harmonics.csv').write_text(raw)
 with open('calibration-comparison.csv','w') as f:
     w=csv.writer(f);w.writerow(['mode','source_dBu','input_percent','hz','stock_THD_percent','corrected_THD_percent','relative_error_percent','multiplier'])
