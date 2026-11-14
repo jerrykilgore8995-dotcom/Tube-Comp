@@ -1,4 +1,4 @@
-name: Stock RS124 K7 cutoff THD
+name: RS124 Altec even-order calibration THD
 on:
   push:
     branches: [rs124-stock-k7-cut]
