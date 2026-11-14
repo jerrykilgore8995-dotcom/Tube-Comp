@@ -1,4 +1,4 @@
-name: RS124 exact GR 100Hz and 1kHz
+name: RS124 60-40 harmonic power verification
 on:
   push:
     branches: [rs124-stock-k7-cut]
