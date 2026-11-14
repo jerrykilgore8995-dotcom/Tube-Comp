@@ -22,6 +22,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout
 TubeCompProcessor::createParameters() {
     Layout p;
     addBool(p,"rs124","RS124 / A-436B mode",true);
+    // External digital trims. Input display +12 is the OLD unity input level.
+    // At default Input 0 the actual gain is -12 dB; Input -12 is -24 dB.
+    addFloat(p,"digitalInput","Input",-12.f,12.f,.01f,0.f);
+    addFloat(p,"digitalOutput","Output",-12.f,12.f,.01f,0.f);
     addFloat(p,"input","Input",0.f,10.f,.01f,5.f);
     addFloat(p,"output","Output attenuator (dB)",-10.f,0.f,.01f,0.f);
     addFloat(p,"attack","RS124 attack position 1-9",1.f,9.f,1.f,4.f);
@@ -65,6 +69,10 @@ tubecomp::Parameters TubeCompProcessor::parametersFromState() const noexcept {
 void TubeCompProcessor::prepareToPlay(double sampleRate,int samplesPerBlock) {
     engine.prepare((float)sampleRate,samplesPerBlock);
     engine.setParameters(parametersFromState(),true);
+    preTrim.reset(sampleRate,.010);
+    postTrim.reset(sampleRate,.010);
+    preTrim.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(v(state,"digitalInput")-12.f));
+    postTrim.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(v(state,"digitalOutput")));
     // Accurate SPICE phase FIR has a fixed 16-sample group-delay offset.
     // Report this to the DAW for sample-accurate plugin delay compensation.
     setLatencySamples(tubecomp::phasefit::kLatency);
@@ -78,13 +86,21 @@ void TubeCompProcessor::processBlock(juce::AudioBuffer<float>& audio,
     const int channels=audio.getNumChannels();
     if(channels<1)return;
     engine.setParameters(parametersFromState());
+    // Signal boundary trims only: no changes to modeled input/output attenuators,
+    // CV, transformer, harmonic reference, feedback or control calibration.
+    preTrim.setTargetValue(juce::Decibels::decibelsToGain(v(state,"digitalInput")-12.f));
+    postTrim.setTargetValue(juce::Decibels::decibelsToGain(v(state,"digitalOutput")));
     auto* l=audio.getWritePointer(0);
     auto* r=channels>1?audio.getWritePointer(1):nullptr;
     float inputPeak=0,outputPeak=0;
     for(int i=0;i<size;++i) {
         float a=l[i],b=r?r[i]:a;
         inputPeak=std::max(inputPeak,std::max(std::fabs(a),std::fabs(b)));
+        const float pre=preTrim.getNextValue();
+        a*=pre;b*=pre;
         engine.process(a,b);
+        const float post=postTrim.getNextValue();
+        a*=post;b*=post;
         l[i]=a;
         if(r)r[i]=b;
         outputPeak=std::max(outputPeak,std::max(std::fabs(a),std::fabs(b)));
