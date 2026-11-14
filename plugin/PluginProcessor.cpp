@@ -25,6 +25,7 @@ TubeCompProcessor::createParameters() {
     addFloat(p,"input","Input",0.f,10.f,.01f,5.f);
     addFloat(p,"output","Output attenuator (dB)",-10.f,0.f,.01f,0.f);
     addFloat(p,"attack","RS124 attack position 1-9",1.f,9.f,1.f,4.f);
+    addFloat(p,"altecAttack","A-436B ATK Fast Med Slow",0.f,2.f,1.f,2.f);
     // Physical recovery dial: 0=#6 slow, 1=HOLD ... 10=#1 fast.
     addFloat(p,"recovery","RS124 recovery selector",0.f,10.f,1.f,6.f);
     addFloat(p,"balance","Push-pull balance",-1.f,1.f,.005f,0.f);
@@ -47,6 +48,7 @@ tubecomp::Parameters TubeCompProcessor::parametersFromState() const noexcept {
     p.input=v(state,"input");
     p.output=v(state,"output");
     p.attack=std::clamp(int(std::lround(v(state,"attack")))-1,0,8);
+    p.altecAttack=std::clamp(int(std::lround(v(state,"altecAttack"))),0,2);
     p.recovery=std::clamp(int(std::lround(v(state,"recovery"))),0,10);
     p.balance=v(state,"balance");
     p.superfuse=v(state,"superfuse")>.5f;
