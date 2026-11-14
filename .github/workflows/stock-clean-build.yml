@@ -1,7 +1,7 @@
-name: Selective detector correction and stock THD verification
+name: Tube Comp 2.5 to 1 ratio Windows VST3
 on:
   push:
-    branches: [selective-detector-correction]
+    branches: [ratio-2p5]
     paths: ['.github/workflows/stock-clean-build.yml']
   workflow_dispatch:
 permissions:
@@ -15,32 +15,20 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for RS124 isolated reference sweep
+      - name: Retrieve unchanged harmonic calibration from selective build
         run: |
-          for attempt in $(seq 1 480); do
-            status=$(gh run view 43582329899 --json status,conclusion --jq .status)
-            if [ "$status" = completed ]; then
-              test "$(gh run view 43582329899 --json conclusion --jq .conclusion)" = success
-              exit
-            fi
-            sleep 30
-          done
-          exit 1
-      - name: Retrieve existing Altec and new RS124 reference spectra
+          gh run download 43584460371 --name Stock-clean-harmonic-measurements --dir previous
+          cp "$(find previous -name CleanHarmonicTargets.inc -print -quit)" plugin/CleanHarmonicTargets.inc
+      - name: Measure steady state 1kHz ratio and harmonics
         run: |
-          gh run download 43572085333 --pattern 'paired-F1000-*' --dir paired-references
-          gh run download 43582329899 --pattern 'paired-RS124-*' --dir paired-references
-      - name: Apply selective detector correction and measure actual stock THD
-        run: python3 scripts/calibrate_clean_harmonics.py
+          g++ -O3 -std=c++17 -Iplugin tests/Ratio25Survey.cpp -o /tmp/ratio25
+          /tmp/ratio25 | tee ratio25.csv
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: Stock-clean-harmonic-measurements
           path: |
             plugin/CleanHarmonicTargets.inc
-            stock-harmonics.csv
-            corrected-harmonics.csv
-            calibration-comparison.csv
+            ratio25.csv
   vst3:
     needs: calibrate
     runs-on: windows-2022
@@ -74,11 +62,11 @@ jobs:
             $null = ConvertFrom-Json -InputObject $normalized -ErrorAction Stop
             [System.IO.File]::WriteAllText($metadata, $normalized)
           }
-          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Stock_Clean_Windows_x64_VST3.zip" -Force
+          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Ratio25_Windows_x64_VST3.zip" -Force
           "Original regression suite: ${{ steps.regression.outcome }}" | Out-File regression-status.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: TubeComp-Stock-Clean-Windows-VST3
+          name: TubeComp-Ratio25-Windows-VST3
           path: |
-            TubeComp_Stock_Clean_Windows_x64_VST3.zip
+            TubeComp_Ratio25_Windows_x64_VST3.zip
             regression-status.txt
