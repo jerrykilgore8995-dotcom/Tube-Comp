@@ -1,0 +1,69 @@
+name: Altec vacuum detector validation
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-vacuum-detector-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        knob: [0.2, 1.0]
+        level: [-18, 7]
+        variant: [vacuum_only, vacuum_factory_R14]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Full circuit with GE curve fitted vacuum diode
+        env:
+          KNOB: ${{ matrix.knob }}
+          LEVEL: ${{ matrix.level }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import os, sys, re, json
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          original_run=audit.subprocess.run
+          def vacuum_run(args,**kwargs):
+              f=Path(kwargs['cwd'])/'case.cir'
+              s=f.read_text()
+              # Published GE 1954 curve fit (kurvmatch parameters), using
+              # the positive-voltage space-charge branch only. Sub-uA
+              # contact-potential behavior is not established by this fit.
+              for n,node,scale in [(1,'sca',1.025),(2,'scb',0.975)]:
+                  s,count=re.subn(r'(?m)^DDET'+str(n)+r'\s+.*$',f'BDET{n} detector {node} I={{{scale}*0.002339*pow(uramp(V(detector,{node})),1.42)}}\nCDET{n} detector {node} {scale*3.2}p',s)
+                  assert count==1
+              if os.environ['VARIANT']=='vacuum_factory_R14':
+                  s,n=re.subn(r'\bR6CG7_DROP=[^\s]+','R6CG7_DROP=6800',s,count=1)
+                  assert n==1
+              s=s.replace('BOUT out 0 V={OUTPAD*V(secOut)}','VOUT secOut out 0').replace('RLOAD secOut 0 600','RLOAD out 0 600')
+              s=s.replace('wrdata tran.txt v(out) v(source) v(pa) v(pb) v(p2a) v(p2b) v(cv)','wrdata tran.txt v(out) v(source) v(pa) v(pb) v(p2a) v(p2b) v(cv) v(k1) v(k2) v(ga) v(gb) v(g2a) v(g2b) v(detector) v(sca) v(scb) v(platefeed) v(outputfeed)')
+              f.write_text(s)
+              return original_run(args,**kwargs)
+          audit.subprocess.run=vacuum_run
+          rows=audit.run(float(os.environ['LEVEL']),float(os.environ['KNOB']),0.5,True,1000,False)
+          results=[]
+          for row in rows:
+              if row[4] not in ['output','6BC8_diff','6CG7_diff']: continue
+              d=dict(node=row[4],THD_percent=row[5],fundamental_dBu=row[6],CV_V=row[7],harmonics_dBc={f'K{k}':row[7+k] for k in range(1,21)},harmonics_dBu={f'K{k}':row[6]+row[7+k] for k in range(1,21)})
+              print('VACUUM_RESULT',json.dumps(d),flush=True)
+              results.append(d)
+          Path('results.json').write_text(json.dumps(results,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vacuum-${{ matrix.variant }}-${{ matrix.knob }}-${{ matrix.level }}
+          path: |
+            results.json
+            audit/**/case.cir
+            audit/**/ngspice.log
+          if-no-files-found: warn
