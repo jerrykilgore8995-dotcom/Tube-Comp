@@ -50,20 +50,7 @@ public:
     {
         // The painted physical power switch is an actual DAW bypass control.
         const auto point=e.position;
-        if(mode==Mode::altec436b && altecMod && point.x>=1095 && point.x<=1192
-           && point.y>=179 && point.y<=271) {
-            const int selected=point.y<210?0:(point.y<240?1:2);
-            setAltecAttack(selected);
-            if(onAltecAttackSelected)onAltecAttackSelected(selected);
-            return;
-        }
-        if(mode==Mode::altec436b && altecMod && point.x>=952 && point.x<=1053
-           && point.y>=175 && point.y<=277) {
-            const int selected=juce::jlimit(0,4,int((point.y-175)/20));
-            setAltecRecovery(selected);
-            if(onAltecRecoverySelected)onAltecRecoverySelected(selected);
-            return;
-        }
+        if(selectAltecModKnob(point)) return;
         const bool touchedPower=(mode==Mode::rs124)
             ? (point.x>1360&&point.x<1451&&point.y>185&&point.y<263)
             : (point.x>1180&&point.x<1263&&point.y>176&&point.y<251);
@@ -84,6 +71,11 @@ public:
         }
     }
 
+    void mouseDrag(const juce::MouseEvent& e) override {
+        if(mode!=Mode::altec436b || !altecMod)return;
+        selectAltecModKnob(e.position,draggingAltecControl);
+    }
+
 private:
     using C = juce::Colour;
     static constexpr float pi = 3.14159265358979323846f;
@@ -93,7 +85,36 @@ private:
     int altecAttack=2;
     bool altecMod=false;
     int altecRecovery=0;
+    int draggingAltecControl=-1;
     float inPosition=.50f,outPosition=1.f,attackPosition=.375f,recPosition=.60f;
+
+    bool selectAltecModKnob(juce::Point<float> point,int forced=-1) {
+        if(mode!=Mode::altec436b || !altecMod)return false;
+        // Map pointer angle to one of the physical rotary detents.
+        const auto choose=[&](float cx,float cy,int count)->int {
+            const float angle=std::atan2(point.x-cx,cy-point.y);
+            const float n=juce::jlimit(0.f,1.f,(angle+2.25f)/4.5f);
+            return juce::jlimit(0,count-1,int(std::lround(n*float(count-1))));
+        };
+        if(forced==0 || (forced<0 && point.x>=946 && point.x<=1043
+                         && point.y>=178 && point.y<=271)) {
+            draggingAltecControl=0;
+            // Recovery position 1 = fastest, 5 = slowest.
+            const int physical=choose(994.f,224.f,5);
+            setAltecRecovery(4-physical);
+            if(onAltecRecoverySelected)onAltecRecoverySelected(4-physical);
+            return true;
+        }
+        if(forced==1 || (forced<0 && point.x>=1065 && point.x<=1162
+                         && point.y>=178 && point.y<=271)) {
+            draggingAltecControl=1;
+            const int physical=choose(1113.f,224.f,3);
+            setAltecAttack(physical);
+            if(onAltecAttackSelected)onAltecAttackSelected(physical);
+            return true;
+        }
+        return false;
+    }
 
     static C col(int r, int g, int b) {
         return C::fromRGB((juce::uint8) r,(juce::uint8) g,(juce::uint8) b);
@@ -501,36 +522,25 @@ private:
         stamp(g,"FUSE",1377,76,103,21,13,cream,true);
         fuse(g,1430,133,true);
         stamp(g,".5 AMP",1375,170,110,18,10.5f,cream);
-        // A-436B-only reversible mods: unmodified faceplate when Mod is OFF.
+        // MOD ON only: miniature versions of the RS124 pointer knobs.
+        // Stock faceplate remains visually unmodified when MOD is off.
         if(altecMod) {
-            const float ax=1118.f, ay=225.f;
-            stamp(g,"ATK",1065,211,45,22,14,cream,true);
-            g.setColour(col(13,20,15));g.fillRoundedRectangle(ax-15,ay-48,30,96,7);
-            g.setColour(col(144,157,139));g.drawRoundedRectangle(ax-15,ay-48,30,96,7,1.4f);
-            g.setColour(col(12,15,12));g.fillRoundedRectangle(ax-6,ay-34,12,68,5);
-            const float hy=ay-27.f+27.f*altecAttack;
-            g.setGradientFill(juce::ColourGradient(col(220,223,216),ax-9,hy-10,
-                                                   col(64,74,69),ax+10,hy+11,false));
-            g.fillRoundedRectangle(ax-9,hy-10,18,20,4);
-            const char* anames[]={"FAST","MED","SLOW"};
-            for(int k=0;k<3;++k)
-                stamp(g,anames[k],1140,189.f+27.f*k,50,20,11.5f,
-                      k==altecAttack?cream:col(137,155,137),k==altecAttack);
-
-            const float rx=968.f, ry=225.f;
-            stamp(g,"REC",925,211,38,22,13,cream,true);
-            g.setColour(col(13,20,15));g.fillRoundedRectangle(rx-14,ry-51,28,102,7);
-            g.setColour(col(144,157,139));g.drawRoundedRectangle(rx-14,ry-51,28,102,7,1.3f);
-            g.setColour(col(12,15,12));g.fillRoundedRectangle(rx-5,ry-40,10,80,5);
-            const float rhy=ry-40.f+20.f*altecRecovery;
-            g.setGradientFill(juce::ColourGradient(col(220,223,216),rx-8,rhy-7,
-                                                   col(64,74,69),rx+8,rhy+8,false));
-            g.fillRoundedRectangle(rx-8,rhy-8,16,16,3);
-            const char* rnames[]={"1 SEC","500","333","200","91"};
-            for(int k=0;k<5;++k)
-                stamp(g,rnames[k],990,176.f+20.f*k,65,18,11.2f,
-                      k==altecRecovery?cream:col(137,155,137),k==altecRecovery);
-            stamp(g,"REC ms",990,277,65,13,9,cream);
+            const auto tinyPointer=[&](float x,float y,int count,int selected,
+                                       const juce::String& caption) {
+                stamp(g,caption,x-56,160,112,18,14,cream,true);
+                pointerKnob(g,x,y,25.f,float(selected)/float(count-1));
+                for(int i=0;i<count;++i) {
+                    const float a=-2.25f+4.50f*float(i)/float(count-1);
+                    const float nx=x+std::sin(a)*48.f;
+                    const float ny=y-std::cos(a)*45.f;
+                    stamp(g,juce::String(i+1),nx-9,ny-9,18,18,11.8f,
+                          i==selected?cream:thin,i==selected);
+                }
+                stamp(g,"FAST",x-57,270,48,16,11,cream,true);
+                stamp(g,"SLOW",x+10,270,48,16,11,cream,true);
+            };
+            tinyPointer(994.f,224.f,5,4-altecRecovery,"RECOVERY");
+            tinyPointer(1113.f,224.f,3,altecAttack,"ATTACK");
         }
         // Bottom-right factory model identity, not invented release controls.
         stamp(g,"A-436B",1363,250,135,23,14.3f,cream,true);
