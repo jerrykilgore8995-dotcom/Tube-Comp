@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: ["attack","recovery","hold"]
+        family: ["attack","recovery","hold","altecmod"]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
