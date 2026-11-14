@@ -45,6 +45,7 @@ double cross(const std::vector<float>& v,double start,
 Timing run(bool rs,int attack,int recovery,bool hold){
  tubecomp::Parameters p;
  p.rs124=rs;p.input=8.f;p.output=0.f;p.attack=attack;
+ p.altecAttack=rs?2:attack;
  p.recovery=hold?2*recovery+1:10-2*recovery;
  p.balance=0.f;p.superfuse=false;p.wet=1.f;p.stereoLink=1.f;
  p.outputOhms=600.f;
@@ -104,7 +105,7 @@ int main(int argc,char** argv){
          <<"ms hold="<<m.holdFraction<<"\n";
  };
  if(family=="attack"){
-     measure(false,0,3,false);
+     for(int a=0;a<3;++a)measure(false,a,3,false);
      for(int a=0;a<9;++a)measure(true,a,3,false);
  }else if(family=="recovery"){
      for(int r=0;r<6;++r)measure(true,4,r,false);
