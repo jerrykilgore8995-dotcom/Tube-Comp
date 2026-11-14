@@ -13,16 +13,21 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     face.onAltecAttackSelected=[this](int a) {
         setParameter("altecAttack",float(a));
     };
+    face.onAltecRecoverySelected=[this](int pos) {
+        setParameter("altecRecovery",float(pos));
+    };
     face.onPowerSelected=[this](bool on) {
         setParameter("bypass",on?0.f:1.f);
     };
     for(const char* id: {"input","output","attack","recovery","balance"})
         makeDial(id);
+    altecModButton.setButtonText("MOD");
+    altecModButton.setClickingTogglesState(true);
     bypass.setButtonText("BYPASS");
     bypass.setClickingTogglesState(true);
     superFuse.setButtonText("SUPERFUSE");
     superFuse.setClickingTogglesState(true);
-    for(auto* b:{&bypass,&superFuse}){
+    for(auto* b:{&bypass,&superFuse,&altecModButton}){
         b->setColour(juce::TextButton::buttonColourId,
                      juce::Colour::fromRGB(35,40,43));
         b->setColour(juce::TextButton::buttonOnColourId,
@@ -37,6 +42,8 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
         p.state,"bypass",bypass);
     fuseAttach=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         p.state,"superfuse",superFuse);
+    altecModAttach=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        p.state,"altecMod",altecModButton);
     outputLoad.addItem("200 OHM",1);outputLoad.addItem("600 OHM",2);
     addAndMakeVisible(outputLoad);
     loadAttach=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
@@ -46,7 +53,7 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     timerCallback();
     startTimerHz(30);
 }
-TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;face.onPowerSelected=nullptr;face.onAltecAttackSelected=nullptr;}
+TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;face.onPowerSelected=nullptr;face.onAltecAttackSelected=nullptr;face.onAltecRecoverySelected=nullptr;}
 void TubeCompEditor::makeDial(const char* id) {
     Dial control;
     control.slider=std::make_unique<InvisibleDial>();
@@ -79,6 +86,7 @@ void TubeCompEditor::setMode(bool rs) {
     dials[4].slider->setVisible(rs);
     superFuse.setVisible(rs);
     outputLoad.setVisible(rs);
+    altecModButton.setVisible(!rs);
 }
 void TubeCompEditor::timerCallback() {
     const bool rs=proc.state.getRawParameterValue("rs124")->load()>.5f;
@@ -92,10 +100,13 @@ void TubeCompEditor::timerCallback() {
     face.setMeterDb(proc.grMeter.load(std::memory_order_relaxed));
     face.setPowerOn(proc.state.getRawParameterValue("bypass")->load()<.5f);
     face.setAltecAttack(int(std::lround(proc.state.getRawParameterValue("altecAttack")->load())));
+    face.setAltecRecovery(int(std::lround(proc.state.getRawParameterValue("altecRecovery")->load())));
+    face.setAltecMod(!rs && proc.state.getRawParameterValue("altecMod")->load()>.5f);
 }
 void TubeCompEditor::resized() {
     face.setBounds(0,0,getWidth(),getHeight());
     bypass.setBounds(421,312,95,23);
     superFuse.setBounds(539,312,124,23);
     outputLoad.setBounds(694,312,113,23);
+    altecModButton.setBounds(840,312,100,23);
 }
