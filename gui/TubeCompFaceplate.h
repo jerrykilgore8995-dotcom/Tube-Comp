@@ -260,43 +260,38 @@ private:
     }
     static void pointerKnob(juce::Graphics& g,float cx,float cy,float radius,float normalized)
     {
-        // The RS124 uses tall, dark phenolic pointer/levers on input/output,
-        // not a generic round aluminum potentiometer.
-        escutcheon(g,cx,cy,radius*.73f);
-        g.setColour(col(11,12,13));
-        g.fillEllipse(cx-radius*.73f,cy-radius*.73f,1.46f*radius,1.46f*radius);
-        const float angle=(-2.25f+normalized*4.50f);
-        {
-            juce::Graphics::ScopedSaveState save(g);
-            g.addTransform(juce::AffineTransform::rotation(angle,cx,cy));
-            juce::Path body;
-            // tapered body / projecting ivory-ended lever pointing UP
-            body.startNewSubPath(cx-13,cy+radius*.67f);
-            body.cubicTo(cx-24,cy+radius*.31f,cx-27,cy-radius*.18f,cx-19,cy-radius*.55f);
-            body.lineTo(cx-14,cy-radius*1.10f);
-            body.quadraticTo(cx,cy-radius*1.30f,cx+14,cy-radius*1.10f);
-            body.lineTo(cx+19,cy-radius*.55f);
-            body.cubicTo(cx+27,cy-radius*.19f,cx+24,cy+radius*.31f,
-                         cx+13,cy+radius*.67f);
-            body.quadraticTo(cx,cy+radius*.88f,cx-13,cy+radius*.67f);
-            body.closeSubPath();
-            g.setColour(C::fromRGBA(3,4,6,135));
-            g.fillPath(body,juce::AffineTransform::translation(3,4));
-            g.setGradientFill(juce::ColourGradient(col(117,119,113),
-                  cx-19,cy-radius*.95f,col(10,11,13),cx+23,cy+radius*.7f,false));
-            g.fillPath(body);
-            g.setColour(col(12,13,14));
-            g.strokePath(body,juce::PathStrokeType(2.5f));
-            line(g,cx-12,cy-radius*.93f,cx-8,cy+radius*.36f,
-                 C::fromRGBA(237,239,233,112),1.5f);
-            line(g,cx+7,cy-radius*.97f,cx+11,cy-radius*.34f,
-                 C::fromRGBA(0,0,0,150),2);
-            // engraved indicator in bright gray on pointed tip.
-            line(g,cx,cy-radius*1.13f,cx,cy-radius*.80f,
-                 col(233,233,226),2.8f);
-        }
-        g.setColour(C::fromRGBA(245,245,242,28));
-        g.drawEllipse(cx-radius*.57f,cy-radius*.60f,1.1f*radius,1.1f*radius,1.1f);
+        // Molded black phenolic chickenhead: all geometry proportional to radius.
+        const float r=radius;
+        escutcheon(g,cx,cy,r*.67f);
+        juce::Graphics::ScopedSaveState save(g);
+        g.addTransform(juce::AffineTransform::rotation(-2.25f+normalized*4.50f,cx,cy));
+        juce::Path head;
+        head.startNewSubPath(cx,cy-r*1.23f);
+        head.quadraticTo(cx-r*.075f,cy-r*1.24f,cx-r*.13f,cy-r*1.06f);
+        head.cubicTo(cx-r*.20f,cy-r*.76f,cx-r*.32f,cy-r*.43f,cx-r*.49f,cy-r*.23f);
+        head.cubicTo(cx-r*.83f,cy+r*.20f,cx-r*.64f,cy+r*.72f,cx,cy+r*.75f);
+        head.cubicTo(cx+r*.64f,cy+r*.72f,cx+r*.83f,cy+r*.20f,cx+r*.49f,cy-r*.23f);
+        head.cubicTo(cx+r*.32f,cy-r*.43f,cx+r*.20f,cy-r*.76f,cx+r*.13f,cy-r*1.06f);
+        head.quadraticTo(cx+r*.075f,cy-r*1.24f,cx,cy-r*1.23f);
+        head.closeSubPath();
+        g.setColour(C::fromRGBA(0,0,0,152));
+        g.fillPath(head,juce::AffineTransform::translation(r*.065f,r*.085f));
+        g.setGradientFill(juce::ColourGradient(col(70,72,69),cx-r*.55f,cy-r*.65f,
+                    col(9,10,10),cx+r*.60f,cy+r*.65f,false));
+        g.fillPath(head);
+        g.setColour(col(8,9,9));
+        g.strokePath(head,juce::PathStrokeType(r*.042f));
+        juce::Path ridge;
+        ridge.startNewSubPath(cx,cy-r*1.16f);
+        ridge.quadraticTo(cx-r*.10f,cy-r*.45f,cx-r*.33f,cy+r*.20f);
+        ridge.quadraticTo(cx-r*.38f,cy+r*.51f,cx,cy+r*.62f);
+        ridge.quadraticTo(cx+r*.38f,cy+r*.51f,cx+r*.33f,cy+r*.20f);
+        ridge.quadraticTo(cx+r*.10f,cy-r*.45f,cx,cy-r*1.16f);
+        ridge.closeSubPath();
+        g.setGradientFill(juce::ColourGradient(col(66,67,63),cx-r*.29f,cy,
+                    col(16,17,17),cx+r*.30f,cy+r*.32f,false));
+        g.fillPath(ridge);
+        line(g,cx,cy-r*1.10f,cx,cy-r*.62f,col(232,230,210),r*.064f);
     }
     static void selectKnob(juce::Graphics& g,float cx,float cy,float radius,float normalized)
     {
@@ -429,7 +424,6 @@ private:
                   py+std::sin(a)*92-8,26,17,11,col(51,49,42));
         }
         stamp(g,"DB COMPRESSION",x+30,y+93,w-60,15,10.3f,col(55,50,46));
-        stamp(g,"A-436B",x+48,y+112,w-96,20,13.5f,col(57,60,51),true);
         const float angle=pi*1.80f-pi*.63f*meterDb/30.f;
         line(g,cx,py,cx+std::cos(angle)*114,py+std::sin(angle)*114,
              col(42,38,33),1.8f);
@@ -474,7 +468,7 @@ private:
         selectKnob(g,617,217,27,recPosition);
         stamp(g,"R E C O V E R Y",542,274,148,17,11.7f,ink,true);
 
-        meterRS124(g,744,66);
+        meterAltec(g,755,54);
 
         stamp(g,"O U T P U T",1048,29,159,19,13.5f,ink,true);
         stamp(g,"A T T E N U A T O R  (dB)",1004,48,255,17,11.7f,ink,true);
