@@ -403,18 +403,19 @@ private:
         // Symmetric arc about twelve o'clock; same radius and inset at both ends.
         // Share this exact angular mapping with the needle.
         const auto grAngle=[&](float db){return pi*(1.5f+.30f*(1.f-2.f*db/30.f));};
+        const float scaleY=py-16.f; // ~12% of the 135px visible meter face
         for(const int db:ticks){
             const float a=grAngle(float(db));
-            const float xx=cx+std::cos(a)*116.f,yy=py+std::sin(a)*116.f;
-            const float tx=cx+std::cos(a)*105.f,ty=py+std::sin(a)*105.f;
+            const float xx=cx+std::cos(a)*116.f,yy=scaleY+std::sin(a)*116.f;
+            const float tx=cx+std::cos(a)*105.f,ty=scaleY+std::sin(a)*105.f;
             line(g,xx,yy,tx,ty,col(46,45,39),1.4f);
             // Raise numerals uniformly, keep each centered under its graduation.
             stamp(g,juce::String(db),cx+std::cos(a)*94.f-13.f,
-                  py+std::sin(a)*98.f-10.f,26,17,11,col(51,49,42));
+                  scaleY+std::sin(a)*98.f-10.f,26,17,11,col(51,49,42));
         }
-        stamp(g,"DB COMPRESSION",x+30,y+103,w-60,15,10.3f,col(55,50,46));
+        stamp(g,"DB COMPRESSION",x+30,y+87,w-60,15,10.3f,col(55,50,46));
         const float angle=grAngle(meterDb);
-        line(g,cx,py,cx+std::cos(angle)*114,py+std::sin(angle)*114,
+        line(g,cx,py,cx+std::cos(angle)*114,scaleY+std::sin(angle)*114,
              col(42,38,33),1.8f);
         g.setColour(col(13,15,14));g.fillEllipse(cx-7,py-7,14,14);
         g.setGradientFill(juce::ColourGradient(col(33,35,32),x+48,y+h-53,
