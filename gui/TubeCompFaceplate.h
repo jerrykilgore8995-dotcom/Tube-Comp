@@ -184,18 +184,18 @@ private:
         for(float x : {91.0f,1509.0f})
             for(float y : {43.0f,279.0f})panHead(g,x,y,7.5f);
     }
-    static void pilot(juce::Graphics& g,float cx,float cy)
+    static void pilot(juce::Graphics& g,float cx,float cy,bool isOn)
     {
         g.setColour(col(18,21,23));g.fillEllipse(cx-23,cy-23,46,46);
         g.setGradientFill(juce::ColourGradient(col(233,235,229),cx-19,cy-19,
                     col(72,75,76),cx+18,cy+18,false));
         g.fillEllipse(cx-18,cy-18,36,36);
-        g.setColour(col(79,17,10));g.fillEllipse(cx-13,cy-13,26,26);
-        g.setGradientFill(juce::ColourGradient(col(255,216,175),cx-9,cy-10,
-                                    col(225,28,13),cx+11,cy+11,false));
+        g.setColour(col(14,28,65));g.fillEllipse(cx-13,cy-13,26,26);
+        g.setGradientFill(juce::ColourGradient((isOn?col(178,216,255):col(40,56,83)),cx-9,cy-10,
+                                    (isOn?col(26,80,184):col(8,17,35)),cx+11,cy+11,false));
         g.fillEllipse(cx-11,cy-11,22,22);
-        g.setColour(C::fromRGBA(255,106,58,75));g.fillEllipse(cx-16,cy-16,32,32);
-        g.setColour(C::fromRGBA(255,249,225,186));g.fillEllipse(cx-6,cy-9,7,6);
+        g.setColour(C::fromRGBA(60,124,219,isOn?55:0));g.fillEllipse(cx-16,cy-16,32,32);
+        g.setColour(C::fromRGBA(219,237,255,isOn?166:55));g.fillEllipse(cx-6,cy-9,7,6);
     }
     static void fuse(juce::Graphics& g,float cx,float cy,bool green)
     {
@@ -460,7 +460,7 @@ private:
         const std::array<juce::String,11> out={"-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"};
         dialScale(g,1119,169,46,out,ink,12.f);
         pointerKnob(g,1119,169,45,outPosition);
-        pilot(g,1262,101);
+        pilot(g,1262,101,powerOn);
         stamp(g,"FUSE",1376,56,91,17,13,ink,true);
         fuse(g,1421,101,false);
         stamp(g,"OFF",1330,168,57,17,11,ink,true);
@@ -493,7 +493,7 @@ private:
         stamp(g,"436B",967,84,116,26,22,cream,true);
         stamp(g,"COMPRESSOR",965,114,181,22,14,cream,true);
         stamp(g,"AMPLIFIER",965,138,181,22,14,cream,true);
-        pilot(g,1218,111);
+        pilot(g,1218,111,powerOn);
         stamp(g,"P O W E R",1170,154,102,20,13,cream,true);
         powerRotary(g,1224,211,powerOn);
         stamp(g,"ON",1273,202,45,17,10.7f,cream);
