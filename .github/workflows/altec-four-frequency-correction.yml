@@ -1,0 +1,77 @@
+name: Altec four frequency corrected targets build
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-four-frequency-correction.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for existing paired measurements
+        run: |
+          gh run watch 43572085333 --interval 30 --exit-status
+          gh run download 43572085333 --pattern 'paired-F*' --dir paired
+          python3 scripts/generate_altec_corrected_targets.py paired
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-calibration
+          path: plugin/AltecCorrectedTargets.inc
+          if-no-files-found: error
+      - name: Measure actual DSP at all four frequencies
+        run: g++ -std=c++17 -O3 -Iplugin tests/AltecDetectorCorrectionSurvey.cpp -o survey && ./survey | tee altec-thd.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Altec-four-frequency-THD
+          path: |
+            altec-thd.csv
+            corrected-targets.json
+  vst3:
+    needs: targets
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: corrected-calibration
+          path: plugin
+      - name: Configure JUCE 8 / VS2022
+        run: cmake -S plugin -B plugin/build -G "Visual Studio 17 2022" -A x64
+      - name: Build realtime DSP measurements and regressions
+        run: cmake --build plugin/build --config Release --target TubeCompDSPTests --parallel 4
+      - name: Verify nine attack, eleven recovery/HOLD, real compression, THD, harmonics, CPU
+        run: ctest --test-dir plugin/build -C Release --output-on-failure
+      - name: Compile Windows VST3 with real JUCE rack GUI
+        run: cmake --build plugin/build --config Release --target TubeComp_VST3 --parallel 4
+      - name: Package actual plugin folder
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path plugin/build -Recurse -Directory -Filter "Tube Comp RS124.vst3" |
+            Select-Object -First 1
+          if (-not $file) { throw "Compiled Tube Comp RS124.vst3 not found" }
+          # Some JUCE 8 builds emit legacy trailing commas in VST3 moduleinfo.
+          # Normalize to strict JSON without changing the compiled VST3 binary.
+          $metadata = Join-Path $file.FullName "Contents/Resources/moduleinfo.json"
+          if (Test-Path $metadata) {
+            $raw = [System.IO.File]::ReadAllText($metadata)
+            $normalized = [System.Text.RegularExpressions.Regex]::Replace($raw, ',(?=\s*[}\]])', '')
+            $null = ConvertFrom-Json -InputObject $normalized -ErrorAction Stop
+            [System.IO.File]::WriteAllText($metadata, $normalized)
+          }
+          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Altec_Corrected_Windows_x64_VST3.zip" -Force
+          $zip = Get-Item "TubeComp_Altec_Corrected_Windows_x64_VST3.zip"
+          if ($zip.Length -lt 100000) { throw "VST3 archive suspiciously small" }
+      - name: Upload working Windows VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-Altec-Corrected-Windows-VST3
+          path: TubeComp_Altec_Corrected_Windows_x64_VST3.zip
+          if-no-files-found: error
