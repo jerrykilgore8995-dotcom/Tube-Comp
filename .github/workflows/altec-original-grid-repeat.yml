@@ -1,0 +1,84 @@
+name: Repeat original Altec SPICE measurement grids with tube mismatch
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-original-grid-repeat.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  repeat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        suite: [broad100, broad1000, broad5000, broad10000, broadpot, inputgrid, longsteady, outputload]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy
+      - name: Repeat original cases and preserve original extraction
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys, re, os, json, csv
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import run_lab as lab
+          import long_steady_compression as steady
+          original=lab.prepare
+          def prepare(case,wd):
+              f=original(case,wd)
+              s=f.read_text()
+              lib=wd/'models/tube_cells.lib'
+              l=lib.read_text()
+              for model,delta in [('V6BC8_REMOTE_EXP',.025),('V6CG7_GE',.05)]:
+                  block=re.search(r'(?im)^\.subckt '+model+r'\b[\s\S]*?^\.ends '+model+r'\b',l).group()
+                  for side,mult in [('A',1+delta),('B',1-delta)]:
+                      name=model+'_'+side
+                      replica=block.replace(model,name)
+                      replica,n=re.subn(r'(BPL P K I=)\{([^\n]+)\}',lambda m:m[1]+'{'+str(mult)+'*('+m[2]+')}',replica)
+                      assert n==1
+                      l+='\n'+replica+'\n'
+                      s,n=re.subn(r'(?m)^(XU[12]'+side+r' .* )'+model+r'$',lambda m:m[1]+name,s)
+                      assert n==1
+              s=s.replace('DDET1 detector sca D6AL5','DDET1 detector sca D6AL5 area=1.025').replace('DDET2 detector scb D6AL5','DDET2 detector scb D6AL5 area=0.975')
+              assert 'area=1.025' in s and 'area=0.975' in s
+              lib.write_text(l); f.write_text(s)
+              return f
+          lab.prepare=prepare
+          steady.prepare=prepare
+          suite=os.environ['SUITE']
+          rows=[]
+          if suite.startswith('broad'):
+              cases=[c for c in lab.mk_cases(True) if c['mode']=='A-436B']
+              cases=cases[40:] if suite=='broadpot' else [c for c in cases[:40] if c['hz']==int(suite[5:])]
+              for c in cases:
+                  r=lab.simulate(c,Path('repeat'),compact=True)
+                  rows.append(r); print(json.dumps(r),flush=True)
+          else:
+              steady.ROOT=Path('repeat')
+              steady.ROOT.mkdir(exist_ok=True)
+              if suite=='inputgrid': cases=[(p*.01,l,600) for p in range(0,101,10) for l in (-18,-6,7)]
+              elif suite=='longsteady': cases=[(p,l,600) for p in (.8,1.) for l in (-24,-18,-12,-6,0,3,7,10,13)]
+              else: cases=[(p,l,z) for z in (200,600) for p in (.8,1.) for l in (-18,-6,7)]
+              for p,l,z in cases:
+                  r=steady.measure('A-436B',l,p,load_ohms=z)
+                  rows.append(r); print(json.dumps(r),flush=True)
+          Path('results.json').write_text(json.dumps(rows,indent=2))
+          flat=[{k:v for k,v in r.items() if not isinstance(v,(dict,list))} for r in rows]
+          with open('results.csv','w') as f:
+              w=csv.DictWriter(f,fieldnames=sorted(set().union(*(r.keys() for r in flat))))
+              w.writeheader();w.writerows(flat)
+          assert rows and all(r['status']=='OK' for r in rows)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-repeat-${{ matrix.suite }}
+          path: |
+            results.json
+            results.csv
+          if-no-files-found: warn
