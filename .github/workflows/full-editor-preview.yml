@@ -1,0 +1,34 @@
+name: Capture Complete RS124 Plugin Editor
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - ".github/workflows/full-editor-preview.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure JUCE
+        run: cmake -S plugin -B plugin/build -G "Visual Studio 17 2022" -A x64
+      - name: Compile real complete editor
+        run: cmake --build plugin/build --config Release --target TubeCompFullEditorPreview --parallel 4
+      - name: Capture real RS124 GUI including bottom controls
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem plugin/build -Recurse -File -Filter "TubeCompFullEditorPreview.exe" |
+            Select-Object -First 1
+          if (-not $exe) { throw "No complete GUI renderer" }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Capture failed" }
+          if (-not (Test-Path "TubeComp_RS124_Full_Editor.png")) { throw "Screenshot missing" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RS124-Full-Editor-GUI
+          path: TubeComp_RS124_Full_Editor.png
+          if-no-files-found: error
