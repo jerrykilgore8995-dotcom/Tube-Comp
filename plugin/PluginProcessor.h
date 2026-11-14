@@ -37,6 +37,8 @@ public:
     std::atomic<float> grMeter{0.f},inputMeter{0.f},outputMeter{0.f};
 
 private:
+    // Purely external DAW trim stages; neither changes tubecomp::Engine internals.
+    juce::SmoothedValue<float,juce::ValueSmoothingTypes::Multiplicative> preTrim,postTrim;
     tubecomp::Engine engine;
     tubecomp::Parameters parametersFromState() const noexcept;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TubeCompProcessor)
