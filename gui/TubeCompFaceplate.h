@@ -552,7 +552,7 @@ private:
         const float y=309.0f;
         g.setColour(col(15,18,20));g.fillRoundedRectangle(13,y,1574,30,3);
         g.setColour(col(55,65,69));g.drawRoundedRectangle(13,y,1574,30,3,1.0f);
-        stamp(g,"TUBE COMP  /  CIRCUIT",40,y+4,300,21,11.5f,col(177,188,192),
+        stamp(g,"TUBE COMP",40,y+4,120,21,11.5f,col(177,188,192),
               true,juce::Justification::centredLeft);
         const float l=1291.f,w=145.f;
         g.setColour(mode==Mode::rs124?col(76,108,124):col(48,53,56));
