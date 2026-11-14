@@ -316,6 +316,30 @@ public:
                     ratio*=1.f+.085f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=(params.rs124 && k>7)?0.f:ratio;
                 }
+                if(params.rs124){
+                    // Match calibrated Altec even-order baseline, preserving
+                    // RS124 odd coefficients and its existing balance scaling.
+                    // Evaluate the Altec at the same dial and source, using
+                    // actual RS124 GR for the Altec normalization curve.
+                    const auto a=spice::lookup(false,params.input,sourceDbu[c],600.f);
+                    const float gr=clamp(spice::attenuationDb(true,cv[c]),0.f,30.f);
+                    const float level=22.f+lin2db(std::max(1.e-8f,harmonicEnv[c]*(pi*.5f)));
+                    const float low=.00432f*db2lin(std::min(0.f,level+18.f));
+                    const float targetRatio=gr<=11.17f?low*gr/11.17f:
+                        (gr<=25.f?.00432f+(.015f-.00432f)*(gr-11.17f)/(25.f-11.17f):
+                        .015f+.010f*(gr-25.f)/5.f);
+                    std::array<float,6> base{};
+                    float sum=0.f;
+                    for(int k=2;k<=7;++k){
+                        const float frac=float(k)/20.f;
+                        base[k-2]=db2lin(a.harmonicDb[k-2])*(1.f+.085f*frac*frac);
+                        sum+=base[k-2]*base[k-2];
+                    }
+                    const float scale=targetRatio/std::max(1.e-12f,std::sqrt(sum));
+                    for(int k=2;k<=6;k+=2)
+                        harmonicLinear[c][k-2]=base[k-2]*scale*
+                           clamp(1.f+params.balance*1.3f,.05f,3.5f);
+                }
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
             gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
