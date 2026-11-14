@@ -12,6 +12,10 @@
 #include "SpiceReference.h"
 #include "SpicePhaseFIRMeasured.inc"
 #include "SpicePhaseFIR200Measured.inc"
+#if __has_include("CleanHarmonicTargets.inc") && !defined(TUBECOMP_STOCK_REFERENCE)
+#include "CleanHarmonicTargets.inc"
+#define TUBECOMP_CLEAN_HARMONICS 1
+#endif
 
 namespace tubecomp {
 constexpr float pi=3.14159265358979323846f;
@@ -316,6 +320,12 @@ public:
                     ratio*=1.f+.085f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
                 }
+#ifdef TUBECOMP_CLEAN_HARMONICS
+                // Detector-isolated reference harmonics, normalized to stock
+                // measured total THD; do not modify gain or detector timing.
+                cleanharmonics::apply(params.rs124,params.input,sourceDbu[c],
+                                      params.balance,harmonicLinear[c]);
+#endif
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
             }
             gainDb[c]+=(desiredGain[c]-gainDb[c])*gainSmoothAlpha;
