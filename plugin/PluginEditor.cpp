@@ -25,7 +25,8 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     auto configureTrim=[this](juce::Slider& dial,juce::Label& label,
                               const char* title,const char* param) {
         dial.setSliderStyle(juce::Slider::LinearHorizontal);
-        dial.setTextBoxStyle(juce::Slider::TextBoxRight,false,42,20);
+        dial.setTextBoxStyle(juce::Slider::TextBoxRight,false,64,20);
+        dial.setNumDecimalPlacesToDisplay(1);
         dial.setTextValueSuffix(" dB");
         dial.setColour(juce::Slider::trackColourId,juce::Colour::fromRGB(96,147,170));
         dial.setColour(juce::Slider::thumbColourId,juce::Colour::fromRGB(219,224,222));
@@ -132,8 +133,10 @@ void TubeCompEditor::resized() {
     superFuse.setBounds(539,312,124,23);
     outputLoad.setBounds(694,312,113,23);
     altecModButton.setBounds(840,312,100,23);
-    inputTrimLabel.setBounds(168,313,37,21);
-    digitalInputTrim.setBounds(204,313,100,21);
-    outputTrimLabel.setBounds(305,313,43,21);
-    digitalOutputTrim.setBounds(346,313,72,21);
+    // Dedicated non-overlapping trim slots, with full-width readouts.
+    // Existing BYPASS, SUPERFUSE, impedance, and MOD bounds stay untouched.
+    inputTrimLabel.setBounds(950,313,42,21);
+    digitalInputTrim.setBounds(996,313,112,21);
+    outputTrimLabel.setBounds(1116,313,48,21);
+    digitalOutputTrim.setBounds(1168,313,112,21);
 }
