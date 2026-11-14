@@ -1,0 +1,148 @@
+Altec 436B vacuum detector candidate - validation required
+* This is NOT an exact tracing of the 436B drawing.
+* Actual BOM values are used where known. Unknown connections are explicit guesses.
+* Sidechain is rectified by 6AL5 diode proxies. Differential triodes truly conduct.
+.include "models/tube_cells.lib"
+.param FREQ=1000 AMP=0.15 GAIN=0.8 BIAS=-0.8
+.param ATTACK_R=33000 REC_R=1000000 OUTPAD=1
+.param BPLUS=272 SRC_OHM=600 R6CG7_DROP=6800
+.option reltol=1e-4 abstol=1e-11 method=gear
+* Documented idle voltage: 272V before R13, vs 210V after R13 (Altec drawing).
+* Preserve user-specified 150uF reservoir before 10k R13 and 47uF after it.
+* The 290V downstream marking is under 20dB compression, NOT the idle 272V condition.
+* The constant VHT source still lacks voltage rise under GR, ripple and rectifier impedance.
+VHT bplus 0 {BPLUS}
+CRES bplus 0 150u
+R13 bplus platefeed 10k
+CPLATE platefeed 0 47u
+VIN source 0 SIN(0 {AMP} {FREQ}) AC 1
+RSOURCE source in 600
+* T1 Peerless 4651A line input, physically coupled two-winding approximation.
+* The original 436B drawing specifies "15000 ohms bridging" at the PRIMARY:
+* This is a loaded INPUT IMPEDANCE, not a 15k physical shunt resistor.
+* Peerless original ratio reported 1:2.6 (Cinemag technical recollection).
+* Sowter 1231 replacement specifies 1:2.3, Lpri=220H, DCR=485/2800R.
+* This candidate uses 1:2.6 to reflect the actual two 50k pots:
+* 100k / (2.6^2) = 14.79k before losses; expected 15k bridging.
+* 220H primary / 1487.2H secondary, series DCR 485 / 2800R.
+* The ratio, DCR, leakage and winding capacitance need bench validation.
+RT1_PRIMARY in tp1 485
+LT1_PRIMARY tp1 0 220
+RT1_SEC_TOP tsH tsech 1400
+LT1_SECONDARY tsech tsecl 1487.2
+RT1_SEC_BOTTOM tsecl tsL 1400
+* Coupling calibrated as a wideband starting point. With Lpri=220H,
+* K=0.995 caused ~2.19H leakage and an UNPHYSICAL 40deg 1kHz shift.
+* K=0.9999 leaves ~44mH referred primary leakage; the exact Peerless
+* leakage/winding parasitics remain pending verified measurements.
+KT1 LT1_PRIMARY LT1_SECONDARY 0.9999
+* Altec P1A and P1B: two 50k variable resistive divider sections.
+* Signal comes off BOTH wipers directly into the 6BC8 grids.
+* Pot midpoint is referenced to the negative 6AL5 control bias; no
+* ideal per-grid audio voltage sources and no fixed primary shunt.
+* GAIN=1 puts the wipers near the ends; GAIN=0 close to midpoint.
+RP1A_UPPER tsH ga {max(1,(1-GAIN)*50000)}
+RP1A_LOWER ga gridcentre {max(1,GAIN*50000)}
+RP1B_UPPER gridcentre gb {max(1,GAIN*50000)}
+RP1B_LOWER gb tsL {max(1,(1-GAIN)*50000)}
+* Provisional idle bias offset: factory drawing marks about -0.5V at
+* this node. Do not confuse the nominal grid idle bias with the dynamic
+* negative control voltage applied by 6AL5.
+VGRIDOFFSET gridcentre cv {BIAS}
+* 6BC8 now uses the SPICE A/B-tested semiremote cutoff candidate.
+* Compare against original single-Koren curve via V6BC8 in models/tube_cells.lib.
+* At forced CV=-30V with BPLUS=290V, compressed plates now ~283.98V
+* (factory 436C indication ~285V), versus 289.97V with old Koren.
+* At -6dBu closed loop the A/B test reports GR=19.90dB, THD=0.498%
+* versus 17.73dB and 0.839% using original curve. NOT hardware proof.
+* Pair 6BC8 with historical 47k anode resistors and shared 34-ohm cathode.
+R3 platefeed pa 47k
+R4 platefeed pb 47k
+XU1A pa ga k1 V6BC8_REMOTE_EXP
+XU1B pb gb k1 V6BC8_REMOTE_EXP
+R8 k1 0 34
+* Coupling to push-pull 6CG7; R5 and R6 are historically 1M.
+C2 pa g2a 22n
+C3 pb g2b 22n
+R5 g2a 0 1Meg
+R6 g2b 0 1Meg
+XU2A p2a g2a k2 V6CG7_GE
+XU2B p2b g2b k2 V6CG7_GE
+R7 k2 0 220
+* Independent 6CG7 B+ supply: dedicated dropping resistor and 47uF cap.
+* An 11k dropper fits 149.0V at plates with 272V and GE tube curve; still provisional.
+* Original 436B R14=6.8k, NOT 11k. This unresolved discrepancy requires
+* checking source loading and other branch current before claiming exactness.
+* Preserved user's 372V configuration in spice/variants/436b_372V_user_supply.cir.
+R6CG7DROP bplus outputfeed {R6CG7_DROP}
+C6CG7FILTER outputfeed 0 47u
+* Peerless 16402 output transformer: spec-anchored LINEAR approximation.
+* Peerless original turns ratio 6.2:1; Sowter 1232 replacement 23kCT/600R,
+* a replacement uses ~80H total inductance and 650R primary DCR.
+* Our original 80H / k=.995 proxy FAILED the Altec ±1.5dB bandwidth test.
+* Fitted 160H / k=.9995 retains 6.2:1 and 650R DCR and yields ≤0.67dB
+* deviation over 30Hz–15kHz. This is a BEHAVIORAL FIT, NOT Peerless data.
+* This is a COUPLED-WINDING electrical proxy, not a core-saturation model.
+* Reference: https://www.sowter.co.uk/specs/1232.php
+* 40H each half, ~4.16H secondary gives ~6.20:1 differential ratio.
+* 325 ohm per half gives ~650 ohm total primary DC resistance.
+RWP1 outputfeed priA 325
+RWP2 outputfeed priB 325
+LPRI_A priA p2a 40
+LPRI_B p2b priB 40
+LSEC secOut 0 4.16
+KPP LPRI_A LPRI_B 0.9995
+KPSA LPRI_A LSEC 0.9995
+KPSB LPRI_B LSEC 0.9995
+* Keep the output attenuator outside the power stage.
+* Stock 436B has no output attenuator.
+VOUT secOut out 0
+RLOAD out 0 600
+* Correct plate-fed 6AL5 feedback topology: source is the two 6CG7
+* plates BEFORE the output attenuator, NOT a scaled sample of the 600R output.
+* C5 and C6 are real 22nF blocking capacitors: DC plate voltage must
+* never be injected into the control network. R10/R11 are 220k returns.
+* Original 436B factory schematic: R10/R11 detector bias comes from
+* the 6CG7 joined cathodes (k2, factory annotated ~2.3V at idle).
+* IMPORTANT: the prior 20V source belonged to a different, variable
+* threshold arrangement and was not original 436B wiring.
+* R10/R11 directly load the joined cathode as in the original drawing.
+* See Altec 436B operating instructions drawing 416C (source-register).
+* Plate-coupled detector, no behavioral buffer: the two 22nF coupling
+* capacitors and 220k grid-return resistors genuinely load the 6CG7 plates.
+* The reference sweep disconnects diode conduction rather than scaling audio.
+C5 p2a sca 22n
+C6 p2b scb 22n
+R10 sca k2 220k
+R11 scb k2 220k
+* Detector 6AL5 anodes collect the negative phase excursions.
+* GE 6AL5 ET-T882 p3 average plate curve: approximately 60mA at 10V.
+* Space-charge law candidate; low current region requires further verification.
+.subckt V6AL5_VAC A K
+BPL A K I={0.001897366596*pow(uramp(V(A,K)),1.5)}
+CAK A K 3.2p
+.ends V6AL5_VAC
+XDET1 detector sca V6AL5_VAC
+XDET2 detector scb V6AL5_VAC
+* Altec 436B factory-labeled control filter: R12 33k, C4 1u, R9 1Meg.
+* RS124 branch remains a separate exploratory variation using switched RC.
+R12 detector cv {ATTACK_R}
+C4 cv 0 1u
+R9 cv 0 {REC_R}
+RDC detector 0 50Meg
+* Simulations are not hardware-calibrated until the source-locked drawing
+* and valve plate curves are verified against reference data.
+.control
+set wr_singlescale
+set wr_vecnames
+op
+echo OP_BEGIN
+print v(bplus) v(platefeed) v(outputfeed) v(pa) v(pb) v(k1) v(g2a) v(g2b) v(p2a) v(p2b) v(k2) v(cv) v(out)
+echo OP_END
+ac dec 16 20 20000
+wrdata ac.txt v(out)
+tran 20u 0.20 0 20u
+wrdata tran.txt v(out) v(in) v(cv) v(pa) v(pb) v(p2a) v(p2b) v(k1) v(k2)
+quit
+.endc
+.end
