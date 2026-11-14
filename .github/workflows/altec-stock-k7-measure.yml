@@ -1,4 +1,4 @@
-name: Stock Altec K7 cutoff build and THD
+name: Altec monotonic K7 calibrated build and THD
 on:
   push:
     branches: [altec-stock-k7-cut]
@@ -28,7 +28,7 @@ jobs:
             if(report){double sum=0;for(int k=2;k<=20;++k)sum+=std::norm(h[k]);std::cout<<std::setprecision(10)<<"RESULT "<<knob*10<<","<<db<<","<<gr<<","<<100*sqrt(sum)/abs(h[1]);for(int k=2;k<=20;++k)std::cout<<","<<20*log10(std::max(1.e-16,abs(h[k])/abs(h[1])));std::cout<<std::endl;}
             return gr;
           }
-          int main(){std::cout<<"input_percent,source_peak_dBFS,GR_dB,THD_percent";for(int k=2;k<=20;++k)std::cout<<",K"<<k<<"_dBc";std::cout<<std::endl;for(int k=1;k<=10;++k)measure(k,-40,true);for(int k=1;k<=10;++k)measure(k,-18,true);double lo=-40,hi=0;if(measure(10,hi,true)>=30){for(int i=0;i<16;++i){double m=(lo+hi)/2;if(measure(10,m,false)<30)lo=m;else hi=m;}measure(10,(lo+hi)/2,true);}}
+          int main(){std::cout<<"input_percent,source_peak_dBFS,GR_dB,THD_percent";for(int k=2;k<=20;++k)std::cout<<",K"<<k<<"_dBc";std::cout<<std::endl;for(double db:{-40.,-22.,-18.,-4.,0.})for(int k=1;k<=10;++k)measure(k,db,true);double lo=-40,hi=0;if(measure(10,hi,true)>=30){for(int i=0;i<16;++i){double m=(lo+hi)/2;if(measure(10,m,false)<30)lo=m;else hi=m;}measure(10,(lo+hi)/2,true);}}
           CPP
           g++ -std=c++17 -O3 -Iplugin /tmp/k7.cpp -o /tmp/k7
           /tmp/k7 | tee stock-k7-thd.csv
@@ -64,12 +64,12 @@ jobs:
             $null = ConvertFrom-Json -InputObject $normalized -ErrorAction Stop
             [System.IO.File]::WriteAllText($metadata, $normalized)
           }
-          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Stock_Altec_K7_Windows_x64_VST3.zip" -Force
-          $zip = Get-Item "TubeComp_Stock_Altec_K7_Windows_x64_VST3.zip"
+          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Altec_K7_Calibrated_Windows_x64_VST3.zip" -Force
+          $zip = Get-Item "TubeComp_Altec_K7_Calibrated_Windows_x64_VST3.zip"
           if ($zip.Length -lt 100000) { throw "VST3 archive suspiciously small" }
       - name: Upload working Windows VST3
         uses: actions/upload-artifact@v4
         with:
-          name: TubeComp-Stock-Altec-K7-Windows-VST3
-          path: TubeComp_Stock_Altec_K7_Windows_x64_VST3.zip
+          name: TubeComp-Altec-K7-Calibrated-Windows-VST3
+          path: TubeComp_Altec_K7_Calibrated_Windows_x64_VST3.zip
           if-no-files-found: error
