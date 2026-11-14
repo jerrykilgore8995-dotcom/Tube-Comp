@@ -33,7 +33,9 @@ struct Parameters {
     bool rs124=true;
     float input=5.f,output=0.f;
     int attack=3,recovery=6;
-    int altecAttack=2; // 0 Fast: 33k||10k, 1 Med: 33k||33k, 2 Slow: stock 33k
+    int altecAttack=2; // 0 Fast: 33k||10k, 1 Med: 33k||33k, 2 Slow: 33k
+    bool altecMod=false; // off retains untouched original Altec DSP coefficients
+    int altecRecovery=0; // 0 stock 1M, 1 1M||1M, 2 1M||500k, 3 1M||250k, 4 1M||100k
     float balance=0.f;
     bool superfuse=false;
     float wet=1.f;
@@ -182,6 +184,7 @@ public:
         p.output=clamp(p.output,-10.f,0.f);
         p.attack=std::clamp(p.attack,0,8);
         p.altecAttack=std::clamp(p.altecAttack,0,2);
+        p.altecRecovery=std::clamp(p.altecRecovery,0,4);
         p.recovery=std::clamp(p.recovery,0,10);
         p.balance=clamp(p.balance,-1.f,1.f);
         p.wet=clamp(p.wet,0.f,1.f);
@@ -201,9 +204,13 @@ public:
         // RS124 attack and release logic intentionally unchanged.
         constexpr float altecR12[3]={330.f/43.f,16.5f,33.f}; // kOhm
         attack63=p.rs124?rsAttackMs[static_cast<size_t>(p.attack)]
-                         :115.f*altecR12[p.altecAttack]/33.f;
+                         :(p.altecMod?115.f*altecR12[p.altecAttack]/33.f:50.f);
+        // Mod OFF restores the original A-436B 1-second coefficient exactly.
+        // Mod ON switches only the Altec R9-equivalent recovery resistance.
+        constexpr float altecR9[5]={1000.f,500.f,1000.f/3.f,200.f,1000.f/11.f}; // kOhm
         release63=p.rs124?
-            rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:1000.f;
+            rsReleaseMs[static_cast<size_t>(recoveryNumber(p.recovery)-1)]:
+            (p.altecMod?altecR9[p.altecRecovery]:1000.f);
         attackAlpha=coeff(attack63*(p.superfuse&&p.rs124?.75f:1.f),fs);
         releaseAlpha=coeff(release63,fs);
         targetOutput=db2lin(p.rs124?p.output:0.f);
