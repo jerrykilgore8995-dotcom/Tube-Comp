@@ -10,6 +10,9 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
         setParameter("rs124",m==TubeCompFaceplate::Mode::rs124?1.f:0.f);
         setMode(m==TubeCompFaceplate::Mode::rs124);
     };
+    face.onAltecAttackSelected=[this](int a) {
+        setParameter("altecAttack",float(a));
+    };
     face.onPowerSelected=[this](bool on) {
         setParameter("bypass",on?0.f:1.f);
     };
@@ -43,7 +46,7 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     timerCallback();
     startTimerHz(30);
 }
-TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;face.onPowerSelected=nullptr;}
+TubeCompEditor::~TubeCompEditor(){stopTimer();face.onModeSelected=nullptr;face.onPowerSelected=nullptr;face.onAltecAttackSelected=nullptr;}
 void TubeCompEditor::makeDial(const char* id) {
     Dial control;
     control.slider=std::make_unique<InvisibleDial>();
@@ -88,6 +91,7 @@ void TubeCompEditor::timerCallback() {
                              (at-1.f)/8.f,rec*.1f);
     face.setMeterDb(proc.grMeter.load(std::memory_order_relaxed));
     face.setPowerOn(proc.state.getRawParameterValue("bypass")->load()<.5f);
+    face.setAltecAttack(int(std::lround(proc.state.getRawParameterValue("altecAttack")->load())));
 }
 void TubeCompEditor::resized() {
     face.setBounds(0,0,getWidth(),getHeight());
