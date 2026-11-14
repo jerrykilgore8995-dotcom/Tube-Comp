@@ -1,0 +1,92 @@
+name: Altec detector subtraction source -2 dBu
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-source-minus2.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        hz: [100, 1000, 5000, 10000]
+        input: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Paired complete and detector-isolated circuit measurements
+        env:
+          LEVEL: '-2'
+          HZ: ${{ matrix.hz }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import os,sys,re,json
+          from pathlib import Path
+          import numpy as np
+          from scipy.interpolate import CubicSpline
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          hz=int(os.environ['HZ']); pct=int(os.environ['INPUT']); knob=pct/100
+          level=int(os.environ['LEVEL'])
+          step=0.5 if hz<=1000 else 0.25
+          full=audit.run(level,knob,step,True,hz,False)
+          wd=Path('audit')/f'F{hz}_L{level}_I{knob}_T{step}_M1_C0'
+          z=np.loadtxt(wd/'tran.txt',skiprows=1)
+          cv=float(next(r[7] for r in full if r[4]=='output'))
+          # Evaluate both waveforms on the SAME absolute-time coherent grid,
+          # avoiding phase rotation from independently chosen end times.
+          count=min(100,int(.1*hz)); n=count*256
+          t0=3.1
+          t=t0+np.arange(n)/(256*hz)
+          orders=np.arange(1,21)
+          def phasors(z):
+              y=CubicSpline(z[:,0],z[:,1])(t)
+              return 2*np.fft.rfft(y-y.mean())[orders*count]/n
+          a=phasors(z)
+          full_deck=(wd/'case.cir').read_text()
+          assert re.search(r'\bOUTPAD=1(?:\.0)?\s',full_deck)
+          Path('full.cir').write_text(full_deck)
+          Path('full.log').write_text((wd/'ngspice.log').read_text())
+          original=audit.subprocess.run
+          def isolated(args,**kwargs):
+              f=Path(kwargs['cwd'])/'case.cir'; s=f.read_text()
+              s,n=re.subn(r'(?m)^R12 detector cv .*$',lambda m:m[0]+'\nVDIAGCV cv 0 DC '+repr(cv),s)
+              assert n==1
+              s,n=re.subn(r'(?m)^DDET[12]\s+.*\n','',s)
+              assert n==2
+              f.write_text(s)
+              return original(args,**kwargs)
+          audit.subprocess.run=isolated
+          audit.run(level,knob,step,True,hz,False)
+          b=phasors(np.loadtxt(wd/'tran.txt',skiprows=1))
+          delta=a-b
+          # Counterfactual correction removes the complex difference,
+          # but keeps the original fundamental gain for the DSP target.
+          c=b.copy(); c[0]=a[0]
+          def db(v): return float(20*np.log10(max(abs(v),1e-30)))
+          def spectrum(x):
+              return dict(fundamental_dBu=db(x[0]/(np.sqrt(2)*.775)),
+                  THD_K2_K20_percent=float(100*np.linalg.norm(x[1:])/abs(x[0])),
+                  THD_20kHz_percent=float(100*np.linalg.norm(x[1:][orders[1:]*hz<=20000])/abs(x[0])),
+                  harmonics=[dict(K=int(k),frequency_Hz=int(k*hz),real_peak_V=float(v.real),imag_peak_V=float(v.imag),dBu=db(v/(np.sqrt(2)*.775)),dBc=db(v/abs(x[0])),phase_deg=float(np.angle(v,deg=True)),in_20kHz_band=bool(k*hz<=20000)) for k,v in zip(orders,x)])
+          result=dict(hz=hz,input_percent=pct,source_dBu=level,output_load_ohm=600,output_pad=1,maxstep_us=step,cv_V=cv,full=spectrum(a),isolated=spectrum(b),corrected=spectrum(c),detector_difference=[dict(K=int(k),real_peak_V=float(v.real),imag_peak_V=float(v.imag),dBu=db(v/(np.sqrt(2)*.775))) for k,v in zip(orders,delta)])
+          Path('paired.json').write_text(json.dumps(result,indent=2))
+          print('PAIRED_RESULT',json.dumps(result),flush=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paired-Lminus2-F${{ matrix.hz }}-I${{ matrix.input }}
+          path: |
+            paired.json
+            full.cir
+            full.log
+            audit/**/case.cir
+            audit/**/ngspice.log
+          if-no-files-found: warn
