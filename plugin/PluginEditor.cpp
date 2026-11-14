@@ -21,6 +21,29 @@ TubeCompEditor::TubeCompEditor(TubeCompProcessor& p)
     };
     for(const char* id: {"input","output","attack","recovery","balance"})
         makeDial(id);
+    // Two independent, narrow controls mounted in the host strip, not faceplate.
+    auto configureTrim=[this](juce::Slider& dial,juce::Label& label,
+                              const char* title,const char* param) {
+        dial.setSliderStyle(juce::Slider::LinearHorizontal);
+        dial.setTextBoxStyle(juce::Slider::TextBoxRight,false,42,20);
+        dial.setTextValueSuffix(" dB");
+        dial.setColour(juce::Slider::trackColourId,juce::Colour::fromRGB(96,147,170));
+        dial.setColour(juce::Slider::thumbColourId,juce::Colour::fromRGB(219,224,222));
+        dial.setColour(juce::Slider::textBoxTextColourId,juce::Colours::white);
+        dial.setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour::fromRGB(20,24,26));
+        dial.setColour(juce::Slider::textBoxOutlineColourId,juce::Colours::transparentBlack);
+        label.setText(title,juce::dontSendNotification);
+        label.setFont(juce::Font(juce::FontOptions(11.5f,juce::Font::bold)));
+        label.setColour(juce::Label::textColourId,juce::Colour::fromRGB(209,224,228));
+        addAndMakeVisible(label);
+        addAndMakeVisible(dial);
+    };
+    configureTrim(digitalInputTrim,inputTrimLabel,"Input","digitalInput");
+    configureTrim(digitalOutputTrim,outputTrimLabel,"Output","digitalOutput");
+    digitalInputAttach=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        p.state,"digitalInput",digitalInputTrim);
+    digitalOutputAttach=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        p.state,"digitalOutput",digitalOutputTrim);
     altecModButton.setButtonText("MOD");
     altecModButton.setClickingTogglesState(true);
     bypass.setButtonText("BYPASS");
@@ -109,4 +132,8 @@ void TubeCompEditor::resized() {
     superFuse.setBounds(539,312,124,23);
     outputLoad.setBounds(694,312,113,23);
     altecModButton.setBounds(840,312,100,23);
+    inputTrimLabel.setBounds(168,313,37,21);
+    digitalInputTrim.setBounds(204,313,100,21);
+    outputTrimLabel.setBounds(305,313,43,21);
+    digitalOutputTrim.setBounds(346,313,72,21);
 }
