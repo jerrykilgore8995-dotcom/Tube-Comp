@@ -1,0 +1,33 @@
+name: Altec 30 dB GR measurement
+on:
+  push:
+    branches: [altec-harmonics-only]
+    paths: ['.github/workflows/altec-30db-measure.yml']
+  workflow_dispatch:
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cat > /tmp/measure.cpp <<'CPP'
+          #include "TubeCompDSP.h"
+          #include <iostream>
+          #include <complex>
+          #include <iomanip>
+          using namespace tubecomp;
+          constexpr int fs=44100,N=8820;
+          constexpr double tau=6.2831853071795864769;
+          double measure(double db,bool forced,bool report){
+            Engine e;e.prepare(fs,256);Parameters p;p.rs124=false;p.input=10;e.setParameters(p,true);
+            if(forced){float a=0,b=39;for(int i=0;i<30;++i){float m=(a+b)/2;if(spice::attenuationDb(false,m)<30)a=m;else b=m;}e.setCalibrationControlVolts((a+b)/2);}
+            std::complex<double> h[21]={};double peak=std::pow(10.,db/20);
+            for(int i=0;i<fs*6+N;++i){float l=float(peak*std::sin(tau*1000*i/fs)),r=l;e.process(l,r);if(report&&i>=fs*6)for(int k=1;k<=20;++k)h[k]+=double(l)*std::polar(1.,-tau*k*1000*i/fs);}
+            double gr=e.meters().gainReduction;
+            if(report){double sum=0;for(int k=2;k<=20;++k)sum+=std::norm(h[k]);std::cout<<std::setprecision(10)<<"RESULT forced="<<forced<<" dBFS="<<db<<" GR="<<gr<<" THD="<<100*sqrt(sum)/abs(h[1])<<" CV="<<e.controlVolts()<<std::endl;}
+            return gr;
+          }
+          int main(){double lo=-40,hi=0;double max=measure(hi,false,true);if(max>=30){for(int i=0;i<16;++i){double m=(lo+hi)/2;if(measure(m,false,false)<30)lo=m;else hi=m;}measure((lo+hi)/2,false,true);}else{std::cout<<"30dB not reachable at unity trim and 0dBFS peak"<<std::endl;measure(-15,true,true);}}
+          CPP
+          g++ -std=c++17 -O3 -Iplugin /tmp/measure.cpp -o /tmp/measure
+          /tmp/measure
