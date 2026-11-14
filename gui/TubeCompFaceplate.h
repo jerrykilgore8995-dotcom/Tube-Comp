@@ -22,8 +22,11 @@ public:
     std::function<void(Mode)> onModeSelected;
     std::function<void(bool)> onPowerSelected;
     std::function<void(int)> onAltecAttackSelected;
+    std::function<void(int)> onAltecRecoverySelected;
     void setPowerOn(bool isOn) {powerOn=isOn;repaint();}
     void setAltecAttack(int position) {altecAttack=juce::jlimit(0,2,position);repaint();}
+    void setAltecMod(bool on) {altecMod=on;repaint();}
+    void setAltecRecovery(int position) {altecRecovery=juce::jlimit(0,4,position);repaint();}
     void setControlPositions(float input,float output,float attack,float recovery) {
         inPosition=juce::jlimit(0.f,1.f,input);
         outPosition=juce::jlimit(0.f,1.f,output);
@@ -47,11 +50,18 @@ public:
     {
         // The painted physical power switch is an actual DAW bypass control.
         const auto point=e.position;
-        if(mode==Mode::altec436b && point.x>=1053 && point.x<=1172
+        if(mode==Mode::altec436b && altecMod && point.x>=1095 && point.x<=1192
            && point.y>=179 && point.y<=271) {
             const int selected=point.y<210?0:(point.y<240?1:2);
             setAltecAttack(selected);
             if(onAltecAttackSelected)onAltecAttackSelected(selected);
+            return;
+        }
+        if(mode==Mode::altec436b && altecMod && point.x>=952 && point.x<=1053
+           && point.y>=175 && point.y<=277) {
+            const int selected=juce::jlimit(0,4,int((point.y-175)/20));
+            setAltecRecovery(selected);
+            if(onAltecRecoverySelected)onAltecRecoverySelected(selected);
             return;
         }
         const bool touchedPower=(mode==Mode::rs124)
@@ -81,6 +91,8 @@ private:
     float meterDb = 8.0f;
     bool powerOn=true;
     int altecAttack=2;
+    bool altecMod=false;
+    int altecRecovery=0;
     float inPosition=.50f,outPosition=1.f,attackPosition=.375f,recPosition=.60f;
 
     static C col(int r, int g, int b) {
@@ -489,21 +501,36 @@ private:
         stamp(g,"FUSE",1377,76,103,21,13,cream,true);
         fuse(g,1430,133,true);
         stamp(g,".5 AMP",1375,170,110,18,10.5f,cream);
-        // A-436B-only three-position R12 attack toggle, original is SLOW.
-        stamp(g,"ATK",1005,212,49,21,14,cream,true);
-        const float sx=1084.f,sy=225.f;
-        g.setColour(col(13,20,15));g.fillRoundedRectangle(sx-17,sy-48,34,96,8);
-        g.setColour(col(144,157,139));g.drawRoundedRectangle(sx-17,sy-48,34,96,8,1.4f);
-        g.setColour(col(12,15,12));g.fillRoundedRectangle(sx-7,sy-35,14,70,5);
-        const float handleY=sy-27.f+27.f*altecAttack;
-        g.setGradientFill(juce::ColourGradient(col(220,223,216),sx-9,handleY-12,
-                                              col(64,74,69),sx+11,handleY+12,false));
-        g.fillRoundedRectangle(sx-10,handleY-11,20,22,5);
-        g.setColour(col(24,30,26));g.drawRoundedRectangle(sx-10,handleY-11,20,22,5,1.2f);
-        for(int k=0;k<3;++k){
-            const float yy=190.f+27.f*k;
-            stamp(g,k==0?"FAST":(k==1?"MED":"SLOW"),1110,yy,62,20,12.4f,
-                  k==altecAttack?cream:col(137,155,137),k==altecAttack);
+        // A-436B-only reversible mods: unmodified faceplate when Mod is OFF.
+        if(altecMod) {
+            const float ax=1118.f, ay=225.f;
+            stamp(g,"ATK",1065,211,45,22,14,cream,true);
+            g.setColour(col(13,20,15));g.fillRoundedRectangle(ax-15,ay-48,30,96,7);
+            g.setColour(col(144,157,139));g.drawRoundedRectangle(ax-15,ay-48,30,96,7,1.4f);
+            g.setColour(col(12,15,12));g.fillRoundedRectangle(ax-6,ay-34,12,68,5);
+            const float hy=ay-27.f+27.f*altecAttack;
+            g.setGradientFill(juce::ColourGradient(col(220,223,216),ax-9,hy-10,
+                                                   col(64,74,69),ax+10,hy+11,false));
+            g.fillRoundedRectangle(ax-9,hy-10,18,20,4);
+            const char* anames[]={"FAST","MED","SLOW"};
+            for(int k=0;k<3;++k)
+                stamp(g,anames[k],1140,189.f+27.f*k,50,20,11.5f,
+                      k==altecAttack?cream:col(137,155,137),k==altecAttack);
+
+            const float rx=968.f, ry=225.f;
+            stamp(g,"REC",925,211,38,22,13,cream,true);
+            g.setColour(col(13,20,15));g.fillRoundedRectangle(rx-14,ry-51,28,102,7);
+            g.setColour(col(144,157,139));g.drawRoundedRectangle(rx-14,ry-51,28,102,7,1.3f);
+            g.setColour(col(12,15,12));g.fillRoundedRectangle(rx-5,ry-40,10,80,5);
+            const float rhy=ry-40.f+20.f*altecRecovery;
+            g.setGradientFill(juce::ColourGradient(col(220,223,216),rx-8,rhy-7,
+                                                   col(64,74,69),rx+8,rhy+8,false));
+            g.fillRoundedRectangle(rx-8,rhy-8,16,16,3);
+            const char* rnames[]={"1 SEC","500","333","200","91"};
+            for(int k=0;k<5;++k)
+                stamp(g,rnames[k],990,176.f+20.f*k,65,18,11.2f,
+                      k==altecRecovery?cream:col(137,155,137),k==altecRecovery);
+            stamp(g,"REC ms",990,277,65,13,9,cream);
         }
         // Bottom-right factory model identity, not invented release controls.
         stamp(g,"A-436B",1363,250,135,23,14.3f,cream,true);
