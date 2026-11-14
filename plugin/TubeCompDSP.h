@@ -10,7 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include "SpiceReference.h"
-#include "AltecDetectorCorrection.inc"
+#include "AltecCorrectedTargets.inc"
 #include "SpicePhaseFIRMeasured.inc"
 #include "SpicePhaseFIR200Measured.inc"
 
@@ -173,6 +173,7 @@ public:
         feedbackAudio={0.f,0.f};
         gainDb={30.f,30.f};
         sourceDbu={-36.f,-36.f};
+        altecFrequency={1000.f,1000.f}; altecPrevious={}; altecCrossing={}; altecPeriod={};
         lastProbe={};lastMeter={};
         wetLevel=1.f;outputLevel=1.f;
         for(int c=0;c<2;++c){
@@ -249,6 +250,19 @@ public:
             const float x=dry[c];
             // First coupling pole before tube and one after its output.
             inAfterHp[c]=hpf[c][0].tick(x);
+            if(!params.rs124){
+                if(altecPrevious[c]<=0.f && inAfterHp[c]>0.f){
+                    const float frac=-altecPrevious[c]/std::max(1.e-20f,inAfterHp[c]-altecPrevious[c]);
+                    const double now=double(sampleCount)-1.+frac;
+                    const double period=now-altecCrossing[c];
+                    if(altecCrossing[c]>0. && period>=fs/20000. && period<=fs/40.){
+                        altecPeriod[c]=altecPeriod[c]>0.? .8*altecPeriod[c]+.2*period:period;
+                        altecFrequency[c]=float(fs/altecPeriod[c]);
+                    }
+                    altecCrossing[c]=now;
+                }
+                altecPrevious[c]=inAfterHp[c];
+            }
             inputEnv[c]+=inputEnvAlpha*(std::fabs(inAfterHp[c])-inputEnv[c]);
             harmonicEnv[c]+=harmonicEnvAlpha*(std::fabs(inAfterHp[c])-harmonicEnv[c]);
             // mean(abs(sine))=2/pi of peak. Explicit DAW convention:
@@ -306,7 +320,7 @@ public:
                                        static_cast<size_t>(k-2)]/
                                           6.020599913f);
                     if(!params.rs124)
-                        ratio=std::max(0.f,ratio-detectorCorrection1k(params.input,k,sourceDbu[c]));
+                        ratio=altecCorrectedRatio(params.input,k,altecFrequency[c],sourceDbu[c],ratio,fs);
                     if((k%2)==0)
                         ratio*=clamp(1.f+params.balance*
                             (params.rs124?1.3f:1.1f),.05f,3.5f);
@@ -316,7 +330,7 @@ public:
                     // Quadratic pre-emphasis is FIT to the output-bin grid,
                     // not a claim about original 6CG7 plate physics.
                     const float kFraction=float(k)/20.f;
-                    ratio*=1.f+.085f*kFraction*kFraction;
+                    if(params.rs124)ratio*=1.f+.085f*kFraction*kFraction;
                     harmonicLinear[c][static_cast<size_t>(k-2)]=ratio;
                 }
                 phase[c].configure(params.rs124,cv[c],params.outputOhms);
@@ -376,6 +390,8 @@ private:
     float targetOutput=1.f,targetWet=1.f,outputLevel=1.f,wetLevel=1.f;
     std::array<float,2> inputEnv{},harmonicEnv{},outputEnv{},feedbackAudio{},cv{},heldAim{};
     std::array<float,2> gainDb{},desiredGain{},sourceDbu{};
+    std::array<float,2> altecFrequency{1000.f,1000.f},altecPrevious{};
+    std::array<double,2> altecCrossing{},altecPeriod{};
     std::array<spice::Point,2> harmonicTargets{};
     std::array<std::array<float,19>,2> harmonicLinear{};
     std::array<std::array<HighPass,2>,2> hpf;
