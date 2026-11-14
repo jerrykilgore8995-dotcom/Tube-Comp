@@ -26,9 +26,9 @@ private:
     TubeCompProcessor& proc;
     TubeCompFaceplate face;
     std::vector<Dial> dials;
-    juce::TextButton bypass,superFuse;
+    juce::TextButton bypass,superFuse,altecModButton;
     juce::ComboBox outputLoad;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttach,fuseAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttach,fuseAttach,altecModAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> loadAttach;
     void timerCallback() override;
     void setMode(bool rs);
