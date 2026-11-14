@@ -18,6 +18,7 @@ constexpr double twopi=6.2831853071795864769;
 struct Timing {
     std::string mode;
     int attack=0,recovery=0;
+    bool mod=false;
     bool hold=false;
     double baseline=0,plateau=0,offcv=0,endcv=0;
     double attack10=std::numeric_limits<double>::quiet_NaN();
@@ -42,17 +43,21 @@ double cross(const std::vector<float>& v,double start,
          return 1000.*(i/sr-start);
  return std::numeric_limits<double>::quiet_NaN();
 }
-Timing run(bool rs,int attack,int recovery,bool hold){
+Timing run(bool rs,int attack,int recovery,bool hold,bool mod=false){
  tubecomp::Parameters p;
  p.rs124=rs;p.input=8.f;p.output=0.f;p.attack=attack;
  p.altecAttack=rs?2:attack;
+ p.altecMod=!rs&&mod;
+ p.altecRecovery=rs?0:recovery;
  p.recovery=hold?2*recovery+1:10-2*recovery;
  p.balance=0.f;p.superfuse=false;p.wet=1.f;p.stereoLink=1.f;
  p.outputOhms=600.f;
  tubecomp::Engine engine;engine.prepare(float(sr),256);
  engine.setParameters(p,true);
  const std::array<double,6> recms={180,330,680,1000,1800,3300};
- const double recoverySeconds=rs?recms[size_t(recovery)]*.001:1.;
+ const std::array<double,5> altecRecoverySeconds={1.,.5,1./3.,.2,1./11.};
+ const double recoverySeconds=rs?recms[size_t(recovery)]*.001:
+                           (mod?altecRecoverySeconds[size_t(recovery)]:1.);
  const double duration=hold?3.5:std::max(3.5,OFF+4*recoverySeconds);
  const int total=int(std::ceil(sr*duration));
  const double peak=std::pow(10.,(6.-22.)/20.);
@@ -68,7 +73,7 @@ Timing run(bool rs,int attack,int recovery,bool hold){
      cv.push_back(engine.controlVolts());
  }
  Timing m;
- m.mode=rs?"RS124":"A-436B";m.attack=attack;m.recovery=recovery;m.hold=hold;
+ m.mode=rs?"RS124":"A-436B";m.attack=attack;m.recovery=recovery;m.hold=hold;m.mod=mod;
  m.baseline=avg(cv,0,.09);m.plateau=avg(cv,OFF-.10,OFF-.015);
  const double rise=m.plateau-m.baseline;
  m.attack10=cross(cv,ON,m.baseline+rise*.10,true);
@@ -85,26 +90,29 @@ Timing run(bool rs,int attack,int recovery,bool hold){
 int main(int argc,char** argv){
  if(argc!=3)return 2;
  std::string family=argv[2];
- if(family!="attack" && family!="recovery" && family!="hold")return 3;
+ if(family!="attack" && family!="recovery" && family!="hold" && family!="altecmod")return 3;
  std::ofstream out(argv[1]);
  if(!out)return 4;
  out<<std::setprecision(9)
-    <<"mode,attack,recovery,hold,baseline_cv_V,plateau_cv_V,"
+    <<"mode,attack,recovery,hold,mod,baseline_cv_V,plateau_cv_V,"
       "off_cv_V,final_cv_V,attack10_ms,attack63_ms,attack90_ms,"
       "recovery63_ms,recovery90_ms,hold_fraction\n";
- auto measure=[&](bool rs,int attack,int rec,bool hold){
-    const Timing m=run(rs,attack,rec,hold);
+ auto measure=[&](bool rs,int attack,int rec,bool hold,bool mod=false){
+    const Timing m=run(rs,attack,rec,hold,mod);
     out<<m.mode<<","<<m.attack<<","<<m.recovery<<","<<(m.hold?1:0)
-       <<","<<m.baseline<<","<<m.plateau<<","<<m.offcv<<","<<m.endcv
+       <<","<<(m.mod?1:0)<<","<<m.baseline<<","<<m.plateau<<","<<m.offcv<<","<<m.endcv
        <<","<<m.attack10<<","<<m.attack63<<","<<m.attack90
        <<","<<m.recovery63<<","<<m.recovery90<<","<<m.holdFraction<<"\n";
     std::cout<<"REAL_DSP_SWITCH "<<m.mode<<" attack="<<m.attack
-         <<" rec="<<m.recovery<<" HOLD="<<m.hold
+         <<" rec="<<m.recovery<<" MOD="<<m.mod<<" HOLD="<<m.hold
          <<" GRcv="<<m.plateau<<"V"
          <<" A63="<<m.attack63<<"ms R63="<<m.recovery63
          <<"ms hold="<<m.holdFraction<<"\n";
  };
- if(family=="attack"){
+ if(family=="altecmod"){
+     measure(false,2,0,false,false);
+     for(int a=0;a<3;++a)for(int r=0;r<5;++r)measure(false,a,r,false,true);
+ }else if(family=="attack"){
      for(int a=0;a<3;++a)measure(false,a,3,false);
      for(int a=0;a<9;++a)measure(true,a,3,false);
  }else if(family=="recovery"){
