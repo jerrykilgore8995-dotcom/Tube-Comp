@@ -399,9 +399,9 @@ private:
         g.fillRoundedRectangle(paper,32);
         g.setColour(col(49,53,49));g.drawRoundedRectangle(paper,32,1.4f);
         const float cx=x+w/2,py=y+h-26;
-        const std::array<int,5> ticks={30,20,15,10,5};
+        const std::array<int,7> ticks={30,25,20,15,10,5,0};
         for(size_t i=0;i<ticks.size();++i){
-            const float a=pi*1.17f+pi*.63f*i/(ticks.size()-1);
+            const float a=pi*1.17f+pi*.63f*float(i)/float(ticks.size()-1);
             float xx=cx+std::cos(a)*116,yy=py+std::sin(a)*117;
             float tx=cx+std::cos(a)*103,ty=py+std::sin(a)*103;
             line(g,xx,yy,tx,ty,col(46,45,39),1.4f);
