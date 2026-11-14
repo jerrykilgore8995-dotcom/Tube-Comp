@@ -149,6 +149,21 @@ inline float harmonics(float x,float peak,
     return x+peak*residue;
 }
 
+// Feedback-domain ratio: above the knee, GR = 1.5*(output-threshold).
+// With output=input+gain-GR this yields dOutput/dInput=1/2.5.
+// The soft knee is quadratic, with continuous slope at both endpoints.
+inline float ratioCv(bool rs,float gr) noexcept {
+    float lo=0.f,hi=39.f;
+    for(int i=0;i<20;++i){float mid=(lo+hi)*.5f;
+        if(spice::attenuationDb(rs,mid)<gr)lo=mid;else hi=mid;}
+    return (lo+hi)*.5f;
+}
+inline float ratioGR(float x) noexcept {
+    constexpr float w=6.f;
+    if(x<=-w*.5f)return 0.f;
+    if(x>=w*.5f)return 1.5f*x;
+    const float d=x+w*.5f;return 1.5f*d*d/(2.f*w);
+}
 class Engine final {
 public:
     void prepare(float sampleRate,int) noexcept {
@@ -196,6 +211,20 @@ public:
         p.outputOhms=p.outputOhms<=300.f?200.f:600.f;
         const bool loadChanged=(params.outputOhms!=p.outputOhms);
         params=p;
+        // Preserve stock gain and gain reduction at the -18 dBu anchor.
+        const auto anchor=spice::lookup(p.rs124,p.input,-18.f,p.outputOhms);
+        const float gr=spice::attenuationDb(p.rs124,anchor.cvMagnitude);
+        ratioBaseGain=anchor.outputDbu+18.f+gr;
+        // Invert the same smooth knee at the anchor. Use the stock zero-GR
+        // crossing for uncompressed anchors rather than inventing GR.
+        float x=gr>=4.5f?gr/1.5f:std::sqrt(8.f*gr)-3.f;
+        ratioThreshold=anchor.outputDbu-x;
+        if(gr<.001f){
+            const auto next=spice::lookup(p.rs124,p.input,-6.f,p.outputOhms);
+            const float ng=spice::attenuationDb(p.rs124,next.cvMagnitude);
+            if(ng>.001f)ratioThreshold=next.outputDbu-(ng>=4.5f?ng/1.5f:std::sqrt(8.f*ng)-3.f);
+            else ratioThreshold=next.outputDbu+3.f;
+        }
         if(loadChanged){
             // 200Ω loading moves the actual low-frequency transformer pole.
             // Both coupling filters are adjusted without clearing history.
@@ -263,9 +292,7 @@ public:
                       1.e-9f,outputEnv[c]*(pi*.5f));
                 const float preOutputDbu=22.f+lin2db(beforeOutputPad);
                 const float padDbu=params.rs124?lin2db(.65f):0.f;
-                targets[c]=spice::feedbackCv(params.rs124,params.input,
-                                           preOutputDbu+padDbu,
-                                           params.outputOhms);
+                targets[c]=ratioCv(params.rs124,ratioGR(preOutputDbu+padDbu-ratioThreshold));
                 if(params.superfuse&&params.rs124)
                     targets[c]=std::min(39.f,targets[c]*1.12f);
             }
@@ -290,18 +317,8 @@ public:
                 const auto target=spice::lookup(params.rs124,params.input,
                                                 sourceDbu[c],
                                                 params.outputOhms);
-                const float refCv=target.cvMagnitude;
-                // Tube transfer gain vs negative 6BC8 grid bias is measured
-                // by ngspice; this is a correction to the reference output.
-                // At steady-state CV=reference CV it matches measured gain.
-                const float dynamicCorrection=
-                    spice::attenuationDb(params.rs124,refCv)-
-                    spice::attenuationDb(params.rs124,cv[c]);
-                // RS124 SPICE reference already includes its nominal .65
-                // post-output pad. Feedback is sampled upstream of the pad.
                 const float padCorrection=params.rs124?-lin2db(.65f):0.f;
-                desiredGainDb[c]=target.outputDbu-sourceDbu[c]+
-                                 dynamicCorrection+padCorrection;
+                desiredGainDb[c]=ratioBaseGain-spice::attenuationDb(params.rs124,cv[c])+padCorrection;
                 desiredGain[c]=clamp(desiredGainDb[c],-65.f,65.f);
                 harmonicTargets[c]=target;
                 for(int k=2;k<=20;++k){
@@ -370,6 +387,7 @@ public:
     StageProbe stageProbe() const noexcept{return lastProbe;}
 private:
     float fs=44100.f;
+    float ratioBaseGain=30.f,ratioThreshold=0.f;
     float calibrationCv=-1.f;
     Parameters params;
     Meter lastMeter{};
