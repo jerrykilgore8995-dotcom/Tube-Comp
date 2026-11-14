@@ -1,0 +1,65 @@
+name: Altec odd harmonic detector isolation
+on:
+  push:
+    branches: [436b-harmonic-audit]
+    paths: ['.github/workflows/altec-detector-isolation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        knob: [0.2, 0.8]
+        test: [fixed_cv, detector_removed]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Diagnostic simulation with original unattenuated output
+        env:
+          KNOB: ${{ matrix.knob }}
+          TEST: ${{ matrix.test }}
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import sys, os, re, json
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import altec_mismatch_audit as audit
+          knob=float(os.environ['KNOB'])
+          test=os.environ['TEST']
+          cv={0.2:-2.316673965310243,0.8:-6.58242187599131}[knob]
+          original_run=audit.subprocess.run
+          def diagnostic_run(args,**kwargs):
+              f=Path(kwargs['cwd'])/'case.cir'
+              s=f.read_text()
+              assert re.search(r'\bOUTPAD=1(?:\.0)?\s',s)
+              s,n=re.subn(r'(?m)^R12 detector cv .*$',lambda m:m[0]+'\nVDIAGCV cv 0 DC '+str(cv),s)
+              assert n==1
+              if test=='detector_removed':
+                  s,n=re.subn(r'(?m)^DDET[12]\s+.*\n','',s)
+                  assert n==2
+              f.write_text(s)
+              return original_run(args,**kwargs)
+          audit.subprocess.run=diagnostic_run
+          rows=audit.run(-18,knob,0.5,True,1000,False)
+          results=[]
+          for row in rows:
+              if row[4] not in ['output','6BC8_diff','6CG7_diff']: continue
+              result=dict(test=test,input_fraction=knob,node=row[4],THD_percent=row[5],fundamental_dBu=row[6],CV_V=row[7],harmonics_dBc={f'K{k}':row[7+k] for k in range(1,21)},harmonics_dBu={f'K{k}':row[6]+row[7+k] for k in range(1,21)})
+              print('DIAGNOSTIC',json.dumps(result),flush=True)
+              results.append(result)
+          Path('diagnostic.json').write_text(json.dumps(results,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolation-${{ matrix.knob }}-${{ matrix.test }}
+          path: |
+            diagnostic.json
+            audit/**/case.cir
+            audit/**/ngspice.log
+          if-no-files-found: warn
