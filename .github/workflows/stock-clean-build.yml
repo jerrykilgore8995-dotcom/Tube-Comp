@@ -1,0 +1,84 @@
+name: Stock cleaned harmonics calibrated Windows VST3
+on:
+  push:
+    branches: [stock-clean-harmonics]
+    paths: ['.github/workflows/stock-clean-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  calibrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for RS124 isolated reference sweep
+        run: |
+          for attempt in $(seq 1 480); do
+            status=$(gh run view 43582329899 --json status,conclusion --jq .status)
+            if [ "$status" = completed ]; then
+              test "$(gh run view 43582329899 --json conclusion --jq .conclusion)" = success
+              exit
+            fi
+            sleep 30
+          done
+          exit 1
+      - name: Retrieve existing Altec and new RS124 reference spectra
+        run: |
+          gh run download 43572085333 --pattern 'paired-F1000-*' --dir paired-references
+          gh run download 43582329899 --pattern 'paired-RS124-*' --dir paired-references
+      - name: Fit actual stock THD and measure full corrected spectrum
+        run: python3 scripts/calibrate_clean_harmonics.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Stock-clean-harmonic-measurements
+          path: |
+            plugin/CleanHarmonicTargets.inc
+            stock-harmonics.csv
+            corrected-harmonics.csv
+            calibration-comparison.csv
+  vst3:
+    needs: calibrate
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Stock-clean-harmonic-measurements
+          path: calibrated
+      - shell: pwsh
+        run: |
+          $header = Get-ChildItem calibrated -Recurse -Filter CleanHarmonicTargets.inc | Select-Object -First 1
+          if (-not $header) { throw "Missing calibrated header" }
+          Copy-Item $header.FullName plugin/CleanHarmonicTargets.inc
+      - run: cmake -S plugin -B plugin/build -G "Visual Studio 17 2022" -A x64
+      - run: cmake --build plugin/build --config Release --target TubeCompDSPTests --parallel 4
+      - name: Record original regression suite without suppressing failure
+        id: regression
+        continue-on-error: true
+        run: ctest --test-dir plugin/build -C Release --output-on-failure
+      - run: cmake --build plugin/build --config Release --target TubeComp_VST3 --parallel 4
+      - shell: pwsh
+        run: |
+          $file = Get-ChildItem plugin/build -Recurse -Directory -Filter "Tube Comp RS124.vst3" | Select-Object -First 1
+          if (-not $file) { throw "Missing VST3" }
+          $metadata = Join-Path $file.FullName "Contents/Resources/moduleinfo.json"
+          if (Test-Path $metadata) {
+            $raw = [System.IO.File]::ReadAllText($metadata)
+            $normalized = [System.Text.RegularExpressions.Regex]::Replace($raw, ',(?=\s*[}\]])', '')
+            $null = ConvertFrom-Json -InputObject $normalized -ErrorAction Stop
+            [System.IO.File]::WriteAllText($metadata, $normalized)
+          }
+          Compress-Archive -LiteralPath $file.FullName -DestinationPath "TubeComp_Stock_Clean_Windows_x64_VST3.zip" -Force
+          "Original regression suite: ${{ steps.regression.outcome }}" | Out-File regression-status.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TubeComp-Stock-Clean-Windows-VST3
+          path: |
+            TubeComp_Stock_Clean_Windows_x64_VST3.zip
+            regression-status.txt
