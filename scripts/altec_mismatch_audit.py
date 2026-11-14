@@ -6,18 +6,20 @@ from scipy.interpolate import CubicSpline
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from run_lab import prepare
 
-def spectrum(t,y):
+def spectrum(t,y,hz):
     # Exactly 100 complete cycles, 256 samples per cycle, no duplicate endpoint.
-    x=t[-1]-.1+np.arange(25600)/256000
+    cycles=min(100,int(.1*hz))
+    n=cycles*256
+    x=t[-1]-cycles/hz+np.arange(n)/(256*hz)
     z=CubicSpline(t,y)(x)
     z=z-z.mean()
     a=np.abs(np.fft.rfft(z))*2/len(z)
-    h=a[np.arange(1,21)*100]
+    h=a[np.arange(1,21)*cycles]
     return 20*np.log10(np.maximum(h/h[0],1e-18)),100*np.linalg.norm(h[1:])/h[0],20*np.log10(h[0]/np.sqrt(2)/.775)
 
-def run(level,knob,step,mismatch):
-    wd=Path("audit")/f"L{level}_I{knob}_T{step}_M{int(mismatch)}"
-    f=prepare(dict(mode="A-436B",hz=1000,dbu=level,attack=0,recovery=0,hold=False,input_knob=knob),wd)
+def run(level,knob,step,mismatch,hz=1000,caps=False):
+    wd=Path("audit")/f"F{hz}_L{level}_I{knob}_T{step}_M{int(mismatch)}_C{int(caps)}"
+    f=prepare(dict(mode="A-436B",hz=hz,dbu=level,attack=0,recovery=0,hold=False,input_knob=knob),wd)
     s=f.read_text()
     lib=wd/"models/tube_cells.lib"
     l=lib.read_text()
@@ -37,6 +39,10 @@ def run(level,knob,step,mismatch):
         s=s.replace("DDET1 detector sca D6AL5","DDET1 detector sca D6AL5 area=1.025").replace("DDET2 detector scb D6AL5","DDET2 detector scb D6AL5 area=0.975")
         assert all(x in s for x in ["V6BC8_REMOTE_EXP_A","V6BC8_REMOTE_EXP_B","V6CG7_GE_A","V6CG7_GE_B"])
         lib.write_text(l)
+    if caps:
+        for name,value in [("C2",23.76),("C3",20.46),("C5",20.02),("C6",23.32)]:
+            s,n=re.subn(r"(?m)^("+name+r"\s+\S+\s+\S+\s+)22n\s*$",lambda m:m[1]+str(value)+"n",s)
+            assert n==1, name
     s=s.replace("VIN source 0 SIN(0 {AMP} {FREQ}) AC 1","BINPUT source 0 V={AMP*sin(2*pi*FREQ*time)*(0.5-0.5*cos(pi*min(time/0.04,1)))}")
     s=re.sub(r"(?m)^tran .*",f"tran {step}u 3.2 3.0 {step}u",s)
     # Preserve the proven solver tolerances; convergence is checked across maxsteps.
@@ -52,14 +58,14 @@ def run(level,knob,step,mismatch):
     assert z[-1,0]>3.19999 and np.all(np.diff(z[:,0])>0)
     rows=[]
     for name,y in [("source",z[:,2]),("6BC8_A",z[:,3]),("6BC8_B",z[:,4]),("6BC8_diff",z[:,3]-z[:,4]),("6CG7_A",z[:,5]),("6CG7_B",z[:,6]),("6CG7_diff",z[:,5]-z[:,6]),("output",z[:,1])]:
-        h,thd,out=spectrum(z[:,0],y)
-        rows.append([level,knob,step,int(mismatch),name,thd,out,np.mean(z[:,7]),*h])
+        h,thd,out=spectrum(z[:,0],y,hz)
+        rows.append([level,knob,step,int(mismatch),name,thd,out,np.mean(z[:,7]),*h,hz,int(caps)])
     print(wd,rows[-1],flush=True)
     return rows
 
 if __name__=="__main__":
     import argparse
-    p=argparse.ArgumentParser();p.add_argument("--level",type=float,default=-18);p.add_argument("--knob",type=float,default=.8);p.add_argument("--step",type=float,default=1);p.add_argument("--mismatch",type=int,default=0);a=p.parse_args()
-    rows=run(a.level,a.knob,a.step,bool(a.mismatch))
+    p=argparse.ArgumentParser();p.add_argument("--level",type=float,default=-18);p.add_argument("--knob",type=float,default=.8);p.add_argument("--step",type=float,default=1);p.add_argument("--mismatch",type=int,default=0);p.add_argument("--hz",type=int,default=1000);p.add_argument("--caps",type=int,default=0);a=p.parse_args()
+    rows=run(a.level,a.knob,a.step,bool(a.mismatch),a.hz,bool(a.caps))
     with open("harmonics.csv","w") as f:
-        w=csv.writer(f);w.writerow(["input_dBu","input_fraction","maxstep_us","mismatch","node","THD_percent","fundamental_dBu","CV_V",*[f"K{k}_dBc" for k in range(1,21)]]);w.writerows(rows)
+        w=csv.writer(f);w.writerow(["input_dBu","input_fraction","maxstep_us","mismatch","node","THD_percent","fundamental_dBu","CV_V",*[f"K{k}_dBc" for k in range(1,21)],"frequency_Hz","capacitor_mismatch"]);w.writerows(rows)
