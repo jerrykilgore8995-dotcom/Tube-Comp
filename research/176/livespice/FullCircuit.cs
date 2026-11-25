@@ -3,7 +3,7 @@ using ComputerAlgebra;
 
 internal sealed record Settings(double Input = 10, double Output = 1,
     double InputVernier = 0, double OutputVernier = 0, int Ratio = 2,
-    double Attack = .5, double Release = .8, bool Limiting = true, bool Powered = false);
+    double Attack = .5, double Release = .8, bool Limiting = true, bool Powered = false, bool Double = false);
 
 internal sealed partial class FrontEnd
 {
@@ -224,6 +224,19 @@ internal sealed partial class FrontEnd
         R("REG", "DET_BIAS", 82e3);
         AdjustableR("DET_BIAS", "0", bias, "ratioBias");
         C("DET_BIAS", "0", 20e-6);
+        // Select the series RC across C5, or park the capacitor at ground
+        // through the same resistance while the branch is disconnected.
+        if (export)
+        {
+            AdjustableR("CV", "DOUBLE_CAP", 1.5e6, "doubleOn");
+            AdjustableR("DOUBLE_CAP", "0", 1.5e6, "doubleOff");
+            C("DOUBLE_CAP", "0", .22e-6);
+        }
+        else if (settings.Double)
+        {
+            R("CV", "DOUBLE_CAP", 1.5e6);
+            C("DOUBLE_CAP", "0", .22e-6);
+        }
         AdjustableR("CV", "ATK_IN", settings.Limiting ? .001 : 1e12, "limitOn");
         AdjustableR("CV", "0", settings.Limiting ? 1e12 : .001, "limitOff");
         R("ATK_IN", "DET_A", 10e3);

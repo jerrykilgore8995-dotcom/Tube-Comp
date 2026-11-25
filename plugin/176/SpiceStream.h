@@ -12,6 +12,7 @@ struct Controls {
     float inputVernier = 0, outputVernier = 0;
     float tap = .29f, biasResistance = 6800;
     float attack = .5f, release = .8f, limiting = 1;
+    bool doubleTiming = false;
 };
 
 class SpiceStream {

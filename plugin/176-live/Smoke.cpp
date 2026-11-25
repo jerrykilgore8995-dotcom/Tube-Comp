@@ -23,8 +23,8 @@ int main(int argc, char**)
     std::array<double, block> tone{};
     std::vector<double> times;
     times.reserve(blocks);
-    for (int setting = 0; setting < 6; ++setting) {
-        const int ratioIndex = setting == 5 ? 3 : setting % 4;
+    for (int setting = 0; setting < 7; ++setting) {
+        const int ratioIndex = setting == 6 ? 1 : setting == 5 ? 3 : setting % 4;
         const int ratio = ratios[ratioIndex];
         const int frequency = setting == 5 ? 10000 : 1000;
         ua176::Controls knobs;
@@ -32,6 +32,7 @@ int main(int argc, char**)
         knobs.tap = taps[ratioIndex];
         knobs.biasResistance = bias[ratioIndex];
         knobs.limiting = setting == 4 ? 0 : 1;
+        knobs.doubleTiming = setting == 6;
         for (auto& simulator : simulators)
             if (!simulator.prepare(rate, knobs)) {
                 std::fprintf(stderr, "Initialization failed at %d:1, limiting %.0f\n", ratio, knobs.limiting);
@@ -78,9 +79,9 @@ int main(int argc, char**)
         double mean = 0;
         for (double ms : times)
             mean += ms / times.size();
-        std::printf("%d Hz, %d:1 limiting %.0f, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
+        std::printf("%d Hz, %d:1 limiting %.0f, %s timing, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
                     "RMS %.6f V, CV %.6f V, B+ %.6f V, REG %.6f V\n",
-                    frequency, ratio, knobs.limiting, channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
+                    frequency, ratio, knobs.limiting, knobs.doubleTiming ? "Double" : "Single", channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
                     blocks, rms, controlSum, bPlus, reg);
         std::fflush(stdout);
         missedDeadline |= misses != 0;

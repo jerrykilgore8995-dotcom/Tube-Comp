@@ -40,6 +40,9 @@ State::ParameterLayout parameters()
     result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"limiting", 1}, "Limiting action", true));
     result.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"meter", 1},
         "Meter", juce::StringArray{"Gain reduction", "Input", "Output"}, 0));
+#ifdef UA176_LIVE
+    result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"double", 1}, "Double", false));
+#endif
     return result;
 }
 
@@ -220,6 +223,9 @@ public:
         controls.tap = tap[r];
         controls.biasResistance = bias[r];
         controls.attack = get("attack");
+#ifdef UA176_LIVE
+        controls.doubleTiming = get("double") > .5f;
+#endif
         controls.release = get("release");
         controls.limiting = get("limiting");
         return controls;
@@ -312,6 +318,13 @@ public:
             addAndMakeVisible(knob);
             attachments[i] = std::make_unique<State::SliderAttachment>(processor.state, controlIds[i], knob);
         }
+#ifdef UA176_LIVE
+        doubleSwitch.setLookAndFeel(&doubleLook);
+        doubleSwitch.setClickingTogglesState(true);
+        doubleSwitch.setTooltip("Double timing");
+        addAndMakeVisible(doubleSwitch);
+        doubleAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "double", doubleSwitch);
+#endif
         setSize(1140, 218);
         startTimerHz(30);
     }
@@ -319,11 +332,17 @@ public:
     ~Editor() override
     {
         stopTimer();
+#ifdef UA176_LIVE
+        doubleSwitch.setLookAndFeel(nullptr);
+#endif
         for (auto& knob : knobs) knob.setLookAndFeel(nullptr);
     }
 
     void resized() override
     {
+#ifdef UA176_LIVE
+        doubleSwitch.setBounds(811, 48, 41, 38);
+#endif
         constexpr std::array<int, 7> x{237, 370, 370, 772, 772, 904, 1035};
         constexpr std::array<int, 7> y{121, 67, 166, 67, 166, 121, 67};
         for (std::size_t i = 0; i < knobs.size(); ++i) {
@@ -380,6 +399,30 @@ private:
                  : "176");
     }
 
+#ifdef UA176_LIVE
+    struct DoubleLook final : juce::LookAndFeel_V4 {
+        void drawButtonBackground(juce::Graphics& g, juce::Button& b, const juce::Colour&,
+                                  bool hovered, bool pressed) override
+        {
+            const auto dot = juce::Rectangle<float>(14, 14).withCentre({b.getWidth() * .5f, 11});
+            g.setColour(juce::Colour(0xff100e0d));
+            g.fillEllipse(dot);
+            g.setColour(juce::Colour(b.getToggleState() ? 0xffdbb66e : 0xff766656));
+            g.drawEllipse(dot, b.getToggleState() ? 1.5f : 1.f);
+            if (hovered || pressed)
+                g.drawEllipse(dot.reduced(3), .65f);
+        }
+        void drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, bool) override
+        {
+            g.setColour(juce::Colour(0xffe3d4ad));
+            g.setFont(juce::FontOptions(9.f));
+            g.drawText(b.getButtonText(), 0, 20, b.getWidth(), 13, juce::Justification::centred);
+        }
+    };
+    DoubleLook doubleLook;
+    juce::TextButton doubleSwitch{"Double"};
+    std::unique_ptr<State::ButtonAttachment> doubleAttachment;
+#endif
     Processor& processor;
     PinLook pins;
     std::unique_ptr<juce::Drawable> panel;

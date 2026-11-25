@@ -103,6 +103,8 @@ ElectricalControls electrical(const Controls& c)
     pad(c.output, p.OUTPUTArm, p.OUTPUTShunt);
     p.inVernier = 1 / std::max(.01, 300. * c.inputVernier);
     p.outVernier = 1 / std::max(.01, 300. * c.outputVernier);
+    p.doubleOn = c.doubleTiming ? 1 / 1.5e6 : 0;
+    p.doubleOff = c.doubleTiming ? 0 : 1 / 1.5e6;
     p.limitOn = c.limiting > .5 ? 1000. : 1e-12;
     p.limitOff = c.limiting > .5 ? 1e-12 : 1000.;
     p.tap = c.tap;
@@ -117,7 +119,7 @@ bool same(const Controls& a, const Controls& b)
 {
     return a.input == b.input && a.output == b.output && a.inputVernier == b.inputVernier &&
         a.outputVernier == b.outputVernier && a.tap == b.tap && a.biasResistance == b.biasResistance &&
-        a.attack == b.attack && a.release == b.release && a.limiting == b.limiting;
+        a.attack == b.attack && a.release == b.release && a.limiting == b.limiting && a.doubleTiming == b.doubleTiming;
 }
 
 // Factor the linear circuit once for a control setting. Each RHS column
