@@ -1,0 +1,29 @@
+UA 176T balanced input bench
+.include input.lib
+.include ../models/tube_cells.lib
+
+* AMP is generator open-circuit peak differential voltage.
+.param AMP=0.109601551 FREQ=1k SOURCE=600 LOSSDB=20 BIAS=0
+VDRIVE DRIVEP DRIVEN DC 0 AC 1 SIN(0 {AMP} {FREQ})
+RCOMMON DRIVEN 0 1G
+RSOURCEP DRIVEP INP {SOURCE/2}
+RSOURCEN DRIVEN INN {SOURCE/2}
+XPAD INP INN TP TN UA176T_PAD LOSSDB={LOSSDB}
+XT1 TP TN GP GN UTC_O1
+VBIAS CV 0 {BIAS}
+XGRIDP GP CV UA176_GRID_FIXTURE
+XGRIDN GN CV UA176_GRID_FIXTURE
+
+.options reltol=1e-7 abstol=1e-12 vntol=1e-9
+.control
+set wr_singlescale
+set wr_vecnames
+set numdgt=15
+ac dec 48 10 100k
+let zin = v(inp,inn)/(-i(vdrive))
+let primary = v(tp,tn)/v(drivep,driven)
+let secondary = v(gp,gn)/v(drivep,driven)
+wrdata ac.txt zin primary secondary
+quit
+.endc
+.end

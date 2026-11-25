@@ -1,0 +1,44 @@
+* UA 176T input experiment. Scope: input attenuator and T1.
+* A negative terminal is explicit throughout the balanced input.
+* The balanced 600-ohm T-pad is the electrical equivalent of the T variant.
+.subckt UA176T_PAD INP INN OUTP OUTN params: LOSSDB=20
+.param KPAD={pow(10,LOSSDB/20)}
+.param ARM={max(1u,300*(KPAD-1)/(KPAD+1))}
+RINP INP MIDP {ARM}
+RINN INN MIDN {ARM}
+ROUTP MIDP OUTP {ARM}
+ROUTN MIDN OUTN {ARM}
+RSHUNT MIDP MIDN {1200*KPAD/max(1e-9,KPAD*KPAD-1)}
+.ends UA176T_PAD
+
+* UTC O-1 full primary and secondary. N, RP and RS are catalog values.
+* LM, LL, RC, CS and CW are provisional pending original winding measurements.
+* The magnetizing branch is linear pending a measured saturation curve.
+.subckt UTC_O1 INP INN OUTP OUTN params: N=10 RP=52 RS=3900 LM=3.3 LL=2m RC=100k CS=100p CW=15p
+RP1 INP P1 {RP/2}
+RP2 INN PN {RP/2}
+LLEAK P1 PP {LL}
+LMAG PP PN {LM}
+RCORE PP PN {RC}
+ETURNS SPLUS SMINUS PP PN {N}
+FTURNS PP PN ETURNS {-N}
+RS1 SPLUS OUTP {RS/2}
+RS2 SMINUS OUTN {RS/2}
+CSEC OUTP OUTN {CS}
+CWIN1 PP OUTP {CW}
+CWIN2 PN OUTN {CW}
+.ends UTC_O1
+
+* Test fixture for the nonlinear, bias-dependent grid load. The plate and
+* cathode environment are a bench approximation until the next UA stage lands.
+* Keep the plate law and interelectrode capacitances from the shared Sylvania
+* cell, and add the grid-current diode supplied with the 176 research model.
+.subckt UA176_GRID_FIXTURE G BIAS params: VRAIL=120 VK=2 RPLATE=4.7k
+VRAIL BPLUS 0 {VRAIL}
+VK K 0 {VK}
+RGRID G BIAS 25k
+RPLATE BPLUS P {RPLATE}
+XTUBE P G K V6BC8
+DGRID G K UA176_6BC8_GRID_DIODE
+.model UA176_6BC8_GRID_DIODE D(IS=1n RS=2k CJO=1p N=1.5 TT=1n)
+.ends UA176_GRID_FIXTURE
