@@ -19,9 +19,9 @@ int main(int argc, char**)
     constexpr std::array<int, 4> ratios{2, 4, 8, 12};
     const int channels = argc > 1 ? 2 : 1;
     std::array<ua176::Live176, 2> simulators;
-    if (ua176::dryMix(.25f, .75f, 0) != .25f ||
-        ua176::dryMix(.25f, .75f, .5f) != .5f ||
-        ua176::dryMix(.25f, .75f, 1) != .75f)
+    if (ua176::dryMix(-.25f, .75f, 0) != -.25f ||
+        ua176::dryMix(-.25f, .75f, .5f) != -.5f ||
+        ua176::dryMix(-.25f, .75f, 1) != -.75f)
         return 7;
     bool missedDeadline = false;
     double bassCv = 0;

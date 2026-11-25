@@ -14,6 +14,8 @@ struct LiveControls {
 inline float dryMix(float wet, float dry, float amount) noexcept
 {
     if (amount <= 0) return wet;
+    // The modeled wet path inverts in the passband.
+    dry = -dry;
     if (amount >= 1) return dry;
     return wet + amount * (dry - wet);
 }

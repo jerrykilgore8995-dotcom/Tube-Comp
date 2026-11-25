@@ -9,6 +9,7 @@ from LiveSPICE. It factors the linear BDF2 network once per control setting
 and solves the coupled device currents per audio frame, in a mono circuit. The input and output pads,
 detector mode, attack, release, and ratio affect the circuit. The left
 vernier position blends in dry signal, from 0% dry by default to 100% dry.
+The dry signal follows the modeled wet path's inverted polarity.
 The right vernier position adjusts a first-order digital sidechain HPF from
 0 Hz (bypass) to 350 Hz. The filter acts at the detector taps, preserving
 the transformer windings and existing reflected detector-current path.
