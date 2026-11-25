@@ -19,20 +19,26 @@ int main(int argc, char**)
     constexpr std::array<int, 4> ratios{2, 4, 8, 12};
     const int channels = argc > 1 ? 2 : 1;
     std::array<ua176::Live176, 2> simulators;
+    if (ua176::dryMix(.25f, .75f, 0) != .25f ||
+        ua176::dryMix(.25f, .75f, .5f) != .5f ||
+        ua176::dryMix(.25f, .75f, 1) != .75f)
+        return 7;
     bool missedDeadline = false;
+    double bassCv = 0;
     std::array<double, block> tone{};
     std::vector<double> times;
     times.reserve(blocks);
-    for (int setting = 0; setting < 7; ++setting) {
-        const int ratioIndex = setting == 6 ? 1 : setting == 5 ? 3 : setting % 4;
+    for (int setting = 0; setting < 9; ++setting) {
+        const int ratioIndex = setting >= 6 ? 1 : setting == 5 ? 3 : setting % 4;
         const int ratio = ratios[ratioIndex];
-        const int frequency = setting == 5 ? 10000 : 1000;
-        ua176::Controls knobs;
+        const int frequency = setting >= 7 ? 50 : setting == 5 ? 10000 : 1000;
+        ua176::LiveControls knobs;
         knobs.output = 1;
         knobs.tap = taps[ratioIndex];
         knobs.biasResistance = bias[ratioIndex];
         knobs.limiting = setting == 4 ? 0 : 1;
         knobs.doubleTiming = setting == 6;
+        knobs.sidechainHz = setting == 8 ? 350 : 0;
         for (auto& simulator : simulators)
             if (!simulator.prepare(rate, knobs)) {
                 std::fprintf(stderr, "Initialization failed at %d:1, limiting %.0f\n", ratio, knobs.limiting);
@@ -79,19 +85,23 @@ int main(int argc, char**)
         double mean = 0;
         for (double ms : times)
             mean += ms / times.size();
-        std::printf("%d Hz, %d:1 limiting %.0f, %s timing, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
+        std::printf("%d Hz, %d:1 limiting %.0f, %s timing, HPF %.0f Hz, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
                     "RMS %.6f V, CV %.6f V, B+ %.6f V, REG %.6f V\n",
-                    frequency, ratio, knobs.limiting, knobs.doubleTiming ? "Double" : "Single", channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
+                    frequency, ratio, knobs.limiting, knobs.doubleTiming ? "Double" : "Single", knobs.sidechainHz, channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
                     blocks, rms, controlSum, bPlus, reg);
         std::fflush(stdout);
         missedDeadline |= misses != 0;
+        if (setting == 7)
+            bassCv = controlSum;
+        if (setting == 8 && !(controlSum - bassCv > 2))
+            return 8;
         if ((setting == 0 && (rms < 6.70 || rms > 7.02 || controlSum < -3.55 || controlSum > -3.4))
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }
     // Change the pad during playback and measure across its output load.
     auto& simulator = simulators[0];
-    ua176::Controls knobs;
+    ua176::LiveControls knobs;
     knobs.output = 1;
     if (!simulator.prepare(rate, knobs))
         return 6;

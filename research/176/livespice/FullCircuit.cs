@@ -13,6 +13,8 @@ internal sealed partial class FrontEnd
     public Expression BPlus => Node("T3_CT").V;
     public Expression Regulated => Node("REG").V;
     public Expression LinePlate => Node("V3PA").V;
+    private Expression DetectorSense => Node("V3PA").V - Node("V3PB").V;
+    private readonly Expression filterHistory = Variable.New("filterHistory");
 
     public Analysis Build(Settings settings) => Build(0, settings);
 
@@ -185,11 +187,12 @@ internal sealed partial class FrontEnd
         R("HALF_A", "HALF_B", 500e3);
         R("OUT_RAW", "T3_P", 1);
         C("T3_P", "T3_N", 80e-12);
-        AdjustableR("T3_P", "OUT_FEED", Math.Max(.01, 300 * settings.OutputVernier), "outVernier");
+        if (!export)
+            R("T3_P", "OUT_FEED", Math.Max(.01, 300 * settings.OutputVernier));
         if (settings.Output > 1 || export)
         {
             outputReturn = "OUT_N";
-            Pad("OUT_FEED", "T3_N", "OUT_P", outputReturn, "OUTPUT", settings.Output);
+            Pad(export ? "T3_P" : "OUT_FEED", "T3_N", "OUT_P", outputReturn, "OUTPUT", settings.Output);
         }
         else
             R("OUT_FEED", "OUT_P", .01);
@@ -216,7 +219,15 @@ internal sealed partial class FrontEnd
             var current = analysis.AddUnknown("ITAP_" + side);
             analysis.AddPassiveComponent(Node(terminal), Node("T3_CT"), current);
             analysis.AddPassiveComponent(Node(plate), Node("T3_CT"), -selectedTap * current);
-            analysis.AddEquation(Node(terminal).V - Node("T3_CT").V, selectedTap * (Node(plate).V - Node("T3_CT").V));
+            Expression drive = selectedTap * (Node(plate).V - Node("T3_CT").V);
+            if (export)
+            {
+                // An ideal differential correction at the detector taps,
+                // with the original current reflection and common mode.
+                Expression low = Parameter("hpFeed") * DetectorSense + Parameter("hpMemory") * filterHistory;
+                drive = side == "A" ? drive - low : drive + low;
+            }
+            analysis.AddEquation(Node(terminal).V - Node("T3_CT").V, drive);
             C(terminal, k, .5e-6);
             R(k, "DET_BIAS", 220e3);
             DetectorDiode(side, k);

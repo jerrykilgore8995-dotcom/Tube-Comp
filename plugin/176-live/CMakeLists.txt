@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(UA176Live VERSION 0.1.3 LANGUAGES C CXX)
+project(UA176Live VERSION 0.1.4 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -27,7 +27,14 @@ if(UA176_LIVE_BUILD_VST3)
         GIT_TAG 8.0.13
         GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(JUCE)
-    juce_add_binary_data(UA176LivePanel HEADER_NAME UA176Art.h NAMESPACE UA176Art SOURCES ../176/Faceplate.svg)
+    set(panel "${CMAKE_CURRENT_SOURCE_DIR}/../176/Faceplate.svg")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${panel}")
+    file(READ "${panel}" livePanel)
+    string(REGEX REPLACE "(<text x=\"370[.]00\" y=\"123[.]00\"[^>]*>)VERNIER" "\\1MIX" livePanel "${livePanel}")
+    string(REGEX REPLACE "(<text x=\"772[.]00\" y=\"123[.]00\"[^>]*>)VERNIER" "\\1SC HPF" livePanel "${livePanel}")
+    set(livePanelFile "${CMAKE_CURRENT_BINARY_DIR}/Faceplate.svg")
+    file(WRITE "${livePanelFile}" "${livePanel}")
+    juce_add_binary_data(UA176LivePanel HEADER_NAME UA176Art.h NAMESPACE UA176Art SOURCES "${livePanelFile}")
     juce_add_plugin(UA176Live
         COMPANY_NAME "Tube Comp"
         BUNDLE_ID "com.tubecomp.176live"

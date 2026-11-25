@@ -56,7 +56,7 @@ internal sealed partial class FrontEnd
         var compiled = Build(new Settings(Output: 3.16227766));
         var x = compiled.Unknowns.Distinct().ToArray();
         var derivatives = x.Select(v => Call.D(v, Component.t)).ToArray();
-        var input = devices.Select(d => d.Current).Prepend(Drive).ToArray();
+        var input = devices.Select(d => d.Current).Prepend(Drive).Append(filterHistory).ToArray();
         var basis = x.Concat(derivatives).Concat(input).ToArray();
         var equations = compiled.Equations.Select(eq => LinearCombination.New(basis, eq.Left - eq.Right)).ToArray();
         if (equations.Length != x.Length)
@@ -84,12 +84,12 @@ internal sealed partial class FrontEnd
                     writer.WriteLine($"    d[{i} * stateCount + {j}] = {Cxx(eq[derivatives[states[j]]], controlSymbols)};");
             for (int j = 0; j < input.Length; j++)
                 if (!eq[input[j]].EqualsZero())
-                    writer.WriteLine($"    b[{i} * (deviceCount + 2) + {j + 1}] = {Cxx(-eq[input[j]], controlSymbols)};");
+                    writer.WriteLine($"    b[{i} * (deviceCount + 3) + {j + 1}] = {Cxx(-eq[input[j]], controlSymbols)};");
             if (!eq[1].EqualsZero())
-                writer.WriteLine($"    b[{i} * (deviceCount + 2)] = {Cxx(-eq[1], controlSymbols)};");
+                writer.WriteLine($"    b[{i} * (deviceCount + 3)] = {Cxx(-eq[1], controlSymbols)};");
         }
         writer.WriteLine("}");
-        var voltages = devices.SelectMany(d => d.Voltages).Concat(new[] { Output, ControlVoltage, BPlus, Regulated }).ToArray();
+        var voltages = devices.SelectMany(d => d.Voltages).Concat(new[] { Output, ControlVoltage, BPlus, Regulated, DetectorSense }).ToArray();
         writer.WriteLine($"constexpr int portCount = {voltages.Length};");
         writer.WriteLine("void ports(double* z) {");
         for (int i = 0; i < voltages.Length; i++)

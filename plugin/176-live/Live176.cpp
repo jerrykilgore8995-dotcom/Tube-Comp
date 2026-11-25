@@ -87,12 +87,13 @@ void plateLaw(double vp, double vg, double offset, double gridScale, double knee
 
 #include "Live176Deck.h"
 
-constexpr int deviceVoltages = portCount - 4;
+constexpr int deviceVoltages = portCount - 5;
 constexpr int observations = stateCount + portCount;
-constexpr int historyOffset = deviceCount + 2;
+constexpr int filterInput = deviceCount + 2;
+constexpr int historyOffset = filterInput + 1;
 constexpr int columns = historyOffset + stateCount;
 
-ElectricalControls electrical(const Controls& c)
+ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtered)
 {
     ElectricalControls p{};
     auto pad = [](double k, double& arm, double& shunt) {
@@ -101,8 +102,8 @@ ElectricalControls electrical(const Controls& c)
     };
     pad(c.input, p.INPUTArm, p.INPUTShunt);
     pad(c.output, p.OUTPUTArm, p.OUTPUTShunt);
-    p.inVernier = 1 / std::max(.01, 300. * c.inputVernier);
-    p.outVernier = 1 / std::max(.01, 300. * c.outputVernier);
+    p.hpFeed = .5 * c.tap * hpGain;
+    p.hpMemory = filtered ? .5 * c.tap * (1 - hpGain) : 0;
     p.doubleOn = c.doubleTiming ? 1 / 200e3 : 0;
     p.doubleOff = c.doubleTiming ? 0 : 1 / 200e3;
     p.limitOn = c.limiting > .5 ? 1000. : 1e-12;
@@ -115,10 +116,9 @@ ElectricalControls electrical(const Controls& c)
     return p;
 }
 
-bool same(const Controls& a, const Controls& b)
+bool same(const LiveControls& a, const LiveControls& b)
 {
-    return a.input == b.input && a.output == b.output && a.inputVernier == b.inputVernier &&
-        a.outputVernier == b.outputVernier && a.tap == b.tap && a.biasResistance == b.biasResistance &&
+    return a.input == b.input && a.output == b.output && a.sidechainHz == b.sidechainHz && a.tap == b.tap && a.biasResistance == b.biasResistance &&
         a.attack == b.attack && a.release == b.release && a.limiting == b.limiting && a.doubleTiming == b.doubleTiming;
 }
 
@@ -171,11 +171,11 @@ bool eliminate(double* a, double* rhs, int size, int width) noexcept
 
 struct Live176::Circuit {
     double rate = 44100;
-    Controls controls{};
+    LiveControls controls{};
     bool configured = false;
     std::array<double, nodeCount * nodeCount> a{};
     std::array<double, nodeCount * stateCount> d{};
-    std::array<double, nodeCount * (deviceCount + 2)> b{};
+    std::array<double, nodeCount * historyOffset> b{};
     std::array<double, nodeCount * columns> rhs{};
     std::array<double, portCount * nodeCount> z{};
     std::array<double, observations * columns> response{};
@@ -192,13 +192,18 @@ struct Live176::Circuit {
     bool factored = false;
     std::array<double, deviceVoltages> slopes{};
     double rail = 0, regulator = 0;
+    double hpGain = 0, hpState = 0;
 
     Circuit() { ports(z.data()); }
 
-    bool setup(const Controls& next, bool dc)
+    bool setup(const LiveControls& next, bool dc)
     {
         a.fill(0); d.fill(0); b.fill(0);
-        stamp(electrical(next), a.data(), d.data(), b.data());
+        const bool filtered = !dc && next.sidechainHz > 0;
+        const double frequency = std::clamp(static_cast<double>(next.sidechainHz), 0., std::min(350., rate * .45));
+        const double g = filtered ? std::tan(3.14159265358979323846 * frequency / rate) : 0;
+        const double nextHpGain = g / (1 + g);
+        stamp(electrical(next, nextHpGain, filtered), a.data(), d.data(), b.data());
         const double scale = dc ? 0 : rate * .5;
         for (int row = 0; row < nodeCount; ++row) {
             std::copy_n(b.data() + row * historyOffset, historyOffset, rhs.data() + row * columns);
@@ -221,6 +226,9 @@ struct Live176::Circuit {
             std::copy_n(rhs.data() + stateIndices[state] * columns, columns,
                         candidate.data() + (portCount + state) * columns);
         response.swap(candidate);
+        hpGain = nextHpGain;
+        if (next.sidechainHz <= 0)
+            hpState = 0;
         factored = false;
         oldDeviceCurrent = deviceCurrent;
         controls = next;
@@ -231,11 +239,13 @@ struct Live176::Circuit {
     {
         feed[0] = supply;
         feed[1] = audio;
+        feed[filterInput] = hpState;
         for (int i = 0; i < stateCount; ++i)
             feed[historyOffset + i] = 4 * previous[i] - older[i];
         for (int port = 0; port < deviceVoltages; ++port) {
             const auto* row = response.data() + port * columns;
             portBase[port] = row[0] * feed[0] + row[1] * feed[1]
+                + row[filterInput] * hpState
                 + dot<stateCount>(row + historyOffset, feed.data() + historyOffset);
         }
     }
@@ -384,6 +394,10 @@ struct Live176::Circuit {
         cv = observe(deviceVoltages + 1);
         rail = observe(deviceVoltages + 2);
         regulator = observe(deviceVoltages + 3);
+        if (hpGain > 0)
+            hpState += 2 * hpGain * (observe(deviceVoltages + 4) - hpState);
+        else if (!configured && controls.sidechainHz > 0)
+            hpState = observe(deviceVoltages + 4);
         older = previous;
         for (int state = 0; state < stateCount; ++state)
             previous[state] = observe(portCount + state);
@@ -393,13 +407,14 @@ struct Live176::Circuit {
 
 Live176::Live176() : circuit(std::make_unique<Circuit>()) {}
 Live176::~Live176() = default;
-bool Live176::prepare(double rate, const Controls& knobs)
+bool Live176::prepare(double rate, const LiveControls& knobs)
 {
     circuit->rate = rate;
     circuit->deviceCurrent.fill(0);
     circuit->previous.fill(0);
     circuit->older.fill(0);
     circuit->configured = false;
+    circuit->hpState = 0;
     if (!circuit->setup(knobs, true))
         return false;
     double audio = 0, cv = 0;
@@ -411,7 +426,7 @@ bool Live176::prepare(double rate, const Controls& knobs)
     return circuit->configured;
 }
 
-bool Live176::setControls(const Controls& knobs)
+bool Live176::setControls(const LiveControls& knobs)
 {
     return circuit->configured && (same(circuit->controls, knobs) || circuit->setup(knobs, false));
 }

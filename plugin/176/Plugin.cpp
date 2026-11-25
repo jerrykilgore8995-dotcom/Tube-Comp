@@ -11,12 +11,23 @@
 
 namespace {
 using State = juce::AudioProcessorValueTreeState;
+#ifdef UA176_LIVE
+using EngineControls = ua176::LiveControls;
+constexpr std::array<const char*, 7> controlIds{
+    "input", "ratio", "mix", "attack", "sidechainHpf", "output", "release"
+};
+constexpr std::array<const char*, 7> controlNames{
+    "Input", "Compression ratio", "Mix (dry %)", "Attack", "Sidechain HPF (Hz)", "Output", "Release"
+};
+#else
+using EngineControls = ua176::Controls;
 constexpr std::array<const char*, 7> controlIds{
     "input", "ratio", "inputVernier", "attack", "outputVernier", "output", "release"
 };
 constexpr std::array<const char*, 7> controlNames{
     "Input", "Compression ratio", "Input vernier", "Attack", "Output vernier", "Output", "Release"
 };
+#endif
 constexpr std::array<float, 4> tap{.12f, .29f, .58f, 1.f};
 constexpr std::array<float, 4> bias{1000, 6800, 20000, 47000};
 
@@ -31,9 +42,17 @@ State::ParameterLayout parameters()
     add(0, {0, 40, 2}, 20);
     result.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"ratio", 1},
         "Compression ratio", juce::StringArray{"2:1", "4:1", "8:1", "12:1"}, 1));
+#ifdef UA176_LIVE
+    add(2, {0, 100, 1}, 0);
+#else
     add(2, {0, 1}, 0);
+#endif
     add(3, {0, 1}, .5f);
+#ifdef UA176_LIVE
+    add(4, {0, 350, 1}, 0);
+#else
     add(4, {0, 1}, 0);
+#endif
     add(5, {0, 40, 2}, 30);
     add(6, {0, 1}, .8f);
     result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"on", 1}, "Power", true));
@@ -76,6 +95,8 @@ public:
     void prepareToPlay(double sampleRate, int) override
     {
         setLatencySamples(0);
+        mix.reset(sampleRate, .010);
+        mix.setCurrentAndTargetValue(get("mix") * .01f);
         const auto controls = readControls();
         good.fill(false);
         for (int c = 0; c < getTotalNumInputChannels(); ++c)
@@ -94,6 +115,7 @@ public:
         float inputPeak = 0, outputPeak = 0, reduction = 0;
         bool failed = false;
         constexpr double scale = ua176::SpiceStream::fullScalePeak;
+        mix.setTargetValue(get("mix") * .01f);
         for (int c = 0; c < getTotalNumInputChannels(); ++c) {
             auto& simulator = simulators[static_cast<std::size_t>(c)];
             const bool ready = good[static_cast<std::size_t>(c)] && simulator.setControls(controls);
@@ -101,10 +123,11 @@ public:
             for (int i = 0; i < block.getNumSamples(); ++i) {
                 const float drySample = samples[i];
                 inputPeak = std::max(inputPeak, std::abs(drySample));
+                const float dryAmount = mix.getNextValue();
                 double volts = 0, cv = 0;
                 const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
                 if (solved && on) {
-                    samples[i] = static_cast<float>(volts / scale);
+                    samples[i] = ua176::dryMix(static_cast<float>(volts / scale), drySample, dryAmount);
                     reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
                 }
                 failed |= !solved;
@@ -212,14 +235,18 @@ public:
 
 #endif
 
-    ua176::Controls readControls() const noexcept
+    EngineControls readControls() const noexcept
     {
         const auto r = static_cast<std::size_t>(juce::jlimit(0, 3, static_cast<int>(get("ratio"))));
-        ua176::Controls controls;
+        EngineControls controls;
         controls.input = std::pow(10.f, (40 - get("input")) / 20);
         controls.output = std::pow(10.f, (40 - get("output")) / 20);
+#ifdef UA176_LIVE
+        controls.sidechainHz = get("sidechainHpf");
+#else
         controls.inputVernier = get("inputVernier");
         controls.outputVernier = get("outputVernier");
+#endif
         controls.tap = tap[r];
         controls.biasResistance = bias[r];
         controls.attack = get("attack");
@@ -276,6 +303,7 @@ private:
 #ifdef UA176_LIVE
     std::array<ua176::Live176, 2> simulators;
     std::array<bool, 2> good{};
+    juce::SmoothedValue<float> mix;
 #else
     std::array<ua176::SpiceStream, 2> simulators;
     std::array<std::array<float, ua176::SpiceStream::latency>, 2> dry{};
@@ -318,6 +346,18 @@ public:
             addAndMakeVisible(knob);
             attachments[i] = std::make_unique<State::SliderAttachment>(processor.state, controlIds[i], knob);
         }
+#ifdef UA176_LIVE
+        knobs[2].onValueChange = [this] {
+            knobs[2].setTooltip(juce::String(knobs[2].getValue(), 0) + "% dry");
+        };
+        knobs[4].onValueChange = [this] {
+            const auto hz = knobs[4].getValue();
+            knobs[4].setTooltip(hz == 0 ? juce::String("Sidechain HPF off")
+                                      : juce::String(hz, 0) + " Hz sidechain HPF");
+        };
+        knobs[2].onValueChange();
+        knobs[4].onValueChange();
+#endif
 #ifdef UA176_LIVE
         doubleSwitch.setLookAndFeel(&doubleLook);
         doubleSwitch.setClickingTogglesState(true);

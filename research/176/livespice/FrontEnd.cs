@@ -142,11 +142,9 @@ internal sealed partial class FrontEnd
         R("DRIVEN", "0", 1e9);
         R("DRIVEP", "INP", 300);
         R("DRIVEN", "INN", 300);
-        Pad("INP", "INN", "PAD_P", "TN", "INPUT", settings?.Input ?? 10);
-        if (settings == null)
-            R("PAD_P", "TP", 1e-6);
-        else
-            AdjustableR("PAD_P", "TP", Math.Max(.01, 300 * settings.InputVernier), "inVernier");
+        Pad("INP", "INN", export ? "TP" : "PAD_P", "TN", "INPUT", settings?.Input ?? 10);
+        if (!export)
+            R("PAD_P", "TP", settings == null ? 1e-6 : Math.Max(.01, 300 * settings.InputVernier));
         Transformer("TP", "TN", "SEC_P", "SEC_N", "T1", 10, 52, 3900, 3.3, .002, 100e3, 92e-12, 15e-12);
 
         R("SEC_P", "TAP_P", 10e3);
