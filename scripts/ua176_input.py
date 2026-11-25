@@ -46,13 +46,17 @@ def simulate(executable, deck, control, file, condition):
         models = stage.parent / "models"
         models.mkdir()
         shutil.copyfile(ROOT / "spice/models/tube_cells.lib", models / "tube_cells.lib")
-        shutil.copyfile(STAGE / "input.lib", stage / "input.lib")
+        for pattern in ("*.lib", "*.inc"):
+            for include in STAGE.glob(pattern):
+                shutil.copyfile(include, stage / include.name)
         deck = re.sub(r"(?s)(set numdgt=15\n).*?(\nquit)", r"\1" + control + r"\2", deck)
         (stage / "case.cir").write_text(deck)
         result = subprocess.run([executable, "-b", "case.cir"], cwd=stage,
                                 capture_output=True, text=True, timeout=90)
         data_file = stage / file
-        if result.returncode or not data_file.exists() or "error" in result.stderr.lower():
+        diagnostics = result.stderr.lower()
+        if (result.returncode or not data_file.exists()
+                or any(mark in diagnostics for mark in ("error", "aborted", "timestep too small"))):
             raise RuntimeError(f"ngspice failed for {condition}\n{result.stdout}\n{result.stderr}")
         data = np.loadtxt(data_file, skiprows=1, ndmin=2)
         if not data.size or not np.all(np.isfinite(data)):
@@ -156,7 +160,8 @@ def plot_harmonics(rows, destination, node="secondary", title=None, levels=LEVEL
                              layout="constrained", squeeze=False)
     for axis, level in zip(axes.flat, levels):
         row = next(row for row in rows if row["frequency_hz"] == 1000
-                   and row["matched_source_dbu"] == level and row["pad_loss_db"] == 20)
+                   and row.get("target_input_dbu", row.get("matched_source_dbu")) == level
+                   and row["pad_loss_db"] == 20)
         harmonics = np.array([row[f"{node}_k{k}_norm_dbfs"] for k in HARMONICS])
         plotted = harmonics >= -100
         axis.vlines([1], -100, [0], color="#efab48", linewidth=1.8)

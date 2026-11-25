@@ -1,0 +1,42 @@
+* Koren cells supplied for the UA 176 project. Pin order P G K.
+* In the supplied PWR + PWRS form, positive arguments have a factor of two.
+.subckt UA176_12AX7 P G K
+BPL P K I={2*pow(uramp(V(P,K)/600*ln(1+exp(600*(.01+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.4)/1060}
+RPK P K 1G
+CGK G K 2.3p
+CGP G P 2.4p
+CPK P K .9p
+RG G GD 2k
+DGRID GD K UA176_12AX7_GRID
+.model UA176_12AX7_GRID D(IS=1n RS=1 CJO=10p TT=1n)
+.ends UA176_12AX7
+
+.subckt UA176_12BH7 P G K
+BPL P K I={2*pow(uramp(V(P,K)/185.4*ln(1+exp(185.4*(1/18.02+(V(G,K)-.6206)/sqrt(1247.69+V(P,K)*V(P,K)))))),1.181)/945.75}
+* Bound the denominator outside the fitted positive-plate-voltage region.
+BG G K I={(8.2e-4+.162/max(1,6.624+V(P,K)))*(2*18.02/945.75)*pow(uramp(V(G,K)+1.03),1.3)}
+RPK P K 1G
+CGK G K 2.9p
+CGP G P 2.5p
+CPK P K .5p
+.ends UA176_12BH7
+
+* T3 output winding proxy. 9:1 plate-to-plate ratio from the Sowter 1285.
+* The winding DCR values approximate its total referred-secondary DCR.
+* Magnetizing inductance, leakage and capacitance are provisional.
+* The half-primaries are series-aiding from PA to PB with DC feed at CT.
+.subckt UA176_T3 PA CT PB OUTP OUTN
+RPA PA PLEAKA 525
+RPB PB PLEAKB 525
+LLA PLEAKA HALF_A 50m
+LLB PLEAKB HALF_B 50m
+LPA HALF_A CT 62.5
+LPB CT HALF_B 62.5
+LS OUT_RAW OUTN {250/81}
+KAB LPA LPB .99999
+KAS LPA LS .99999
+KBS LPB LS .99999
+RC HALF_A HALF_B 500k
+RS OUT_RAW OUTP 1
+CS OUTP OUTN 80p
+.ends UA176_T3
