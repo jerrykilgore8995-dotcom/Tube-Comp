@@ -1,0 +1,60 @@
+name: Build 176 embedded SPICE VST3
+on:
+  push:
+    branches: [ua176-input-stage]
+    paths: ["plugin/176/**", "spice/176/**", ".github/workflows/ua176-spice-vst3.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch the official ngspice 44.2 shared runtime
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP "ngspice-44.2_dll_64.7z"
+          $url = "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/old-releases/44.2/ngspice-44.2_dll_64.7z"
+          curl.exe --fail --location --retry 3 --output $path $url
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch ngspice" }
+          if ((Get-FileHash $path -Algorithm SHA256).Hash -ne "737579C2CCFE6520A2C0DB9DF1243B196500640C99A594D642EF7F0CBC8FF453") {
+            throw "ngspice download checksum mismatch"
+          }
+          $runtime = Join-Path $env:RUNNER_TEMP "176-ngspice"
+          & 7z x $path "-o$runtime" -y
+          if ($LASTEXITCODE -ne 0) { throw "Could not extract ngspice" }
+          $dll = Get-ChildItem $runtime -Recurse -File -Filter ngspice.dll | Select-Object -First 1
+          if (!$dll) { throw "ngspice.dll missing from the official package" }
+          "SPICE_DLL=$($dll.FullName)" >> $env:GITHUB_ENV
+          "SPICE_RUNTIME=$runtime" >> $env:GITHUB_ENV
+      - name: Configure and compile
+        run: |
+          cmake -S plugin/176 -B build-176 -G "Visual Studio 17 2022" -A x64
+          cmake --build build-176 --config Release --target UA176Spice_VST3 UA176SpiceSmoke --parallel 4
+      - name: Verify live continuous netlist processing on Windows
+        shell: pwsh
+        run: |
+          & build-176/Release/UA176SpiceSmoke.exe $env:SPICE_DLL
+          if ($LASTEXITCODE -ne 0) { throw "Embedded simulation did not pass the reference tone" }
+      - name: Package the VST3 and its SPICE runtime
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem build-176 -Recurse -Directory -Filter "176.vst3" | Select-Object -First 1
+          if (!$plugin) { throw "176.vst3 missing" }
+          $resources = Join-Path $plugin.FullName "Contents/Resources/ngspice"
+          New-Item -ItemType Directory -Force $resources | Out-Null
+          Copy-Item (Join-Path (Split-Path $env:SPICE_DLL) "*.dll") $resources
+          Get-ChildItem $env:SPICE_RUNTIME -Recurse -File | Where-Object {
+            $_.Name -match '^(COPYING|LICENSE|NOTICE|README)' -or $_.Name -eq 'spinit'
+          } | ForEach-Object { Copy-Item $_.FullName $resources -Force }
+          Compress-Archive -LiteralPath $plugin.FullName -DestinationPath "176-SPICE-Windows-x64-VST3.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 176-SPICE-Windows-x64-VST3
+          path: 176-SPICE-Windows-x64-VST3.zip
+          if-no-files-found: error

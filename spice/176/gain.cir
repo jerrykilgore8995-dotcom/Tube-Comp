@@ -5,6 +5,7 @@ UA 176T input and C-10476 6BC8 variable-mu stage
 .param AMP=0.109601551 FREQ=1k SOURCE=600 LOSSDB=20 BIAS=0
 .param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108 VERNIER=0
 .include front_end.inc
+VBPLUS REG 0 {SUPPLY}
 * Bench source for static control-voltage sweeps.
 VCV CV 0 {BIAS}
 

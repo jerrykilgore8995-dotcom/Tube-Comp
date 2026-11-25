@@ -13,6 +13,8 @@ UA 176 signal path, T3 ratio taps and closed 6AL5 control loop
 .param TAPFRAC={ternary_fcn(RATIO==2,.12,ternary_fcn(RATIO==4,.29,ternary_fcn(RATIO==8,.58,1)))}
 .param RATIO_R={ternary_fcn(RATIO==2,1k,ternary_fcn(RATIO==4,6.8k,ternary_fcn(RATIO==8,20k,47k)))}
 .include front_end.inc
+VBPLUS REG 0 {SUPPLY}
+VLINE T3_CT 0 {B3}
 .include line_stage.inc
 
 * C6/C7 block plate DC. R36/R37 bias the separate cathodes, pins 1 and 5.

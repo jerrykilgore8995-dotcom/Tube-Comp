@@ -38,7 +38,6 @@ R10B METER R11TOP {max(1m,1k*(1-METERZERO))}
 R11 R11TOP 0 330
 
 * The 0B2-regulated rail is held at nominal DC for this stage bench.
-VBPLUS REG 0 {SUPPLY}
 C10 REG 0 .1u
 R12 PA PLATE_BAL_A 4.7k
 R13A PLATE_BAL_A REG {max(1m,1k*PLATEBAL)}

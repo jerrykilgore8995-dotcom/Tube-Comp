@@ -7,6 +7,8 @@ UA 176T audio path through the push-pull line amplifier and T3
 .param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108 VERNIER=0
 .param B3=315 OUTVERNIER=0 OUTPUTLOAD=600 FBRES=180k TAPFRAC=1
 .include front_end.inc
+VBPLUS REG 0 {SUPPLY}
+VLINE T3_CT 0 {B3}
 * Bench source for static control-voltage sweeps.
 VCV CV 0 {BIAS}
 

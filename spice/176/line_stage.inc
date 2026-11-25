@@ -27,7 +27,6 @@ R28 V3K 0 330
 
 * Corrected C-10476 feed junction: T3 center tap, R26 and C9B.
 * The B+ supply upstream of this junction is a fixed bench boundary.
-VLINE T3_CT 0 {B3}
 C9B T3_CT 0 10u
 R26 T3_CT V2_SUPPLY 47k
 C9A V2_SUPPLY 0 10u
