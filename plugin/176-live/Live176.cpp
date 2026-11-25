@@ -416,7 +416,7 @@ bool Live176::setControls(const Controls& knobs)
 
 bool Live176::step(double input, double& output, double& cv) noexcept
 {
-    return circuit->configured && circuit->advance(input, 1, 24, output, cv);
+    return circuit->configured && circuit->advance(input, 1, 64, output, cv);
 }
 
 double Live176::bPlus() const noexcept { return circuit->rail; }

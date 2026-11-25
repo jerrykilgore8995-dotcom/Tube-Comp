@@ -23,12 +23,14 @@ int main(int argc, char**)
     std::array<double, block> tone{};
     std::vector<double> times;
     times.reserve(blocks);
-    for (int setting = 0; setting < 5; ++setting) {
-        const int ratio = ratios[setting % 4];
+    for (int setting = 0; setting < 6; ++setting) {
+        const int ratioIndex = setting == 5 ? 3 : setting % 4;
+        const int ratio = ratios[ratioIndex];
+        const int frequency = setting == 5 ? 10000 : 1000;
         ua176::Controls knobs;
         knobs.output = 1;
-        knobs.tap = taps[setting % 4];
-        knobs.biasResistance = bias[setting % 4];
+        knobs.tap = taps[ratioIndex];
+        knobs.biasResistance = bias[ratioIndex];
         knobs.limiting = setting == 4 ? 0 : 1;
         for (auto& simulator : simulators)
             if (!simulator.prepare(rate, knobs)) {
@@ -41,7 +43,7 @@ int main(int argc, char**)
         int captured = 0;
         for (int b = 0; b < blocks + warm; ++b) {
             for (int i = 0; i < block; ++i)
-                tone[i] = sourcePeak * std::sin(tau * 1000 * (b * block + i) / rate);
+                tone[i] = sourcePeak * std::sin(tau * frequency * (b * block + i) / rate);
             const auto start = Clock::now();
             for (int channel = 0; channel < channels; ++channel) {
                 auto& simulator = simulators[channel];
@@ -76,9 +78,9 @@ int main(int argc, char**)
         double mean = 0;
         for (double ms : times)
             mean += ms / times.size();
-        std::printf("%d:1 limiting %.0f, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
+        std::printf("%d Hz, %d:1 limiting %.0f, %s 512 @ 44.1k: mean %.3f ms, p99 %.3f ms, max %.3f ms, misses %zu / %d, "
                     "RMS %.6f V, CV %.6f V, B+ %.6f V, REG %.6f V\n",
-                    ratio, knobs.limiting, channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
+                    frequency, ratio, knobs.limiting, channels == 1 ? "mono" : "stereo", mean, p99, times.back(), static_cast<std::size_t>(misses),
                     blocks, rms, controlSum, bPlus, reg);
         std::fflush(stdout);
         missedDeadline |= misses != 0;
