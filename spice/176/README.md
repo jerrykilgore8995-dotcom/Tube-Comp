@@ -38,3 +38,44 @@ modeled grid load and reflected loading with a linear magnetic core.
 - [UTC O-series winding and bandwidth data](https://www.ka-electronics.com/images/pdf/UTC_Transformer_Catalog_1974.pdf)
 - [UTC O-series frequency-response curves](https://flurrydynelabs.com/Transformer%20Catalogs/UTC_Transformers_Catalog_1962-1963.pdf)
 - [Reported UA 176 transformer identification](https://www.tapatalk.com/groups/prorecordingworkshop/what-transformers-are-in-the-ua-176-t4052333.html)
+
+## C-10476 6BC8 and interstage bench
+
+`gain.cir` extends the input path through the normal-position gain ladder,
+the dual 6BC8, the cathode and plate balance networks, and the interstage
+transformer. The 176T attenuator is carried forward at the front end.
+
+- T1 uses 2.0 mH primary-referred leakage and 92 pF directly across the entire
+  secondary. The AC matrix crosses 1.5, 2.0 and 2.5 mH with 84, 92 and 100 pF.
+  These winding values are working estimates. The interwinding paths are
+  separate from the differential self-capacitance.
+- R2–R5 form the two 10 kΩ / 6.8 kΩ sections around the control-voltage node.
+  HI selects the ends of T1 and LO selects the divider taps. The bench holds
+  the test switch in normal operation and uses an external fixed voltage at C5.
+- The 0B2 rail is represented by its nominal 108 V DC boundary. R12 and R14
+  feed the two plates through the R13 balance pot. The T2 high-impedance winding
+  is connected across the plates. The cathode return includes R6–R11, with the
+  GR meter tap unloaded.
+- T2 is a reverse UTC A-19 candidate. The nominal 80 kΩ to 15 kΩ ratio and
+  2.9 kΩ winding resistance on the 15 kΩ side come from catalog data.
+  The 4 kΩ resistance of the high-impedance winding, 240 H magnetizing branch,
+  100 mH high-side leakage, loss and capacitances are provisional. The 20 kΩ
+  resistor on each side and 7 pF per grid form the differential load fixture.
+  The active following amplifier and its feedback will set the final load.
+
+Run the full DC, AC and transient bench from the repository root:
+
+```sh
+python3 scripts/ua176_gain.py --output /tmp/ua176-gain
+```
+
+The AC CSV reports source-referenced magnitude and phase at the T1 winding,
+6BC8 grids, 6BC8 plates and T2 secondary. Phase uses grid P minus N, plate
+B minus A and T2 N minus P, with the last two oriented for midband comparison.
+The fixed-CV gain changes describe the gain cell's sensitivity. The rectifier
+and timing loop are outside this bench. T1 and T2 magnetic cores are linear,
+so the transient sweep captures tube distortion and nonlinear grid loading.
+
+- [UA 176 C-10476 schematic](https://funkwerkes.com/web/wp-content/techdocs/MixedProAudio/Universal-Audio-176-Compressor-Schematic.pdf)
+- [UTC A-19 winding data](https://www.ka-electronics.com/images/pdf/UTC_Transformer_Catalog_1974.pdf)
+- [Reported A-19 orientation in the UA circuit](https://groupdiy.com/threads/universal-audio-ua-176-limiting-amplifier.56531/page-2)

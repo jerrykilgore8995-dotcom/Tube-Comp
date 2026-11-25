@@ -11,10 +11,11 @@ ROUTN MIDN OUTN {ARM}
 RSHUNT MIDP MIDN {1200*KPAD/max(1e-9,KPAD*KPAD-1)}
 .ends UA176T_PAD
 
-* UTC O-1 full primary and secondary. N, RP and RS are catalog values.
+* Floating transformer equivalent. Defaults are the UTC O-1 candidate.
+* N, RP and RS are catalog values for the default UTC O-1.
 * LM, LL, RC, CS and CW are provisional pending original winding measurements.
 * The magnetizing branch is linear pending a measured saturation curve.
-.subckt UTC_O1 INP INN OUTP OUTN params: N=10 RP=52 RS=3900 LM=3.3 LL=2m RC=100k CS=100p CW=15p
+.subckt UA176_TRANSFORMER INP INN OUTP OUTN params: N=10 RP=52 RS=3900 LM=3.3 LL=2m RC=100k CS=92p CW=15p
 RP1 INP P1 {RP/2}
 RP2 INN PN {RP/2}
 LLEAK P1 PP {LL}
@@ -27,7 +28,7 @@ RS2 SMINUS OUTN {RS/2}
 CSEC OUTP OUTN {CS}
 CWIN1 PP OUTP {CW}
 CWIN2 PN OUTN {CW}
-.ends UTC_O1
+.ends UA176_TRANSFORMER
 
 * Test fixture for the nonlinear, bias-dependent grid load. The plate and
 * cathode environment are a bench approximation until the next UA stage lands.

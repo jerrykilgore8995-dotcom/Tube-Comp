@@ -29,6 +29,17 @@ def voltage_db(amplitude):
 
 def run_case(executable, condition, control, file):
     source, loss, load, bias = condition
+    deck = (STAGE / "input.cir").read_text()
+    deck = deck.replace("SOURCE=600 LOSSDB=20 BIAS=0",
+                        f"SOURCE={source} LOSSDB={loss} BIAS={bias}")
+    if load == "catalog_50k":
+        deck = re.sub(r"(?m)^XGRID[PN].*$", "", deck)
+        deck = deck.replace("VBIAS CV 0 {BIAS}",
+                            "RLOADP GP 0 25k\nRLOADN GN 0 25k")
+    return simulate(executable, deck, control, file, condition)
+
+
+def simulate(executable, deck, control, file, condition):
     with TemporaryDirectory(prefix="ua176-input-") as temp:
         stage = Path(temp) / "176"
         stage.mkdir()
@@ -36,13 +47,6 @@ def run_case(executable, condition, control, file):
         models.mkdir()
         shutil.copyfile(ROOT / "spice/models/tube_cells.lib", models / "tube_cells.lib")
         shutil.copyfile(STAGE / "input.lib", stage / "input.lib")
-        deck = (STAGE / "input.cir").read_text()
-        deck = deck.replace("SOURCE=600 LOSSDB=20 BIAS=0",
-                            f"SOURCE={source} LOSSDB={loss} BIAS={bias}")
-        if load == "catalog_50k":
-            deck = re.sub(r"(?m)^XGRID[PN].*$", "", deck)
-            deck = deck.replace("VBIAS CV 0 {BIAS}",
-                                "RLOADP GP 0 25k\nRLOADN GN 0 25k")
         deck = re.sub(r"(?s)(set numdgt=15\n).*?(\nquit)", r"\1" + control + r"\2", deck)
         (stage / "case.cir").write_text(deck)
         result = subprocess.run([executable, "-b", "case.cir"], cwd=stage,
@@ -50,8 +54,8 @@ def run_case(executable, condition, control, file):
         data_file = stage / file
         if result.returncode or not data_file.exists() or "error" in result.stderr.lower():
             raise RuntimeError(f"ngspice failed for {condition}\n{result.stdout}\n{result.stderr}")
-        data = np.loadtxt(data_file, skiprows=1)
-        if data.ndim != 2 or not np.all(np.isfinite(data)):
+        data = np.loadtxt(data_file, skiprows=1, ndmin=2)
+        if not data.size or not np.all(np.isfinite(data)):
             raise RuntimeError(f"Invalid ngspice data for {condition}")
         return data
 
@@ -101,7 +105,13 @@ wrdata tran.txt primary secondary v(gp)"""
     time = (start_cycle + 1 + np.arange(periods * points) / points) / frequency
     row = dict(frequency_hz=frequency, matched_source_dbu=level, source_ohms=600,
                pad_loss_db=loss, load=load, bias_v=bias, samples_per_period=points)
-    for name, wave in zip(("primary", "secondary", "positive_grid"), data[:, 1:].T):
+    row.update(harmonic_columns(data, time, periods, ("primary", "secondary", "positive_grid")))
+    return row
+
+
+def harmonic_columns(data, time, periods, names):
+    row = {}
+    for name, wave in zip(names, data[:, 1:].T, strict=True):
         samples = np.interp(time, data[:, 0], wave)
         amplitudes = 2 * np.abs(np.fft.rfft(samples)) / len(samples)
         fundamental = amplitudes[periods]
@@ -111,7 +121,6 @@ wrdata tran.txt primary secondary v(gp)"""
         for harmonic, fraction in zip(HARMONICS, fractions):
             row[f"{name}_k{harmonic}_norm_dbfs"] = voltage_db(fraction)
     return row
-
 
 def write_csv(path, rows):
     with path.open("w", newline="") as output:
@@ -140,12 +149,12 @@ def plot_ac(rows, destination):
     plt.close(fig)
 
 
-def plot_harmonics(rows, destination):
+def plot_harmonics(rows, destination, node="secondary", title=None):
     fig, axes = plt.subplots(3, 3, figsize=(12, 8.5), sharex=True, sharey=True, layout="constrained")
     for axis, level in zip(axes.flat, LEVELS):
         row = next(row for row in rows if row["frequency_hz"] == 1000
                    and row["matched_source_dbu"] == level and row["pad_loss_db"] == 20)
-        harmonics = np.array([row[f"secondary_k{k}_norm_dbfs"] for k in HARMONICS])
+        harmonics = np.array([row[f"{node}_k{k}_norm_dbfs"] for k in HARMONICS])
         plotted = harmonics >= -100
         axis.vlines([1], -100, [0], color="#efab48", linewidth=1.8)
         axis.vlines(HARMONICS[plotted], -100, harmonics[plotted], color="#ffd385", linewidth=1.5)
@@ -155,7 +164,7 @@ def plot_harmonics(rows, destination):
         axis.set(xlim=(.5, 20.5), ylim=(-100, 0), xticks=[1, 2, 4, 8, 12, 16, 20])
     fig.supxlabel("Harmonic order")
     fig.supylabel("Normalized level (dBFS)")
-    fig.suptitle("UA 176T T1 secondary · 1 kHz · 20 dB pad · fundamental = 0 dBFS")
+    fig.suptitle(title or "UA 176T T1 secondary · 1 kHz · 20 dB pad · fundamental = 0 dBFS")
     fig.savefig(destination, dpi=150)
     plt.close(fig)
 
