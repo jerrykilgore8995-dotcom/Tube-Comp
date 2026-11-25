@@ -128,5 +128,33 @@ int main(int argc, char**)
         if (!std::isfinite(measured) || std::abs(measured - attenuation) > .05)
             return 6;
     }
+    // Compare the fundamental through the whole circuit with limiting off.
+    knobs.output = 10;
+    knobs.limiting = 0;
+    double midband = 0;
+    for (int frequency : {1000, 30, 50, 100, 500, 3000, 5000, 10000, 15000, 18000, 19500, 20000}) {
+        if (!simulator.prepare(rate, knobs))
+            return 9;
+        constexpr int capture = rate / 10;
+        double real = 0, imag = 0;
+        for (int i = 0; i < 5 * capture; ++i) {
+            const double phase = tau * frequency * i / rate;
+            const double sine = std::sin(phase);
+            double volts = 0, cv = 0;
+            if (!simulator.step(sourcePeak * sine, volts, cv))
+                return 9;
+            if (i >= 4 * capture) {
+                real += volts * sine;
+                imag += volts * std::cos(phase);
+            }
+        }
+        const double fundamental = std::hypot(real, imag);
+        if (frequency == 1000)
+            midband = fundamental;
+        const double relative = 20 * std::log10(fundamental / midband);
+        std::printf("Through response at %d Hz: %+.3f dB vs 1 kHz\n", frequency, relative);
+        if (!std::isfinite(relative) || std::abs(relative) > 1)
+            return 9;
+    }
     return missedDeadline ? 5 : 0;
 }

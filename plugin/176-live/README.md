@@ -5,8 +5,10 @@ directory into the Windows VST3 directory. The editor uses the 176 faceplate
 artwork. The original ngspice VST3 has a separate plug-in ID.
 
 The native audio engine compiles the averaged-supply 176 circuit equations
-from LiveSPICE. It factors the linear BDF2 network once per control setting
-and solves the coupled device currents per audio frame, in a mono circuit. The input and output pads,
+from LiveSPICE. For each control setting it precomputes a stiffly accurate
+linear state transition over one host sample, with source and device currents
+held over that interval. The nonlinear device currents are solved at the
+host sample rate. The input and output pads,
 detector mode, attack, release, and ratio affect the circuit. The left
 vernier position blends in dry signal, from 0% dry by default to 100% dry.
 The dry signal follows the modeled wet path's inverted polarity.

@@ -89,9 +89,12 @@ void plateLaw(double vp, double vg, double offset, double gridScale, double knee
 
 constexpr int deviceVoltages = portCount - 5;
 constexpr int observations = stateCount + portCount;
+static_assert(observations <= nodeCount);
 constexpr int filterInput = deviceCount + 2;
 constexpr int historyOffset = filterInput + 1;
 constexpr int columns = historyOffset + stateCount;
+constexpr int linearMapDoublings = 4;
+constexpr double sdirkGamma = .2928932188134524756; // 1 - 1/sqrt(2)
 
 ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtered)
 {
@@ -181,7 +184,7 @@ struct Live176::Circuit {
     std::array<double, observations * columns> response{};
     std::array<double, observations * columns> candidate{};
     std::array<double, columns> feed{};
-    std::array<double, stateCount> previous{}, older{};
+    std::array<double, stateCount> previous{};
     std::array<double, portCount> portBase{}, voltages{};
     std::array<double, deviceCount> deviceCurrent{}, oldDeviceCurrent{}, evaluation{}, residual{};
     std::array<double, deviceCount * deviceCount> jacobian{};
@@ -196,6 +199,26 @@ struct Live176::Circuit {
 
     Circuit() { ports(z.data()); }
 
+    // Compose an affine map F with itself, optionally keeping a weighted
+    // contribution from F. Each composed state map uses the same held sources.
+    void composeLinearMap(double weight) noexcept
+    {
+        for (int observation = 0; observation < observations; ++observation) {
+            const auto* row = candidate.data() + observation * columns;
+            auto* composed = rhs.data() + observation * columns;
+            std::copy_n(row, historyOffset, composed);
+            for (int column = historyOffset; column < columns; ++column)
+                composed[column] = (1 - weight) * row[column];
+            for (int state = 0; state < stateCount; ++state) {
+                const auto* transition = candidate.data() + (portCount + state) * columns;
+                const double coefficient = weight * row[historyOffset + state];
+                for (int column = 0; column < columns; ++column)
+                    composed[column] += coefficient * transition[column];
+            }
+        }
+        std::copy_n(rhs.data(), candidate.size(), candidate.data());
+    }
+
     bool setup(const LiveControls& next, bool dc)
     {
         a.fill(0); d.fill(0); b.fill(0);
@@ -204,13 +227,13 @@ struct Live176::Circuit {
         const double g = filtered ? std::tan(3.14159265358979323846 * frequency / rate) : 0;
         const double nextHpGain = g / (1 + g);
         stamp(electrical(next, nextHpGain, filtered), a.data(), d.data(), b.data());
-        const double scale = dc ? 0 : rate * .5;
+        const double scale = dc ? 0 : std::ldexp(rate, linearMapDoublings) / sdirkGamma;
         for (int row = 0; row < nodeCount; ++row) {
             std::copy_n(b.data() + row * historyOffset, historyOffset, rhs.data() + row * columns);
             for (int state = 0; state < stateCount; ++state) {
                 const double coefficient = d[row * stateCount + state] * scale;
                 rhs[row * columns + historyOffset + state] = coefficient;
-                a[row * nodeCount + stateIndices[state]] += 3 * coefficient;
+                a[row * nodeCount + stateIndices[state]] += coefficient;
             }
         }
         if (!eliminate(a.data(), rhs.data(), nodeCount, columns))
@@ -225,6 +248,18 @@ struct Live176::Circuit {
         for (int state = 0; state < stateCount; ++state)
             std::copy_n(rhs.data() + stateIndices[state] * columns, columns,
                         candidate.data() + (portCount + state) * columns);
+        if (!dc) {
+            // The stiffly accurate, two-stage SDIRK map is
+            // F(x + (1 - gamma)/gamma * (F(x) - x)). Square it to span one
+            // host sample. These are matrix operations during setup only.
+            // At run time the source and implicit device currents are held
+            // over the interval and the nonlinear solve runs at host rate.
+            composeLinearMap((1 - sdirkGamma) / sdirkGamma);
+            for (int pass = 0; pass < linearMapDoublings; ++pass)
+                composeLinearMap(1);
+        }
+        if (!std::all_of(candidate.begin(), candidate.end(), [](double value) { return std::isfinite(value); }))
+            return false;
         response.swap(candidate);
         hpGain = nextHpGain;
         if (next.sidechainHz <= 0)
@@ -240,8 +275,7 @@ struct Live176::Circuit {
         feed[0] = supply;
         feed[1] = audio;
         feed[filterInput] = hpState;
-        for (int i = 0; i < stateCount; ++i)
-            feed[historyOffset + i] = 4 * previous[i] - older[i];
+        std::copy(previous.begin(), previous.end(), feed.begin() + historyOffset);
         for (int port = 0; port < deviceVoltages; ++port) {
             const auto* row = response.data() + port * columns;
             portBase[port] = row[0] * feed[0] + row[1] * feed[1]
@@ -324,7 +358,38 @@ struct Live176::Circuit {
         }
     }
 
-    bool newton(int budget, bool predict)
+    void evaluateCurrents(const std::array<double, deviceCount>& currents) noexcept
+    {
+        for (int port = 0; port < deviceVoltages; ++port) {
+            const auto* row = response.data() + port * columns + 2;
+            voltages[port] = portBase[port] + dot<deviceCount>(row, currents.data());
+        }
+        devicesAt<false>(voltages.data(), evaluation.data());
+    }
+
+    double backtrack(const std::array<double, deviceCount>& currents, double damping, double error) noexcept
+    {
+        std::array<double, deviceCount> trial{}, scales{};
+        for (int i = 0; i < deviceCount; ++i)
+            scales[i] = 1e-8 + 3e-5 * std::abs(evaluation[i]);
+        while (damping >= .001) {
+            for (int i = 0; i < deviceCount; ++i)
+                trial[i] = currents[i] + damping * residual[i];
+            evaluateCurrents(trial);
+            double trialError = 0;
+            for (int i = 0; i < deviceCount; ++i) {
+                const double difference = std::abs(evaluation[i] - trial[i]) / scales[i];
+                trialError = std::max(trialError, std::isfinite(difference)
+                    ? difference : std::numeric_limits<double>::infinity());
+            }
+            if (trialError < error)
+                break;
+            damping *= .5;
+        }
+        return damping;
+    }
+
+    bool newton(int budget, bool predict, bool useLineSearch = false)
     {
         auto next = deviceCurrent;
         if (predict)
@@ -332,11 +397,7 @@ struct Live176::Circuit {
                 next[i] += (controls.limiting > .5 ? .9 : .3) * (deviceCurrent[i] - oldDeviceCurrent[i]);
         double previousError = std::numeric_limits<double>::infinity();
         for (int iteration = 0; iteration < budget; ++iteration) {
-            for (int port = 0; port < deviceVoltages; ++port) {
-                const auto* row = response.data() + port * columns + 2;
-                voltages[port] = portBase[port] + dot<deviceCount>(row, next.data());
-            }
-            devicesAt<false>(voltages.data(), evaluation.data());
+            evaluateCurrents(next);
             double error = 0;
             for (int i = 0; i < deviceCount; ++i) {
                 residual[i] = evaluation[i] - next[i];
@@ -372,6 +433,10 @@ struct Live176::Circuit {
                         damping = std::min(damping, .5 / dv);
                 }
             }
+            // Use a residual line search on the full-Newton retry. Trial
+            // currents never advance the electrical state or the audio clock.
+            if (useLineSearch)
+                damping = backtrack(next, damping, error);
             for (int i = 0; i < deviceCount; ++i)
                 next[i] += damping * residual[i];
         }
@@ -387,7 +452,9 @@ struct Live176::Circuit {
     bool advance(double audio, double supply, int budget, double& output, double& cv) noexcept
     {
         preparePorts(audio, supply);
-        if ((!configured || !newton(std::min(budget, controls.limiting > .5 ? 7 : 14), true)) && !newton(budget, false))
+        if ((!configured || !newton(std::min(budget, controls.limiting > .5 ? 7 : 14), true))
+            && !newton(budget, false)
+            && (!configured || !newton(budget, false, true)))
             return false;
         std::copy(deviceCurrent.begin(), deviceCurrent.end(), feed.begin() + 2);
         output = observe(deviceVoltages);
@@ -398,7 +465,6 @@ struct Live176::Circuit {
             hpState += 2 * hpGain * (observe(deviceVoltages + 4) - hpState);
         else if (!configured && controls.sidechainHz > 0)
             hpState = observe(deviceVoltages + 4);
-        older = previous;
         for (int state = 0; state < stateCount; ++state)
             previous[state] = observe(portCount + state);
         return std::isfinite(output) && std::isfinite(cv);
@@ -412,7 +478,6 @@ bool Live176::prepare(double rate, const LiveControls& knobs)
     circuit->rate = rate;
     circuit->deviceCurrent.fill(0);
     circuit->previous.fill(0);
-    circuit->older.fill(0);
     circuit->configured = false;
     circuit->hpState = 0;
     if (!circuit->setup(knobs, true))
@@ -421,7 +486,6 @@ bool Live176::prepare(double rate, const LiveControls& knobs)
     for (int i = 1; i <= 40; ++i)
         if (!circuit->advance(0, i / 40., 60, audio, cv))
             return false;
-    circuit->older = circuit->previous;
     circuit->configured = circuit->setup(knobs, false);
     return circuit->configured;
 }
