@@ -112,7 +112,7 @@ capacitances.
 | Path | Connection in the deck |
 | --- | --- |
 | T2 and V2 bias | T2 ends connect to the V2 grids, with R15/R17 returning to ground. The V2 cathodes use R19/R20 and the shared R16 return. |
-| V2 to V3 | R23/R24 feed the V2 plates from the decoupled V2 supply. C3/C4 couple each plate to its V3 grid. R27/R29 are the grid returns. |
+| V2 to V3 | R23/R24 feed the V2 plates from the decoupled V2 supply. C3/C4 are 0.1 µF each and couple each plate to its V3 grid. C-10476 specifies 0.047 µF. R27/R29 are the grid returns. |
 | V3 cathodes | Both cathodes use the shared R28 return. |
 | Feedback | R22/R18 and R25/R21 divide the corresponding V3 plate voltages. C1/C2 return the AC signal to the V2 cathodes. |
 | Main B+ | The fixed 315 V bench source connects at T3 CT, C9B and R26, following the published correction to C-10476. R26 supplies the V2 rail, with C9A at the V2 end. |
