@@ -88,5 +88,34 @@ int main(int argc, char**)
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }
+    // Change the pad during playback and measure across its output load.
+    auto& simulator = simulators[0];
+    ua176::Controls knobs;
+    knobs.output = 1;
+    if (!simulator.prepare(rate, knobs))
+        return 6;
+    double openRms = 0;
+    int sample = 0;
+    for (int attenuation : {0, 2, 10, 20, 30, 40}) {
+        knobs.output = std::pow(10.f, attenuation / 20.f);
+        if (!simulator.setControls(knobs))
+            return 6;
+        double power = 0;
+        constexpr int window = rate / 5;
+        for (int n = 0; n < 3 * window; ++n, ++sample) {
+            double value = 0, cv = 0;
+            if (!simulator.step(sourcePeak * std::sin(tau * 1000 * sample / rate), value, cv))
+                return 6;
+            if (n >= 2 * window)
+                power += value * value;
+        }
+        const double rms = std::sqrt(power / window);
+        if (attenuation == 0)
+            openRms = rms;
+        const double measured = 20 * std::log10(openRms / rms);
+        std::printf("Output pad: %d dB selected, %.3f dB measured\n", attenuation, measured);
+        if (!std::isfinite(measured) || std::abs(measured - attenuation) > .05)
+            return 6;
+    }
     return missedDeadline ? 5 : 0;
 }

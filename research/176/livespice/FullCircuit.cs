@@ -7,7 +7,8 @@ internal sealed record Settings(double Input = 10, double Output = 1,
 
 internal sealed partial class FrontEnd
 {
-    public Expression Output => Node("OUT_P").V - Node("T3_N").V;
+    private string outputReturn = "T3_N";
+    public Expression Output => Node("OUT_P").V - Node(outputReturn).V;
     public Expression ControlVoltage => Node("CV").V;
     public Expression BPlus => Node("T3_CT").V;
     public Expression Regulated => Node("REG").V;
@@ -187,13 +188,12 @@ internal sealed partial class FrontEnd
         AdjustableR("T3_P", "OUT_FEED", Math.Max(.01, 300 * settings.OutputVernier), "outVernier");
         if (settings.Output > 1 || export)
         {
-            Pad("OUT_FEED", "T3_N", "OUT_P", "OUT_N", "OUTPUT", settings.Output);
-            R("OUT_P", "OUT_N", 600);
+            outputReturn = "OUT_N";
+            Pad("OUT_FEED", "T3_N", "OUT_P", outputReturn, "OUTPUT", settings.Output);
         }
         else
             R("OUT_FEED", "OUT_P", .01);
-        if (settings.Output == 1 && !export)
-            R("OUT_P", "T3_N", 600);
+        R("OUT_P", outputReturn, 600);
         V("OUT_REF", "T3_N", "0", 0);
     }
 
