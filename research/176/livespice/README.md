@@ -37,6 +37,35 @@ warm-up, for each of 0 V, −2 V and −4 V control bias. Harmonic distortion us
 K2–K20. Setup and the first block are timed separately because LiveSPICE
 generates and compiles the transient function before steady processing.
 
-This is a headless bench. The live line amplifier, T3, 6AL5 feedback,
-power supply, and VST3 host integration are outside this fixture.
-The existing ngspice VST3 remains the full offline reference.
+The front-end and closed-loop fixtures are headless. The existing ngspice
+VST3 is the offline reference.
+
+## Closed-loop circuit
+
+The full fixture connects T2 directly to the 12AX7 grids, runs both 12AX7 and
+12BH7 halves with their cathode returns, and models the 180 kΩ / 180 kΩ /
+0.47 µF plate-to-cathode feedback paths. It uses 0.1 µF for both coupling
+capacitors, the three coupled T3 windings and their reflected detector load,
+the two 6AL5 sections, the ratio-selected tap and bias divider, and the timing
+network back to the 6BC8 grids. The supply is configurable for comparison.
+
+The averaged supply uses 439.417 V and 678.671 Ω in place of the T4,
+GZ34 and choke section. Those parameters fit the warmed powered ngspice
+deck at 55, 60 and 65 mA drawn through R44. The 60 µF filter, R44, local
+decoupling, R43 and 33 Ω lit-state 0B2 resistance preserve load-dependent sag
+and regulation. This model represents the warmed supply and averages out
+rectifier ripple and turn-on behavior.
+
+```sh
+dotnet research/176/livespice/bin/Release/net8.0/LiveSpice176.dll 1 full ratio=2
+dotnet research/176/livespice/bin/Release/net8.0/LiveSpice176.dll 1 full ratio=2 powered
+dotnet research/176/livespice/bin/Release/net8.0/LiveSpice176.dll 1 full ratio=4 off
+```
+
+Use `level` for matched-source dBu, `input-db` and `output-db` for pad
+attenuation, and `input-vernier`, `output-vernier`, `attack` and `release`
+for normalized settings. Ratio accepts 2, 4, 8 or 12. Setpoints are fixed per
+bench run. The grid diodes use fixed zero-bias capacitance as in the
+front-end fixture. The test reports final steady-state voltages and audio
+after 5.2 seconds of simulation, and times processing separately from
+LiveSPICE equation generation and first-block compilation.

@@ -1,4 +1,4 @@
-name: Benchmark 176 LiveSPICE front end
+name: Benchmark 176 LiveSPICE circuit
 on:
   push:
     branches: [ua176-input-stage]
@@ -34,4 +34,8 @@ jobs:
           foreach ($factor in 1, 2) {
             dotnet $bench $factor
             if ($LASTEXITCODE -ne 0) { throw "LiveSPICE bench failed at ${factor}x" }
+          }
+          foreach ($supply in "averaged", "powered") {
+            dotnet $bench 1 full ratio=2 $supply
+            if ($LASTEXITCODE -ne 0) { throw "176 closed-loop bench failed with ${supply} supply" }
           }

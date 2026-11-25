@@ -1,7 +1,7 @@
 using Circuit;
 using ComputerAlgebra;
 
-internal sealed class FrontEnd
+internal sealed partial class FrontEnd
 {
     private readonly Dictionary<string, Node> nodes = new();
     private readonly Analysis analysis = new();
@@ -63,10 +63,15 @@ internal sealed class FrontEnd
         C(m, om, cw);
     }
 
-    private void Tube6BC8(string plate, string grid, string cathode)
+    private void Tube6BC8(string plate, string grid, string cathode, bool fullCircuit)
     {
-        var vp = Node(plate).V - Node(cathode).V;
-        var vg = Node(grid).V - Node(cathode).V;
+        Expression vp = Node(plate).V - Node(cathode).V;
+        Expression vg = Node(grid).V - Node(cathode).V;
+        if (fullCircuit)
+        {
+            vp = analysis.AddUnknownEqualTo("VPK_" + plate, vp);
+            vg = analysis.AddUnknownEqualTo("VGK_" + plate, vg);
+        }
         var x = 1.794225622 * (1 + 54.16463004 * vg * Binary.Power(922.2704089 + vp * vp, -.5));
         var softplus = Call.If(x > 50, x, Call.Ln(1 + Call.Exp(x)));
         var e = vp * softplus / 1.794225622;
@@ -85,25 +90,28 @@ internal sealed class FrontEnd
         C(junction, cathode, 1e-12);
     }
 
-    // Mirrors spice/176/gain.cir with the normal HI grid wiring and centered trims.
-    public Analysis Build(double bias)
+    public Analysis Build(double bias) => Build(bias, null);
+
+    private Analysis Build(double bias, Settings settings)
     {
         analysis.PushContext(null);
         Ground.Analyze(analysis, Node("0"));
         VoltageSource.Analyze(analysis, "VDRIVE", Node("DRIVEP"), Node("DRIVEN"), Drive,
             Arrow.New(Drive.Evaluate(Component.t, 0), 0));
-        VoltageSource.Analyze(analysis, "VBPLUS", Node("REG"), Node("0"), 108);
-        VoltageSource.Analyze(analysis, "VCV", Node("CV"), Node("0"), bias);
+        if (settings == null)
+        {
+            V("VBPLUS", "REG", "0", 108);
+            V("VCV", "CV", "0", bias);
+        }
+        else
+        {
+            Supply(settings.Powered);
+        }
         R("DRIVEN", "0", 1e9);
         R("DRIVEP", "INP", 300);
         R("DRIVEN", "INN", 300);
-        const double arm = 300.0 * 9 / 11; // 20 dB, balanced 600 ohm pad
-        R("INP", "MIDP", arm);
-        R("INN", "MIDN", arm);
-        R("MIDP", "PAD_P", arm);
-        R("MIDN", "TN", arm);
-        R("MIDP", "MIDN", 12000.0 / 99);
-        R("PAD_P", "TP", 1e-6);
+        Pad("INP", "INN", "PAD_P", "TN", "INPUT", settings?.Input ?? 10);
+        R("PAD_P", "TP", Math.Max(.000001, 300 * (settings?.InputVernier ?? 0)));
         Transformer("TP", "TN", "SEC_P", "SEC_N", "T1", 10, 52, 3900, 3.3, .002, 100e3, 92e-12, 15e-12);
 
         R("SEC_P", "TAP_P", 10e3);
@@ -116,8 +124,8 @@ internal sealed class FrontEnd
         R("TAP_N", "GN", 1e12);
         C("CV", "0", .1e-6);
 
-        Tube6BC8("PA", "GP", "KA");
-        Tube6BC8("PB", "GN", "KB");
+        Tube6BC8("PA", "GP", "KA", settings != null);
+        Tube6BC8("PB", "GN", "KB", settings != null);
         R("KA", "KRETURN", 50);
         R("KB", "KRETURN", 50);
         R("KA", "KRETURN", 47);
@@ -136,11 +144,19 @@ internal sealed class FrontEnd
         Transformer("PA", "PB", "NEXT_P", "NEXT_N", "T2", 1.0 / 2.3, 10e3, 2900,
                     346, .10, 400e3, 60e-12, 15e-12);
 
-        R("NEXT_P", "NEXT_RETURN", 20e3);
-        R("NEXT_N", "NEXT_RETURN", 20e3);
-        C("NEXT_P", "NEXT_RETURN", 7e-12);
-        C("NEXT_N", "NEXT_RETURN", 7e-12);
-        R("NEXT_RETURN", "0", .001);
+        if (settings == null)
+        {
+            R("NEXT_P", "NEXT_RETURN", 20e3);
+            R("NEXT_N", "NEXT_RETURN", 20e3);
+            C("NEXT_P", "NEXT_RETURN", 7e-12);
+            C("NEXT_N", "NEXT_RETURN", 7e-12);
+            R("NEXT_RETURN", "0", .001);
+        }
+        else
+        {
+            LineStage(settings);
+            Detector(settings);
+        }
         analysis.PopContext();
         return analysis;
     }

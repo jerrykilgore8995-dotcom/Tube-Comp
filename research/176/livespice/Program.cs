@@ -15,6 +15,12 @@ var oversample = args.Length == 0 ? 1 : int.Parse(args[0]);
 if (oversample is < 1 or > 4)
     throw new ArgumentOutOfRangeException(nameof(oversample));
 
+if (args.Length > 1 && args[1] == "full")
+{
+    FullBench.Run(sampleRate, blockSize, oversample, peak, args.Skip(2).ToArray());
+    return;
+}
+
 foreach (var bias in new double[] { 0, -2, -4 })
 {
     var timeStep = (Expression)((Real)1 / (sampleRate * oversample));
