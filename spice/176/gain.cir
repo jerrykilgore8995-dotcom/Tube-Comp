@@ -3,7 +3,7 @@ UA 176T input and C-10476 6BC8 variable-mu stage
 .include ../models/tube_cells.lib
 
 .param AMP=0.109601551 FREQ=1k SOURCE=600 LOSSDB=20 BIAS=0
-.param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108
+.param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108 GSTOP=1k
 VDRIVE DRIVEP DRIVEN DC 0 AC 1 SIN(0 {AMP} {FREQ})
 RCOMMON DRIVEN 0 1G
 RSOURCEP DRIVEP INP {SOURCE/2}
@@ -16,10 +16,14 @@ R2 SEC_P TAP_P 10k
 R3 TAP_P CV 6.8k
 R4 CV TAP_N 6.8k
 R5 TAP_N SEC_N 10k
-RG_HI_P SEC_P GP {ternary_fcn(HIGH,1m,1T)}
-RG_LO_P TAP_P GP {ternary_fcn(HIGH,1T,1m)}
-RG_HI_N SEC_N GN {ternary_fcn(HIGH,1m,1T)}
-RG_LO_N TAP_N GN {ternary_fcn(HIGH,1T,1m)}
+RG_HI_P SEC_P GRID_FEED_P {ternary_fcn(HIGH,1m,1T)}
+RG_LO_P TAP_P GRID_FEED_P {ternary_fcn(HIGH,1T,1m)}
+RG_HI_N SEC_N GRID_FEED_N {ternary_fcn(HIGH,1m,1T)}
+RG_LO_N TAP_N GRID_FEED_N {ternary_fcn(HIGH,1T,1m)}
+
+* Provisional series grid stoppers at the 6BC8 pins.
+RSTOP_P GRID_FEED_P GP {GSTOP}
+RSTOP_N GRID_FEED_N GN {GSTOP}
 
 * Normal test switch position. Limiting off grounds CV through the bench
 * source at BIAS=0. Negative values drive CV externally for static sweeps.

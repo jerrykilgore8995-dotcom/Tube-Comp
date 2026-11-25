@@ -52,6 +52,10 @@ transformer. The 176T attenuator is carried forward at the front end.
 - R2–R5 form the two 10 kΩ / 6.8 kΩ sections around the control-voltage node.
   HI selects the ends of T1 and LO selects the divider taps. The bench holds
   the test switch in normal operation and uses an external fixed voltage at C5.
+- Each 6BC8 grid has a series stopper after the HI/LO selector. The deck uses
+  1 kΩ per grid (`GSTOP`) as a provisional value. No separate stopper value
+  is legible in the available C-10476 scan. The grid capacitances and grid
+  current are connected on the tube side of each resistor.
 - The 0B2 rail is represented by its nominal 108 V DC boundary. R12 and R14
   feed the two plates through the R13 balance pot. The T2 high-impedance winding
   is connected across the plates. The cathode return includes R6–R11, with the
