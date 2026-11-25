@@ -110,7 +110,8 @@ struct SpiceStream::Impl {
         else if (equal("vrb")) *result = controls.biasResistance;
         else if (equal("vatt")) *result = controls.attack;
         else if (equal("vrel")) *result = controls.release;
-        else if (equal("vlimit")) *result = controls.limiting;
+        else if (equal("vlimit"))
+            *result = 1. + (controls.limiting - 1.) * std::clamp(position / 220., 0., 1.);
         else *result = 0;
         return 0;
     }
@@ -185,9 +186,7 @@ struct SpiceStream::Impl {
             || sync(voltage, nullptr, nullptr, nullptr, this) != 0)
             return false;
 
-        std::istringstream source(poweredDeck);
-        std::vector<std::string> lines;
-        for (std::string line; std::getline(source, line);) lines.push_back(line);
+        std::vector<std::string> lines(std::begin(poweredDeckLines), std::end(poweredDeckLines));
         lines.pop_back();
         const auto step = 1 / (sampleRate * 2);
         std::ostringstream transient;

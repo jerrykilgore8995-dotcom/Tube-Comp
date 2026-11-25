@@ -1,6 +1,7 @@
 """Flatten the measured SPICE deck and expose its physical controls to the host."""
 import argparse
 import math
+import json
 from pathlib import Path
 import re
 
@@ -32,7 +33,7 @@ def main():
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     lines = "\n".join(flatten(args.deck)).split("\n.control", 1)[0]
-    lines = re.sub(r"(?m)^VDRIVE DRIVEP.*", "VDRIVE DRIVEP DRIVEN DC 0 EXTERNAL", lines)
+    lines = re.sub(r"(?m)^VDRIVE DRIVEP.*", "VDRIVE DRIVEP DRIVEN EXTERNAL", lines)
     lines = lines.replace("RCOMMON DRIVEN 0 1G", "RCOMMON DRIVEN 0 100")
     lines = lines.replace("XPAD INP INN PAD_P TN UA176T_PAD LOSSDB={LOSSDB}",
                           "XPAD INP INN PAD_P TN PIN UA176_HOST_PAD")
@@ -47,9 +48,10 @@ def main():
     lines = lines.replace("ETAPA TAPA CT", "ETAPA TAPA_INT CT").replace("ETAPB TAPB CT", "ETAPB TAPB_INT CT")
     lines = lines.replace(".ends UA176_T3", "VTAPA TAPA_INT TAPA 0\nVTAPB TAPB_INT TAPB 0\n.ends UA176_T3")
     lines = lines.replace("R_S5 DET_BIAS 0 {RATIO_R}", "R_S5 DET_BIAS 0 R={v(rbias)}")
-    lines = lines.replace("ternary_fcn(LIMITING,1m,1T)", "ternary_fcn(v(comp_enable)>.5,.01,1e12)")
-    lines = lines.replace("ternary_fcn(LIMITING,1T,1m)", "ternary_fcn(v(comp_enable)>.5,1e12,.01)")
-    lines = re.sub(r"(?m)^(R_S4_\w+ \w+ \w+) \{(.*)\}$", r"\1 R={\2}", lines)
+    lines = re.sub(r"(?m)^R_S4_ON .*$",
+                   "BS4ON CV ATK_IN I={v(cv,atk_in)*(1e-9+.01*v(comp_enable))}", lines)
+    lines = re.sub(r"(?m)^R_S4_OFF .*$",
+                   "BS4OFF CV 0 I={v(cv)*(1e-9+.01*(1-v(comp_enable)))}", lines)
     lines = lines.replace("{max(1m,25k*(1-ATTACK))}", "R={max(.01,25k*(1-v(atk)))}")
     lines = lines.replace("{max(1m,5meg*(1-RELEASE))}", "R={max(.01,5meg*(1-v(rel)))}")
     lines = lines.replace("{max(1m,5meg*RELEASE)}", "R={max(.01,5meg*v(rel))}")
@@ -57,6 +59,7 @@ def main():
                           "R30 T3_P OUT_FEED R={max(.01,300*v(poutvernier))}\n"
                           "XOUTPUT OUT_FEED T3_N OUT_P OUT_N POUT UA176_HOST_PAD")
     lines = re.sub(r"(?ms)^\.subckt UA176_6AL5 .*?^\.ends UA176_6AL5", detector_cell(), lines)
+    lines = lines.replace("reltol=1e-4 abstol=1e-10 vntol=1e-5", "reltol=1e-4 abstol=1e-10 vntol=1e-5 trtol=7")
     lines = lines.replace("RLOAD OUT_P T3_N", "RLOAD OUT_P OUT_N")
     lines = lines.replace("VOUT_REF T3_N 0 0", "VOUT_REF T3_N 0 0\nEOBS AUDIO 0 OUT_P OUT_N 1")
     lines += """
@@ -68,19 +71,26 @@ ROP MP OP R={max(.01,300*(v(CONTROL)-1)/(v(CONTROL)+1))}
 RON MN ON R={max(.01,300*(v(CONTROL)-1)/(v(CONTROL)+1))}
 RSH MP MN R={1200*v(CONTROL)/max(1e-9,v(CONTROL)*v(CONTROL)-1)}
 .ends UA176_HOST_PAD
-VPIN PIN 0 DC 10 EXTERNAL
-VPOUT POUT 0 DC 3.16227766 EXTERNAL
-VPINVERNIER PINVERNIER 0 DC 0 EXTERNAL
-VPOUTVERNIER POUTVERNIER 0 DC 0 EXTERNAL
-VRS RSEL 0 DC .29 EXTERNAL
-VRB RBIAS 0 DC 6800 EXTERNAL
-VATT ATK 0 DC .5 EXTERNAL
-VREL REL 0 DC .8 EXTERNAL
-VLIMIT COMP_ENABLE 0 DC 1 EXTERNAL
+* EXTERNAL callbacks provide the whole voltage, including the DC value.
+VPIN PIN 0 EXTERNAL
+VPOUT POUT 0 EXTERNAL
+VPINVERNIER PINVERNIER 0 EXTERNAL
+VPOUTVERNIER POUTVERNIER 0 EXTERNAL
+VRS RSEL 0 EXTERNAL
+VRB RBIAS 0 EXTERNAL
+VATT ATK 0 EXTERNAL
+VREL REL 0 EXTERNAL
+VLIMIT COMP_ENABLE 0 EXTERNAL
+.ic v(rect)=400 v(filter)=389 v(t3_ct)=315 v(reg)=108 v(v2_supply)=285
+.ic v(det_bias)=8.27 v(det_k1)=8.27 v(det_k2)=8.27
 .save v(audio) v(cv)
 .end
 """
-    args.output.write_text('#pragma once\ninline constexpr auto poweredDeck = R"NET(' + lines + ')NET";\n')
+    # MSVC limits the length of an individual C++ string literal.
+    literals = ",\n".join(json.dumps(line, ensure_ascii=True) for line in lines.splitlines())
+    args.output.write_text("#pragma once\ninline constexpr const char* poweredDeckLines[] = {\n"
+                           + literals + "\n};\n")
+
 
 
 if __name__ == "__main__":
