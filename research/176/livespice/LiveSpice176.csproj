@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <Target Name="CheckLiveSpice" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(LiveSpiceRoot)/Circuit/Analysis.cs') Or !Exists('$(LiveSpiceRoot)/ComputerAlgebra/ComputerAlgebra/ComputerAlgebra.csproj')"
+      Text="Set LiveSpiceRoot to the absolute path of a recursive LiveSPICE checkout." />
+  </Target>
+  <ItemGroup>
+    <Using Include="Util" />
+    <Compile Include="$(LiveSpiceRoot)/Circuit/**/*.cs;$(LiveSpiceRoot)/Util/**/*.cs;$(LiveSpiceRoot)/ComputerAlgebra/ComputerAlgebra/**/*.cs"
+      Exclude="$(LiveSpiceRoot)/**/obj/**/*.cs;$(LiveSpiceRoot)/**/bin/**/*.cs;$(LiveSpiceRoot)/ComputerAlgebra/ComputerAlgebra/Utils/CustomAttribute.cs" />
+  </ItemGroup>
+</Project>

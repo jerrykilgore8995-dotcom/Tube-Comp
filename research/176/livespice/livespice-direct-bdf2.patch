@@ -1,0 +1,59 @@
+diff --git a/Circuit/Simulation/Simulation.cs b/Circuit/Simulation/Simulation.cs
+index bac949f..daff1d1 100644
+--- a/Circuit/Simulation/Simulation.cs
++++ b/Circuit/Simulation/Simulation.cs
+@@ -349,11 +349,7 @@ private Action<int, double, double[][], double[][]> DefineProcess()
+                                 }, LinqExpr.GreaterThan(it, Zero));
+
+-                                //// bool failed = false
+-                                //LinqExpr failed = Decl(code, code, "failed", LinqExpr.Constant(false));
+-                                //for (int i = 0; i < eqs.Length; ++i)
+-                                //    // failed |= |JxFi| > epsilon
+-                                //    code.Add(LinqExpr.OrAssign(failed, LinqExpr.GreaterThan(Abs(eqs[i].ToExpression().Compile(map)), LinqExpr.Constant(1e-3))));
+-
+-                                //code.Add(LinqExpr.IfThen(failed, ThrowSimulationDiverged(n)));
++                                // Fail the research bench if the Newton budget was exhausted.
++                                // The upstream output check catches only non-finite audio.
++                                code.Add(LinqExpr.IfThen(LinqExpr.Equal(it, Zero), ThrowSimulationDiverged(n)));
+                             }
+                         }
+diff --git a/Circuit/Simulation/TransientSolution.cs b/Circuit/Simulation/TransientSolution.cs
+index 5bcd775..66eb1ac 100644
+--- a/Circuit/Simulation/TransientSolution.cs
++++ b/Circuit/Simulation/TransientSolution.cs
+@@ -124,21 +124,20 @@ public static TransientSolution Solve(Analysis Analysis, Expression TimeStep, IE
+             Log.WriteLine(MessageType.Info, "Performing transient analysis...");
+
+-            SystemOfEquations system = new SystemOfEquations(mna.Substitute(SinglePoleSwitch.ExcludeOpen).OfType<Equal>(), dy_dt.Concat(y));
+-
+-            // Solve the diff eq for dy/dt and integrate the results.
+-            system.RowReduce(dy_dt);
+-            system.BackSubstitute(dy_dt);
+-            LogExpressions(Log, MessageType.Verbose, "Differential equations:", system.Where(i => i.DependsOn(dy_dt)).Select(i => Equal.New(i, 0)));
+-            IEnumerable<Equal> integrated = system.Solve(dy_dt)
+-                .NDIntegrate(t, h, IntegrationMethod.BackwardDifferenceFormula2)
+-                .Select(i => Equal.New(i.Left, i.Right)).Buffer();
+-            system.AddRange(integrated);
+-            LogExpressions(Log, MessageType.Verbose, "Integrated solutions:", integrated);
+-
++            // Stamp BDF2 directly into the MNA form. Eliminating derivatives
++            // first requires an invertible capacitance matrix, which floating
++            // and redundant capacitor loops need not have.
++            IEnumerable<Arrow> bdf = y
++                .Select(v => new { Value = v, Derivative = D(v, t) })
++                .Where(state => dy_dt.Contains(state.Derivative))
++                .Select(state =>
++                {
++                    Expression v = state.Value;
++                    return Arrow.New(state.Derivative,
++                        (3 * v - 4 * v.Substitute(t, t - h) + v.Substitute(t, t - 2 * h)) / (2 * h));
++                });
++            SystemOfEquations system = new SystemOfEquations(
++                mna.Substitute(bdf.Append(SinglePoleSwitch.ExcludeOpen)).OfType<Equal>(), y);
+             LogExpressions(Log, MessageType.Verbose, "Discretized system:", system.Select(i => Equal.New(i, 0)));
+
+-            if (system.DependsOn(dy_dt))
+-                throw new Exception("Failed to eliminate differentials from system of equations.");
+-
+             // Solving the system...
+             List<SolutionSet> solutions = new List<SolutionSet>();

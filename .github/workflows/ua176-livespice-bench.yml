@@ -1,0 +1,37 @@
+name: Benchmark 176 LiveSPICE front end
+on:
+  push:
+    branches: [ua176-input-stage]
+    paths: ["research/176/livespice/**", ".github/workflows/ua176-livespice-bench.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Prepare pinned LiveSPICE sources
+        shell: pwsh
+        run: |
+          $live = Join-Path $env:RUNNER_TEMP "176-LiveSPICE"
+          git clone https://github.com/dsharlet/LiveSPICE.git $live
+          git -C $live checkout b2a4bb0ec4d3c4cdb158530ab4b20c13207030f7
+          git -C $live submodule update --init --recursive
+          git -C $live apply (Join-Path $PWD "research/176/livespice/livespice-direct-bdf2.patch")
+          if ($LASTEXITCODE -ne 0) { throw "Could not apply LiveSPICE bench patch" }
+          "UA176_LIVESPICE_ROOT=$live" >> $env:GITHUB_ENV
+      - name: Compare 1x and 2x processing at 44.1 kHz
+        shell: pwsh
+        run: |
+          dotnet build research/176/livespice -c Release "-p:LiveSpiceRoot=$env:UA176_LIVESPICE_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw "LiveSPICE bench failed to build" }
+          $bench = "research/176/livespice/bin/Release/net8.0/LiveSpice176.dll"
+          foreach ($factor in 1, 2) {
+            dotnet $bench $factor
+            if ($LASTEXITCODE -ne 0) { throw "LiveSPICE bench failed at ${factor}x" }
+          }
