@@ -228,14 +228,14 @@ internal sealed partial class FrontEnd
         // through the same resistance while the branch is disconnected.
         if (export)
         {
-            AdjustableR("CV", "DOUBLE_CAP", 1.5e6, "doubleOn");
-            AdjustableR("DOUBLE_CAP", "0", 1.5e6, "doubleOff");
-            C("DOUBLE_CAP", "0", .22e-6);
+            AdjustableR("CV", "DOUBLE_CAP", 200e3, "doubleOn");
+            AdjustableR("DOUBLE_CAP", "0", 200e3, "doubleOff");
+            C("DOUBLE_CAP", "0", .20e-6);
         }
         else if (settings.Double)
         {
-            R("CV", "DOUBLE_CAP", 1.5e6);
-            C("DOUBLE_CAP", "0", .22e-6);
+            R("CV", "DOUBLE_CAP", 200e3);
+            C("DOUBLE_CAP", "0", .20e-6);
         }
         AdjustableR("CV", "ATK_IN", settings.Limiting ? .001 : 1e12, "limitOn");
         AdjustableR("CV", "0", settings.Limiting ? 1e12 : .001, "limitOff");

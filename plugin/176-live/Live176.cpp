@@ -103,8 +103,8 @@ ElectricalControls electrical(const Controls& c)
     pad(c.output, p.OUTPUTArm, p.OUTPUTShunt);
     p.inVernier = 1 / std::max(.01, 300. * c.inputVernier);
     p.outVernier = 1 / std::max(.01, 300. * c.outputVernier);
-    p.doubleOn = c.doubleTiming ? 1 / 1.5e6 : 0;
-    p.doubleOff = c.doubleTiming ? 0 : 1 / 1.5e6;
+    p.doubleOn = c.doubleTiming ? 1 / 200e3 : 0;
+    p.doubleOff = c.doubleTiming ? 0 : 1 / 200e3;
     p.limitOn = c.limiting > .5 ? 1000. : 1e-12;
     p.limitOff = c.limiting > .5 ? 1e-12 : 1000.;
     p.tap = c.tap;
