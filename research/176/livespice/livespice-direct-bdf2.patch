@@ -4,7 +4,7 @@ index bac949f..daff1d1 100644
 +++ b/Circuit/Simulation/Simulation.cs
 @@ -349,11 +349,7 @@ private Action<int, double, double[][], double[][]> DefineProcess()
                                  }, LinqExpr.GreaterThan(it, Zero));
-
+ 
 -                                //// bool failed = false
 -                                //LinqExpr failed = Decl(code, code, "failed", LinqExpr.Constant(false));
 -                                //for (int i = 0; i < eqs.Length; ++i)
@@ -23,7 +23,7 @@ index 5bcd775..66eb1ac 100644
 +++ b/Circuit/Simulation/TransientSolution.cs
 @@ -124,21 +124,20 @@ public static TransientSolution Solve(Analysis Analysis, Expression TimeStep, IE
              Log.WriteLine(MessageType.Info, "Performing transient analysis...");
-
+ 
 -            SystemOfEquations system = new SystemOfEquations(mna.Substitute(SinglePoleSwitch.ExcludeOpen).OfType<Equal>(), dy_dt.Concat(y));
 -
 -            // Solve the diff eq for dy/dt and integrate the results.
@@ -51,7 +51,7 @@ index 5bcd775..66eb1ac 100644
 +            SystemOfEquations system = new SystemOfEquations(
 +                mna.Substitute(bdf.Append(SinglePoleSwitch.ExcludeOpen)).OfType<Equal>(), y);
              LogExpressions(Log, MessageType.Verbose, "Discretized system:", system.Select(i => Equal.New(i, 0)));
-
+ 
 -            if (system.DependsOn(dy_dt))
 -                throw new Exception("Failed to eliminate differentials from system of equations.");
 -

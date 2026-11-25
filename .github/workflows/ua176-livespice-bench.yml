@@ -19,10 +19,10 @@ jobs:
         shell: pwsh
         run: |
           $live = Join-Path $env:RUNNER_TEMP "176-LiveSPICE"
-          git clone https://github.com/dsharlet/LiveSPICE.git $live
+          git -c core.autocrlf=false clone https://github.com/dsharlet/LiveSPICE.git $live
           git -C $live checkout b2a4bb0ec4d3c4cdb158530ab4b20c13207030f7
           git -C $live submodule update --init --recursive
-          git -C $live apply (Join-Path $PWD "research/176/livespice/livespice-direct-bdf2.patch")
+          git -C $live apply --ignore-space-change (Join-Path $PWD "research/176/livespice/livespice-direct-bdf2.patch")
           if ($LASTEXITCODE -ne 0) { throw "Could not apply LiveSPICE bench patch" }
           "UA176_LIVESPICE_ROOT=$live" >> $env:GITHUB_ENV
       - name: Compare 1x and 2x processing at 44.1 kHz
