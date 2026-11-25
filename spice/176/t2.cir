@@ -1,0 +1,23 @@
+UA 176 T2 passive transformer reference
+.include input.lib
+
+* The default fixture drives the UTC catalog input (P-B) with the rated
+* winding impedances. Driving G-G instead is the UA orientation.
+.param SOURCE=15k LOAD=80k
+VDRIVE SOURCE_NODE 0 AC 1
+RDRIVE SOURCE_NODE IN {SOURCE}
+XT2 OUT 0 IN 0 UA176_T2
+RLOAD OUT 0 {LOAD}
+
+.control
+set wr_singlescale
+set wr_vecnames
+set numdgt=15
+ac dec 48 10 100k
+let gain = v(out)/v(source_node)
+let winding = v(out)/v(in)
+let zin = v(in)/(-i(vdrive))
+wrdata t2-ac.txt gain winding zin
+quit
+.endc
+.end

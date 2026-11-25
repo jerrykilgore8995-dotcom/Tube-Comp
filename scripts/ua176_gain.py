@@ -42,6 +42,58 @@ wrdata dc.txt v(gp) v(gn) v(ka) v(kb) v(pa) v(pb) plate_a_ma plate_b_ma rail_ma"
     return rows
 
 
+def measure_trims(executable):
+    deck = (STAGE / "gain.cir").read_text()
+    control = """op
+wrdata trims.txt v(ka) v(kb) v(pa) v(pb) v(meter)"""
+    trims = ("CATHBAL", "PLATEBAL", "METERZERO", "VERNIER")
+    rows = []
+    for trim, position in product(trims, (0, .5, 1)):
+        adjusted = deck.replace("VERNIER=0" if trim == "VERNIER" else f"{trim}=.5",
+                                f"{trim}={position}")
+        if trim == "VERNIER":
+            data = simulate(executable, adjusted, """ac lin 1 1k 1k
+let gain = db(v(next_n,next_p)/v(drivep,driven))
+wrdata trim-ac.txt gain""", "trim-ac.txt", (trim, position))
+            rows.append(dict(trim=trim, position=position, cathode_a_v="", cathode_b_v="",
+                             plate_a_v="", plate_b_v="", meter_tap_v="", gain_at_1k_db=data[0, 1]))
+        else:
+            data = simulate(executable, adjusted, control, "trims.txt", (trim, position))
+            ka, kb, pa, pb, meter = data[0, 1:]
+            rows.append(dict(trim=trim, position=position, cathode_a_v=ka, cathode_b_v=kb,
+                             plate_a_v=pa, plate_b_v=pb, meter_tap_v=meter, gain_at_1k_db=""))
+    return rows
+
+
+def measure_t2(executable):
+    deck = (STAGE / "t2.cir").read_text()
+    control = """ac dec 48 10 100k
+let gain = v(out)/v(source_node)
+let winding = v(out)/v(in)
+let zin = v(in)/(-i(vdrive))
+wrdata t2-ac.txt gain winding zin"""
+    cases = (("catalog_forward", "15k", "80k", "OUT 0 IN 0"),
+             ("ua_reverse_rated", "80k", "15k", "IN 0 OUT 0"),
+             ("ua_reverse_grid_fixture", "8k", "40k", "IN 0 OUT 0"))
+    rows = []
+    for direction, source, load, ports in cases:
+        adjusted = deck.replace("SOURCE=15k LOAD=80k", f"SOURCE={source} LOAD={load}")
+        adjusted = adjusted.replace("OUT 0 IN 0", ports)
+        data = simulate(executable, adjusted, control, "t2-ac.txt", direction)
+        hz, gain_r, gain_i, winding_r, winding_i, zin_r, zin_i = data.T
+        gain = gain_r + 1j * gain_i
+        winding = winding_r + 1j * winding_i
+        reference = np.interp(np.log(1000), np.log(hz), voltage_db(gain))
+        for index, frequency in enumerate(hz):
+            rows.append(dict(direction=direction, source=source, load=load,
+                             frequency_hz=frequency, gain_db=voltage_db(gain[index]),
+                             relative_1khz_db=voltage_db(gain[index]) - reference,
+                             phase_deg=np.angle(gain[index], deg=True),
+                             winding_gain_db=voltage_db(winding[index]),
+                             zin_real_ohms=zin_r[index], zin_imag_ohms=zin_i[index]))
+    return rows
+
+
 def measure_ac(executable):
     cases = list(product((600,), (20,), (1,), (0, -4), (1.5, 2, 2.5), (84, 92, 100)))
     cases.extend((600, 20, 1, bias, 2, 92) for bias in BIAS_LEVELS if bias not in (0, -4))
@@ -90,13 +142,15 @@ let winding = v(sec_p,sec_n)
 let grids = v(gp,gn)
 let plates = v(pb,pa)
 let interstage = v(next_n,next_p)
-wrdata tran.txt winding grids plates interstage"""
+let input_terminal = v(inp,inn)
+wrdata tran.txt winding grids plates interstage input_terminal"""
     condition = (600, 20, 1, bias, 2, 92)
     data = run_gain(executable, condition, control, "tran.txt")
     time = (start_cycle + 1 + np.arange(periods * points) / points) / frequency
-    return dict(frequency_hz=frequency, matched_source_dbu=level, pad_loss_db=20,
-                bias_v=bias, samples_per_period=points,
-                **harmonic_columns(data, time, periods, NODES))
+    harmonics = harmonic_columns(data, time, periods, (*NODES, "input_terminal"))
+    terminal_dbu = voltage_db(harmonics["input_terminal_fundamental_vpk"] / (np.sqrt(2) * .775))
+    return dict(frequency_hz=frequency, matched_source_dbu=level, input_terminal_dbu=terminal_dbu,
+                pad_loss_db=20, bias_v=bias, samples_per_period=points, **harmonics)
 
 
 def plot_ac(rows, path):
@@ -126,6 +180,7 @@ def main():
     parser.add_argument("--ngspice", default="ngspice")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--jobs", default=4, type=int)
+    parser.add_argument("--drive-sweep", action="store_true", help="run the extended level and frequency sweep")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
@@ -134,18 +189,21 @@ def main():
     ac = measure_ac(args.ngspice)
     write_csv(args.output / "UA176-6BC8-DC.csv", dc)
     write_csv(args.output / "UA176-6BC8-FR-phase-loading.csv", ac)
+    write_csv(args.output / "UA176-6BC8-trims.csv", measure_trims(args.ngspice))
+    write_csv(args.output / "UA176-T2-bench.csv", measure_t2(args.ngspice))
     plot_ac(ac, args.output / "UA176-6BC8-FR-phase-loading.png")
-    frequencies, levels, biases, points = zip(*(
-        list(product(FREQUENCIES, LEVELS, (0,), (384,)))
-        + [(1000, level, -4, 384) for level in LEVELS]
-        + [(1000, 4, 0, 768), (1000, 18, 0, 768)]
-    ))
+    cases = [(1000, 4, bias, 768) for bias in (0, -4)]
+    if args.drive_sweep:
+        cases += list(product(FREQUENCIES, LEVELS, (0,), (384,)))
+        cases += [(1000, level, -4, 384) for level in LEVELS]
+    frequencies, levels, biases, points = zip(*cases)
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         tone = partial(measure_tone, args.ngspice)
         tones = list(pool.map(tone, frequencies, levels, biases, points))
     write_csv(args.output / "UA176-6BC8-harmonics.csv", tones)
     plot_harmonics(tones, args.output / "UA176-6BC8-SPAN.png", node="interstage",
-                   title="UA 176T through T2 · 1 kHz · 20 dB pad · fundamental = 0 dBFS")
+                   title="UA 176T through T2 · 1 kHz · 20 dB pad · fundamental = 0 dBFS",
+                   levels=LEVELS if args.drive_sweep else (4,))
 
 
 if __name__ == "__main__":

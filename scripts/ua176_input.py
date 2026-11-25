@@ -149,9 +149,12 @@ def plot_ac(rows, destination):
     plt.close(fig)
 
 
-def plot_harmonics(rows, destination, node="secondary", title=None):
-    fig, axes = plt.subplots(3, 3, figsize=(12, 8.5), sharex=True, sharey=True, layout="constrained")
-    for axis, level in zip(axes.flat, LEVELS):
+def plot_harmonics(rows, destination, node="secondary", title=None, levels=LEVELS):
+    layout = (1, 1) if len(levels) == 1 else (3, 3)
+    size = (8, 4.5) if len(levels) == 1 else (12, 8.5)
+    fig, axes = plt.subplots(*layout, figsize=size, sharex=True, sharey=True,
+                             layout="constrained", squeeze=False)
+    for axis, level in zip(axes.flat, levels):
         row = next(row for row in rows if row["frequency_hz"] == 1000
                    and row["matched_source_dbu"] == level and row["pad_loss_db"] == 20)
         harmonics = np.array([row[f"{node}_k{k}_norm_dbfs"] for k in HARMONICS])

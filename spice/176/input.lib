@@ -30,6 +30,15 @@ CWIN1 PP OUTP {CW}
 CWIN2 PN OUTN {CW}
 .ends UA176_TRANSFORMER
 
+* UTC A-19 as connected in the UA 176. Factory ratio is 2.3:1 in reverse.
+* A measured A-19 sample gives 346 H and 10k DCR on G-G at 100 Hz.
+* The 15k P-B side uses the 2.9k catalog DCR (one sample measured 3k).
+* Leakage, core loss, and capacitances are provisional.
+.subckt UA176_T2 G1 G2 P B
+XA19 G1 G2 P B UA176_TRANSFORMER N={1/2.3} RP=10k RS=2.9k
++ LM=346 LL=.10 RC=400k CS=60p CW=15p
+.ends UA176_T2
+
 * Test fixture for the nonlinear, bias-dependent grid load. The plate and
 * cathode environment are a bench approximation until the next UA stage lands.
 * Keep the plate law and interelectrode capacitances from the shared Sylvania

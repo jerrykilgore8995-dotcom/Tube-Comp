@@ -52,26 +52,40 @@ transformer. The 176T attenuator is carried forward at the front end.
 - R2–R5 form the two 10 kΩ / 6.8 kΩ sections around the control-voltage node.
   HI selects the ends of T1 and LO selects the divider taps. The bench holds
   the test switch in normal operation and uses an external fixed voltage at C5.
-- Each 6BC8 grid has a series stopper after the HI/LO selector. The deck uses
-  1 kΩ per grid (`GSTOP`) as a provisional value. No separate stopper value
-  is legible in the available C-10476 scan. The grid capacitances and grid
-  current are connected on the tube side of each resistor.
 - The 0B2 rail is represented by its nominal 108 V DC boundary. R12 and R14
   feed the two plates through the R13 balance pot. The T2 high-impedance winding
   is connected across the plates. The cathode return includes R6–R11, with the
   GR meter tap unloaded.
-- T2 is a reverse UTC A-19 candidate. The nominal 80 kΩ to 15 kΩ ratio and
-  2.9 kΩ winding resistance on the 15 kΩ side come from catalog data.
-  The 4 kΩ resistance of the high-impedance winding, 240 H magnetizing branch,
-  100 mH high-side leakage, loss and capacitances are provisional. The 20 kΩ
-  resistor on each side and 7 pF per grid form the differential load fixture.
-  The active following amplifier and its feedback will set the final load.
+- T2 follows the reverse UTC A-19 wiring. The 80 kΩ G–G winding goes
+  across the plates with F–F strapped, and the 15 kΩ P–B winding feeds the
+  next stage. The 2.3:1 step-down and 2.9 kΩ P–B DCR are catalog values.
+  The 346 H and 10 kΩ G–G DCR are from one A-19 measured at 100 Hz.
+  High-side leakage, core loss and capacitances remain estimates. The active
+  next amplifier will replace the two 20 kΩ / 7 pF grid-load branches.
 
-Run the full DC, AC and transient bench from the repository root:
+| Circuit item | Implementation |
+| --- | --- |
+| Input attenuator and R1 | Continuously variable 600 Ω 176T pad. The 300 Ω linear series vernier shown on the standard 176 is available through `VERNIER` (0–1). The stepped contact bank still needs a separate transcription. |
+| R2–R5 and HI/LO | Two 10 kΩ / 6.8 kΩ ladder arms and direct connections from the selector to the 6BC8 grids. |
+| R6, R7, R8 and R9 | 100 Ω cathode-balance pot, two 47 Ω shunts and 330 Ω cathode return. |
+| R10 and R11 | 1 kΩ meter-zero pot and 330 Ω return. Sweep the wiper voltage with the meter tap unloaded. |
+| R12–R14 | 4.7 kΩ feeds and a 1 kΩ plate-balance pot with its wiper on the regulated rail. |
+| C5, S3, R31 and S4 | 0.1 µF at the control node. Normal test-switch operation is represented by its signal-path connections. The 47 kΩ R31 test injection and limiter switch and timing circuit are outside this bench. |
+| 108 V rail and C10 | Nominal DC source and 0.1 µF bypass. The 0B2 and its feed network belong to the power-supply model. |
+| T2 exit | R15/R17 grid-load fixture. The active amplifier bias and feedback components belong to the next stage. |
+
+Run the DC, AC and +4 dBu/1 kHz reference bench from the repository root:
 
 ```sh
 python3 scripts/ua176_gain.py --output /tmp/ua176-gain
 ```
+
+Add `--drive-sweep` for the extended overload and frequency matrix. The
+reference tone uses a 600 Ω source calibrated to deliver +4 dBu into 600 Ω.
+The transient CSV gives the level at the actual input terminals. The passive
+T2 bench checks both orientations and the trim bench checks three positions
+of each pot. The reverse grid fixture uses an 8 kΩ source as a comparison
+case alongside the active 6BC8 bench.
 
 The AC CSV reports source-referenced magnitude and phase at the T1 winding,
 6BC8 grids, 6BC8 plates and T2 secondary. Phase uses grid P minus N, plate
@@ -83,3 +97,6 @@ so the transient sweep captures tube distortion and nonlinear grid loading.
 - [UA 176 C-10476 schematic](https://funkwerkes.com/web/wp-content/techdocs/MixedProAudio/Universal-Audio-176-Compressor-Schematic.pdf)
 - [UTC A-19 winding data](https://www.ka-electronics.com/images/pdf/UTC_Transformer_Catalog_1974.pdf)
 - [Reported A-19 orientation in the UA circuit](https://groupdiy.com/threads/universal-audio-ua-176-limiting-amplifier.56531/page-2)
+
+- [UTC A-19 terminal arrangement and winding drawing P](https://www.barryrudolph.com/recall/manuals/utc_transformer_pinouts.pdf)
+- [Independent A-19 winding measurements](https://groupdiy.com/threads/audio-transformer-inductance.47515/page-5)
