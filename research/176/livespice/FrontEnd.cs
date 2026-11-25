@@ -5,6 +5,11 @@ internal sealed partial class FrontEnd
 {
     private readonly Dictionary<string, Node> nodes = new();
     private readonly Analysis analysis = new();
+    private readonly bool export;
+    public FrontEnd(bool export = false) => this.export = export;
+    private readonly List<Device> devices = new();
+    private readonly List<Expression> parameters = new();
+    private sealed record Device(Expression Current, Expression[] Voltages, Expression Law);
 
     public readonly Expression Drive = Component.DependentVariable("drive", Component.t);
     public Expression Plates => Node("PB").V - Node("PA").V;
@@ -25,6 +30,25 @@ internal sealed partial class FrontEnd
 
     private void R(string a, string b, double value) =>
         Resistor.Analyze(analysis, Node(a), Node(b), value);
+    private void AdjustableR(string a, string b, double resistance, string name)
+    {
+        if (!export)
+        {
+            R(a, b, resistance);
+            return;
+        }
+        var conductance = Parameter(name);
+        analysis.AddPassiveComponent(Node(a), Node(b), conductance * (Node(a).V - Node(b).V));
+    }
+
+    private Expression Parameter(string name)
+    {
+        var value = Variable.New(name);
+        if (!parameters.Contains(value))
+            parameters.Add(value);
+        return value;
+    }
+
     private void C(string a, string b, double value)
     {
         var va = a == "0" ? (Expression)0 : Node(a).V;
@@ -67,16 +91,24 @@ internal sealed partial class FrontEnd
     {
         Expression vp = Node(plate).V - Node(cathode).V;
         Expression vg = Node(grid).V - Node(cathode).V;
-        if (fullCircuit)
+        if (fullCircuit && !export)
         {
             vp = analysis.AddUnknownEqualTo("VPK_" + plate, vp);
             vg = analysis.AddUnknownEqualTo("VGK_" + plate, vg);
         }
+        if (export)
+        {
+            vp = Variable.New("v0");
+            vg = Variable.New("v1");
+        }
         var x = 1.794225622 * (1 + 54.16463004 * vg * Binary.Power(922.2704089 + vp * vp, -.5));
         var softplus = Call.If(x > 50, x, Call.Ln(1 + Call.Exp(x)));
         var e = vp * softplus / 1.794225622;
-        analysis.AddPassiveComponent(Node(plate), Node(cathode),
-            analysis.AddUnknownEqualTo("I_" + plate, Call.If(e > 0, 20.19891536e-6 * (e ^ 1.439822572), 0)));
+        var law = export
+            ? Call.New("plate", vp, vg, 1.794225622, 1.794225622 * 54.16463004,
+                1.794225622, 922.2704089, 0, 20.19891536e-6, 1.439822572)
+            : Call.If(e > 0, 20.19891536e-6 * (e ^ 1.439822572), 0);
+        Current("I_" + plate, plate, cathode, law, (vp, plate, cathode), (vg, grid, cathode));
         R(plate, cathode, 1e9);
         C(grid, cathode, 3.9e-12);
         C(grid, plate, 3.7e-12);
@@ -86,7 +118,7 @@ internal sealed partial class FrontEnd
         // and a fixed zero-bias junction capacitance for this first bench.
         var junction = grid + "_D";
         R(grid, junction, 2000);
-        Diode.Analyze(analysis, "D_" + grid, Node(junction), Node(cathode), 1e-9, 1.5);
+        GridDiode(grid, junction, cathode, 1.5);
         C(junction, cathode, 1e-12);
     }
 
@@ -111,7 +143,10 @@ internal sealed partial class FrontEnd
         R("DRIVEP", "INP", 300);
         R("DRIVEN", "INN", 300);
         Pad("INP", "INN", "PAD_P", "TN", "INPUT", settings?.Input ?? 10);
-        R("PAD_P", "TP", Math.Max(.000001, 300 * (settings?.InputVernier ?? 0)));
+        if (settings == null)
+            R("PAD_P", "TP", 1e-6);
+        else
+            AdjustableR("PAD_P", "TP", Math.Max(.01, 300 * settings.InputVernier), "inVernier");
         Transformer("TP", "TN", "SEC_P", "SEC_N", "T1", 10, 52, 3900, 3.3, .002, 100e3, 92e-12, 15e-12);
 
         R("SEC_P", "TAP_P", 10e3);

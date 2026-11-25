@@ -5,6 +5,9 @@
 #include <thread>
 #include "SpiceStream.h"
 #include "UA176Art.h"
+#ifdef UA176_LIVE
+#include "../176-live/Live176.h"
+#endif
 
 namespace {
 using State = juce::AudioProcessorValueTreeState;
@@ -42,17 +45,75 @@ State::ParameterLayout parameters()
 
 class Processor final : public juce::AudioProcessor {
 public:
-    Processor() : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
-                                 .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    Processor() : AudioProcessor(BusesProperties().withInput("Input", defaultChannels(), true)
+                                 .withOutput("Output", defaultChannels(), true)),
                   state(*this, nullptr, "UA176State", parameters()) {}
+
+    static juce::AudioChannelSet defaultChannels()
+    {
+#ifdef UA176_LIVE
+        return juce::AudioChannelSet::mono();
+#else
+        return juce::AudioChannelSet::stereo();
+#endif
+    }
 
     bool isBusesLayoutSupported(const BusesLayout& layout) const override
     {
         const auto in = layout.getMainInputChannelSet();
+#ifdef UA176_LIVE
+        return in == layout.getMainOutputChannelSet() && in == juce::AudioChannelSet::mono();
+#else
         return in == layout.getMainOutputChannelSet()
             && (in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo());
+#endif
     }
 
+#ifdef UA176_LIVE
+    void prepareToPlay(double sampleRate, int) override
+    {
+        setLatencySamples(0);
+        const auto controls = readControls();
+        good.fill(false);
+        for (int c = 0; c < getTotalNumInputChannels(); ++c)
+            good[static_cast<std::size_t>(c)] = simulators[static_cast<std::size_t>(c)].prepare(sampleRate, controls);
+        status.store(good[0] ? 1 : 2);
+    }
+
+    void releaseResources() override {}
+
+    void processBlock(juce::AudioBuffer<float>& block, juce::MidiBuffer& midi) override
+    {
+        juce::ScopedNoDenormals guard;
+        midi.clear();
+        const bool on = get("on") > .5f;
+        const auto controls = readControls();
+        float inputPeak = 0, outputPeak = 0, reduction = 0;
+        bool failed = false;
+        constexpr double scale = ua176::SpiceStream::fullScalePeak;
+        for (int c = 0; c < getTotalNumInputChannels(); ++c) {
+            auto& simulator = simulators[static_cast<std::size_t>(c)];
+            const bool ready = good[static_cast<std::size_t>(c)] && simulator.setControls(controls);
+            auto* samples = block.getWritePointer(c);
+            for (int i = 0; i < block.getNumSamples(); ++i) {
+                const float drySample = samples[i];
+                inputPeak = std::max(inputPeak, std::abs(drySample));
+                double volts = 0, cv = 0;
+                const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
+                if (solved && on) {
+                    samples[i] = static_cast<float>(volts / scale);
+                    reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
+                }
+                failed |= !solved;
+                outputPeak = std::max(outputPeak, std::abs(samples[i]));
+            }
+        }
+        levelIn.store(inputPeak);
+        levelOut.store(outputPeak);
+        gr.store(reduction);
+        status.store(failed ? 2 : 1);
+    }
+#else
     void prepareToPlay(double sampleRate, int) override
     {
         releaseResources();
@@ -95,17 +156,7 @@ public:
         midi.clear();
         const bool on = get("on") > .5f;
         const bool offline = isNonRealtime();
-        const auto r = static_cast<std::size_t>(juce::jlimit(0, 3, static_cast<int>(get("ratio"))));
-        ua176::Controls controls;
-        controls.input = std::pow(10.f, (40 - get("input")) / 20);
-        controls.output = std::pow(10.f, (40 - get("output")) / 20);
-        controls.inputVernier = get("inputVernier");
-        controls.outputVernier = get("outputVernier");
-        controls.tap = tap[r];
-        controls.biasResistance = bias[r];
-        controls.attack = get("attack");
-        controls.release = get("release");
-        controls.limiting = get("limiting");
+        const auto controls = readControls();
         const int channels = getTotalNumInputChannels();
         const int count = block.getNumSamples();
         auto* const* write = block.getArrayOfWritePointers();
@@ -156,6 +207,24 @@ public:
         gr.store(reduction);
     }
 
+#endif
+
+    ua176::Controls readControls() const noexcept
+    {
+        const auto r = static_cast<std::size_t>(juce::jlimit(0, 3, static_cast<int>(get("ratio"))));
+        ua176::Controls controls;
+        controls.input = std::pow(10.f, (40 - get("input")) / 20);
+        controls.output = std::pow(10.f, (40 - get("output")) / 20);
+        controls.inputVernier = get("inputVernier");
+        controls.outputVernier = get("outputVernier");
+        controls.tap = tap[r];
+        controls.biasResistance = bias[r];
+        controls.attack = get("attack");
+        controls.release = get("release");
+        controls.limiting = get("limiting");
+        return controls;
+    }
+
     float get(const char* id) const noexcept { return state.getRawParameterValue(id)->load(); }
     void set(const char* id, float normal)
     {
@@ -166,7 +235,14 @@ public:
         }
     }
 
-    const juce::String getName() const override { return "176"; }
+    const juce::String getName() const override
+    {
+#ifdef UA176_LIVE
+        return "176 Live";
+#else
+        return "176";
+#endif
+    }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 1.5; }
@@ -191,11 +267,16 @@ public:
     std::atomic<float> levelIn{0}, levelOut{0}, gr{0};
     std::atomic<int> status{0};
 private:
+#ifdef UA176_LIVE
+    std::array<ua176::Live176, 2> simulators;
+    std::array<bool, 2> good{};
+#else
     std::array<ua176::SpiceStream, 2> simulators;
     std::array<std::array<float, ua176::SpiceStream::latency>, 2> dry{};
     std::uint64_t position = 0;
     std::atomic<std::uint64_t> underruns{0};
     bool bad = false;
+#endif
 };
 
 struct PinLook final : juce::LookAndFeel_V4 {

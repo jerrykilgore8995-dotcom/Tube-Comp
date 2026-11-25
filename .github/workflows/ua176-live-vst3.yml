@@ -1,0 +1,60 @@
+name: Build and benchmark 176 Live VST3
+on:
+  push:
+    branches: [ua176-input-stage]
+    paths: ["plugin/176-live/**", "plugin/176/Plugin.cpp", "plugin/176/Faceplate.svg", "research/176/livespice/**", ".github/workflows/ua176-live-vst3.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Generate the native circuit from LiveSPICE
+        shell: pwsh
+        run: |
+          $live = Join-Path $env:RUNNER_TEMP "176-LiveSPICE"
+          git -c core.autocrlf=false clone https://github.com/dsharlet/LiveSPICE.git $live
+          git -C $live checkout b2a4bb0ec4d3c4cdb158530ab4b20c13207030f7
+          git -C $live submodule update --init --recursive
+          if ($LASTEXITCODE -ne 0) { throw "LiveSPICE checkout failed" }
+          dotnet build research/176/livespice -c Release "-p:LiveSpiceRoot=$live"
+          if ($LASTEXITCODE -ne 0) { throw "LiveSPICE circuit generator failed to build" }
+          $deck = Join-Path $env:RUNNER_TEMP "Live176Deck.h"
+          dotnet research/176/livespice/bin/Release/net8.0/LiveSpice176.dll export $deck
+          if ($LASTEXITCODE -ne 0) { throw "LiveSPICE circuit generation failed" }
+          "LIVE176_DECK=$deck" >> $env:GITHUB_ENV
+      - name: Build and time the mono circuit
+        shell: pwsh
+        run: |
+          cmake -S plugin/176-live -B build-176-live -G "Visual Studio 17 2022" -A x64 "-DLIVE176_DECK=$env:LIVE176_DECK"
+          if ($LASTEXITCODE -ne 0) { throw "176 Live configuration failed" }
+          cmake --build build-176-live --config Release --target UA176LiveSmoke --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "176 Live benchmark failed to build" }
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            & build-176-live/Release/UA176LiveSmoke.exe
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($LASTEXITCODE -ne 5 -or $attempt -eq 3) { throw "176 Live did not pass the performance and convergence tests" }
+          }
+      - name: Compile and package the Windows x64 VST3
+        shell: pwsh
+        run: |
+          cmake --build build-176-live --config Release --target UA176Live_VST3 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "176 Live VST3 failed to build" }
+          $vst = Get-ChildItem build-176-live -Recurse -Directory -Filter "176 Live.vst3" | Select-Object -First 1
+          if (!$vst) { throw "176 Live VST3 missing" }
+          $package = New-Item -Type Directory -Path "176-Live-Package"
+          Copy-Item -Recurse $vst.FullName $package
+          Copy-Item plugin/176-live/README.md (Join-Path $package.FullName "Readme.md")
+          Copy-Item build-176-live/_deps/juce-src/LICENSE.md (Join-Path $package.FullName "JUCE-LICENSE.md")
+          Compress-Archive -Path (Join-Path $package.FullName '*') -DestinationPath "176-Live-Windows-x64-VST3.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 176-Live-Windows-x64-VST3
+          path: 176-Live-Windows-x64-VST3.zip
+          if-no-files-found: error

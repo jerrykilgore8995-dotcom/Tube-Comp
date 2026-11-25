@@ -21,11 +21,12 @@ internal sealed partial class FrontEnd
     private void Pad(string a, string b, string c, string d, string name, double ratio)
     {
         var arm = Math.Max(.01, 300 * (ratio - 1) / (ratio + 1));
-        R(a, name + "_P", arm);
-        R(b, name + "_N", arm);
-        R(name + "_P", c, arm);
-        R(name + "_N", d, arm);
-        R(name + "_P", name + "_N", 1200 * ratio / Math.Max(1e-9, ratio * ratio - 1));
+        AdjustableR(a, name + "_P", arm, name + "Arm");
+        AdjustableR(b, name + "_N", arm, name + "Arm");
+        AdjustableR(name + "_P", c, arm, name + "Arm");
+        AdjustableR(name + "_N", d, arm, name + "Arm");
+        AdjustableR(name + "_P", name + "_N",
+            1200 * ratio / Math.Max(1e-9, ratio * ratio - 1), name + "Shunt");
     }
 
     private static Expression PositivePow(Expression x, double power) =>
@@ -34,19 +35,58 @@ internal sealed partial class FrontEnd
     private static Expression Softplus(Expression x) =>
         Call.If(x > 50, x, Call.Ln(1 + Call.Exp(x)));
 
-    private void Current(string name, string a, string b, Expression law) =>
-        analysis.AddPassiveComponent(Node(a), Node(b), analysis.AddUnknownEqualTo(name, law));
+    private void Current(string name, string a, string b, Expression law,
+                         params (Expression Symbol, string Positive, string Negative)[] ports)
+    {
+        if (!export)
+        {
+            analysis.AddPassiveComponent(Node(a), Node(b), analysis.AddUnknownEqualTo(name, law));
+            return;
+        }
+        var current = Variable.New(name);
+        analysis.AddPassiveComponent(Node(a), Node(b), current);
+        var variables = ports.Select((_, i) => (Expression)Variable.New("v" + i)).ToArray();
+        law = law.Substitute(ports.Select((p, i) => Arrow.New(p.Symbol, variables[i])));
+        devices.Add(new Device(current, ports.Select(p => (Expression)(Node(p.Positive).V - Node(p.Negative).V)).ToArray(),
+            law));
+    }
+
+    private void GridDiode(string name, string a, string b, double ideality)
+    {
+        if (!export)
+        {
+            Diode.Analyze(analysis, "D_" + name, Node(a), Node(b), 1e-9, ideality);
+            return;
+        }
+        var v = (Expression)Variable.New("v0");
+        Current("ID_" + name, a, b, 1e-9 * Component.LinExpm1(v / (ideality * (Expression)Component.VT)),
+            (v, a, b));
+    }
 
     private void LineTube(string p, string g, string k, bool ax7)
     {
-        var vp = analysis.AddUnknownEqualTo("VPK_" + p, Node(p).V - Node(k).V);
-        var vg = analysis.AddUnknownEqualTo("VGK_" + p, Node(g).V - Node(k).V);
+        Expression vp = Node(p).V - Node(k).V;
+        Expression vg = Node(g).V - Node(k).V;
+        if (!export)
+        {
+            vp = analysis.AddUnknownEqualTo("VPK_" + p, vp);
+            vg = analysis.AddUnknownEqualTo("VGK_" + p, vg);
+        }
+        else
+        {
+            vp = Variable.New("v0");
+            vg = Variable.New("v1");
+        }
         var kp = ax7 ? 600 : 185.4;
         var mu = ax7 ? 100 : 18.02;
         var kvb = ax7 ? 300 : 1247.69;
         var x = kp * (1 / mu + (vg - (ax7 ? 0 : .6206)) * Binary.Power(kvb + vp * vp, -.5));
-        Current("I_" + p, p, k, 2 * PositivePow(vp * Softplus(x) / kp, ax7 ? 1.4 : 1.181) /
-            (ax7 ? 1060 : 945.75));
+        var exponent = ax7 ? 1.4 : 1.181;
+        var gain = 2 / (ax7 ? 1060 : 945.75);
+        Expression plateLaw = export
+            ? Call.New("plate", vp, vg, kp / mu, kp, kp, kvb, ax7 ? 0 : -.6206, gain, exponent)
+            : gain * PositivePow(vp * Softplus(x) / kp, exponent);
+        Current("I_" + p, p, k, plateLaw, (vp, p, k), (vg, g, k));
         R(p, k, 1e9);
         C(g, k, ax7 ? 2.3e-12 : 2.9e-12);
         C(g, p, ax7 ? 2.4e-12 : 2.5e-12);
@@ -55,7 +95,7 @@ internal sealed partial class FrontEnd
         {
             var junction = g + "_D";
             R(g, junction, 2001);
-            Diode.Analyze(analysis, "D_" + g, Node(junction), Node(k), 1e-9, 1);
+            GridDiode(g, junction, k, 1);
             C(junction, k, 10e-12);
         }
         else
@@ -63,7 +103,7 @@ internal sealed partial class FrontEnd
             Expression denominator = 6.624 + vp;
             Current("IG_" + p, g, k,
                 (.00082 + .162 / Call.If(denominator > 1, denominator, 1)) *
-                (2 * mu / 945.75) * PositivePow(vg + 1.03, 1.3));
+                (2 * mu / 945.75) * PositivePow(vg + 1.03, 1.3), (vp, p, k), (vg, g, k));
         }
     }
 
@@ -144,15 +184,15 @@ internal sealed partial class FrontEnd
         R("HALF_A", "HALF_B", 500e3);
         R("OUT_RAW", "T3_P", 1);
         C("T3_P", "T3_N", 80e-12);
-        R("T3_P", "OUT_FEED", Math.Max(.01, 300 * settings.OutputVernier));
-        if (settings.Output > 1)
+        AdjustableR("T3_P", "OUT_FEED", Math.Max(.01, 300 * settings.OutputVernier), "outVernier");
+        if (settings.Output > 1 || export)
         {
             Pad("OUT_FEED", "T3_N", "OUT_P", "OUT_N", "OUTPUT", settings.Output);
             R("OUT_P", "OUT_N", 600);
         }
         else
             R("OUT_FEED", "OUT_P", .01);
-        if (settings.Output == 1)
+        if (settings.Output == 1 && !export)
             R("OUT_P", "T3_N", 600);
         V("OUT_REF", "T3_N", "0", 0);
     }
@@ -167,6 +207,7 @@ internal sealed partial class FrontEnd
             12 => (1.0, 47e3),
             _ => throw new ArgumentOutOfRangeException(nameof(settings.Ratio))
         };
+        Expression selectedTap = export ? Parameter("tap") : tap;
         foreach (var side in new[] { "A", "B" })
         {
             var plate = "V3P" + side;
@@ -174,26 +215,33 @@ internal sealed partial class FrontEnd
             var k = "DET_K" + side;
             var current = analysis.AddUnknown("ITAP_" + side);
             analysis.AddPassiveComponent(Node(terminal), Node("T3_CT"), current);
-            analysis.AddPassiveComponent(Node(plate), Node("T3_CT"), -tap * current);
-            analysis.AddEquation(Node(terminal).V - Node("T3_CT").V, tap * (Node(plate).V - Node("T3_CT").V));
+            analysis.AddPassiveComponent(Node(plate), Node("T3_CT"), -selectedTap * current);
+            analysis.AddEquation(Node(terminal).V - Node("T3_CT").V, selectedTap * (Node(plate).V - Node("T3_CT").V));
             C(terminal, k, .5e-6);
             R(k, "DET_BIAS", 220e3);
             DetectorDiode(side, k);
         }
         R("REG", "DET_BIAS", 82e3);
-        R("DET_BIAS", "0", bias);
+        AdjustableR("DET_BIAS", "0", bias, "ratioBias");
         C("DET_BIAS", "0", 20e-6);
-        R("CV", "ATK_IN", settings.Limiting ? .001 : 1e12);
-        R("CV", "0", settings.Limiting ? 1e12 : .001);
+        AdjustableR("CV", "ATK_IN", settings.Limiting ? .001 : 1e12, "limitOn");
+        AdjustableR("CV", "0", settings.Limiting ? 1e12 : .001, "limitOff");
         R("ATK_IN", "DET_A", 10e3);
-        R("ATK_IN", "DET_A", Math.Max(.001, 25e3 * (1 - settings.Attack)));
-        R("DET_A", "REL_WIPER", Math.Max(.001, 5e6 * (1 - settings.Release)));
-        R("REL_WIPER", "0", Math.Max(.001, 5e6 * settings.Release));
+        AdjustableR("ATK_IN", "DET_A", Math.Max(.001, 25e3 * (1 - settings.Attack)), "attack");
+        AdjustableR("DET_A", "REL_WIPER", Math.Max(.001, 5e6 * (1 - settings.Release)), "releaseUpper");
+        AdjustableR("REL_WIPER", "0", Math.Max(.001, 5e6 * settings.Release), "releaseLower");
         R("REL_WIPER", "0", 270e3);
     }
 
     private void DetectorDiode(string name, string k)
     {
+        if (export)
+        {
+            var v = (Expression)Variable.New("v0");
+            Current("ID_" + name, "DET_A", k, Call.New("detector", v), (v, "DET_A", k));
+            C("DET_A", k, 3.2e-12);
+            return;
+        }
         // The voltage across the exponential junction is the Newton unknown.
         // This parametrization avoids the reverse-current logarithm singularity.
         var vj = analysis.AddUnknown("VD_" + name);

@@ -4,6 +4,11 @@ using Circuit;
 using ComputerAlgebra;
 
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+if (args.Length == 2 && args[0] == "export")
+{
+    new FrontEnd(export: true).Export(args[1]);
+    return;
+}
 const int sampleRate = 44100;
 const int blockSize = 512;
 const int toneHz = 1000;
