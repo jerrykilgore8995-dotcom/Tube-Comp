@@ -1,0 +1,51 @@
+UA 176 signal path, T3 ratio taps and closed 6AL5 control loop
+.include input.lib
+.include amplifier.lib
+.include detector.lib
+.include ../models/tube_cells.lib
+
+.param AMP=3.474135043921514 FREQ=1k SOURCE=600 LOSSDB=20
+.param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108 VERNIER=0
+.param B3=315 OUTVERNIER=0 OUTPUTLOAD=600 FBRES=180k
+.param LIMITING=1 RATIO=2 ATTACK=.5 RELEASE=.8
+* S5 gangs a pair of primary taps and a resistor in the detector-bias divider.
+* Tap fractions are from one measured Sowter 1285, normalized to its 12:1 tap.
+.param TAPFRAC={ternary_fcn(RATIO==2,.12,ternary_fcn(RATIO==4,.29,ternary_fcn(RATIO==8,.58,1)))}
+.param RATIO_R={ternary_fcn(RATIO==2,1k,ternary_fcn(RATIO==4,6.8k,ternary_fcn(RATIO==8,20k,47k)))}
+.include front_end.inc
+.include line_stage.inc
+
+* C6/C7 block plate DC. R36/R37 bias the separate cathodes, pins 1 and 5.
+C6 TAP_A DET_K1 .5u
+C7 TAP_B DET_K2 .5u
+R36 DET_K1 DET_BIAS 220k
+R37 DET_BIAS DET_K2 220k
+R38 REG DET_BIAS 82k
+R_S5 DET_BIAS 0 {RATIO_R}
+C8A DET_BIAS 0 20u
+* Pins 7 and 2 are the tied anodes that pull C5 negative via the attack path.
+XV4A DET_A DET_K1 UA176_6AL5
+XV4B DET_A DET_K2 UA176_6AL5
+
+* S4 connects the timing path in ON and grounds the control node in OFF.
+R_S4_ON CV ATK_IN {ternary_fcn(LIMITING,1m,1T)}
+R_S4_OFF CV 0 {ternary_fcn(LIMITING,1T,1m)}
+R32 ATK_IN DET_A 10k
+R33 ATK_IN DET_A {max(1m,25k*(1-ATTACK))}
+R34A DET_A REL_WIPER {max(1m,5meg*(1-RELEASE))}
+R34B REL_WIPER 0 {max(1m,5meg*RELEASE)}
+R35 REL_WIPER 0 270k
+
+.options method=gear maxord=2 reltol=1e-4 abstol=1e-10 vntol=1e-5
+.control
+set wr_singlescale
+set wr_vecnames
+set numdgt=15
+op
+print v(cv) v(det_bias) v(det_k1) v(det_k2)
+ac dec 48 10 100k
+let gain = v(out_p,t3_n)/v(inp,inn)
+wrdata closed-loop-ac.txt gain
+quit
+.endc
+.end

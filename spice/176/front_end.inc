@@ -17,9 +17,7 @@ RG_LO_P TAP_P GP {ternary_fcn(HIGH,1T,1m)}
 RG_HI_N SEC_N GN {ternary_fcn(HIGH,1m,1T)}
 RG_LO_N TAP_N GN {ternary_fcn(HIGH,1T,1m)}
 
-* Normal test switch position. Limiting off grounds CV through the bench
-* source at BIAS=0. Negative values drive CV externally for static sweeps.
-VCV CV 0 {BIAS}
+* Control node at the R3/R4 junction in the normal test-switch position.
 C5 CV 0 .1u
 
 * Push-pull 6BC8 with the Sylvania law and supplied grid-current branch.

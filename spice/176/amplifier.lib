@@ -25,7 +25,7 @@ CPK P K .5p
 * The winding DCR values approximate its total referred-secondary DCR.
 * Magnetizing inductance, leakage and capacitance are provisional.
 * The half-primaries are series-aiding from PA to PB with DC feed at CT.
-.subckt UA176_T3 PA CT PB OUTP OUTN
+.subckt UA176_T3 PA CT PB OUTP OUTN TAPA TAPB params: TAPFRAC=1
 RPA PA PLEAKA 525
 RPB PB PLEAKB 525
 LLA PLEAKA HALF_A 50m
@@ -39,4 +39,10 @@ KBS LPB LS .99999
 RC HALF_A HALF_B 500k
 RS OUT_RAW OUTP 1
 CS OUTP OUTN 80p
+* Selected symmetric tap pair. Mirror detector current to the plate ports
+* with the same turns fraction so the detector loads the main circuit.
+ETAPA TAPA CT PA CT {TAPFRAC}
+ETAPB TAPB CT PB CT {TAPFRAC}
+FTAPA PA CT ETAPA {-TAPFRAC}
+FTAPB PB CT ETAPB {-TAPFRAC}
 .ends UA176_T3

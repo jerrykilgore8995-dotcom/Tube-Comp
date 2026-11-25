@@ -1,0 +1,12 @@
+* User-supplied 6AL5 single-diode fit. A zero-volt sense source makes the
+* current-dependent series drop explicit to ngspice's nodal solver.
+.subckt UA176_6AL5 A K
+VSENSE A ASENSE 0
+* At the origin a small current offset bounds the fractional-power derivative.
+BDROP ASENSE IDEAL V={pow(uramp(i(VSENSE)/.0032)+1e-9,.775)-pow(1e-9,.775)}
+D1 IDEAL OFFSET UA176_6AL5_EXP
+R2 IDEAL K 12.7G
+V2 OFFSET K -.867
+CAK A K 3.2p
+.model UA176_6AL5_EXP D(IS=66p XTI=3.15 N=3.15 RS=0)
+.ends UA176_6AL5

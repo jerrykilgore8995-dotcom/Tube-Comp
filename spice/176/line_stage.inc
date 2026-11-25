@@ -1,0 +1,38 @@
+* T2 drives both V2 grids directly. R15 and R17 return them to ground.
+R15 NEXT_P 0 20k
+R17 NEXT_N 0 20k
+XV2A V2PA NEXT_P V2KA UA176_12AX7
+XV2B V2PB NEXT_N V2KB UA176_12AX7
+R19 V2KA V2_RETURN 2.2k
+R20 V2KB V2_RETURN 2.2k
+R16 V2_RETURN 0 2.2k
+
+* Each V3 plate returns AC feedback to the corresponding V2 cathode.
+R22 V3PA FEEDBACK_A {FBRES}
+R18 FEEDBACK_A 0 180k
+C1 FEEDBACK_A V2KA .47u
+R25 V3PB FEEDBACK_B {FBRES}
+R21 FEEDBACK_B 0 180k
+C2 FEEDBACK_B V2KB .47u
+
+R23 V2PA V2_SUPPLY 220k
+R24 V2PB V2_SUPPLY 220k
+C3 V2PA V3GA .1u
+C4 V2PB V3GB .1u
+R27 V3GA 0 1.2meg
+R29 V3GB 0 1.2meg
+XV3A V3PA V3GA V3K UA176_12BH7
+XV3B V3PB V3GB V3K UA176_12BH7
+R28 V3K 0 330
+
+* Corrected C-10476 feed junction: T3 center tap, R26 and C9B.
+* The B+ supply upstream of this junction is a fixed bench boundary.
+VLINE T3_CT 0 {B3}
+C9B T3_CT 0 10u
+R26 T3_CT V2_SUPPLY 47k
+C9A V2_SUPPLY 0 10u
+XT3 V3PA T3_CT V3PB T3_P T3_N TAP_A TAP_B UA176_T3 TAPFRAC={TAPFRAC}
+R30 T3_P OUT_P {max(1m,300*OUTVERNIER)}
+RLOAD OUT_P T3_N {OUTPUTLOAD}
+* Voltage datum of the isolated secondary for this differential test.
+VOUT_REF T3_N 0 0

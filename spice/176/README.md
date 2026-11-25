@@ -137,3 +137,51 @@ attenuation.
 - [C-10476 supply-junction correction](https://groupdiy.com/threads/ua-universal-audio.45039/)
 - [Sowter 1285 transformer data](https://www.sowter.co.uk/acatalog/VINTAGE-COMPRESSOR-TRANSFORMERS-J-to-Z.html)
 - [Published V2 voltage-annotation differences in the UA 175 drawings](https://groupdiy.com/threads/united-audio-175-different-schematic-versions.86286/)
+
+## T3 taps, 6AL5 and the closed control loop
+
+`closed_loop.cir` connects the T3 primary taps and the C-10476 sidechain to
+the same audio path in `line.cir`. The tap pair is modeled as an ideal
+transformer port referred to the two plate-to-center-tap voltages. Its
+current is reflected into those plate nodes. This preserves detector loading
+without claiming a measured distribution of leakage or DCR along the tapped
+winding. The tap fractions are taken from a bench measurement of a single
+Sowter 1285 replacement, normalized to its outer taps.
+
+| S5 position | Tap voltage fraction | Selected bias return to ground |
+| --- | ---: | ---: |
+| 2:1 | 0.12 | R47, 1 kΩ |
+| 4:1 | 0.29 | R46, 6.8 kΩ |
+| 8:1 | 0.58 | R45, 20 kΩ |
+| 12:1 | 1.00 | R39, 47 kΩ |
+
+- C6/C7 (0.5 µF) block the winding DC. R36/R37 (220 kΩ) bias the two
+  6AL5 cathodes (pins 1 and 5) from the R38/S5 divider. R38 (82 kΩ)
+  goes to the 108 V regulated bench rail and C8A (20 µF) bypasses
+  the divider node.
+- The two anodes (pins 7 and 2) join at the detector output. The
+  user-supplied 6AL5 diode law is solved with a separate current sensor,
+  with a small regularization at zero current.
+- S4 grounds C5 (0.1 µF) in OFF and connects its node to R32 (10 kΩ)
+  in parallel with the R33 (25 kΩ) attack rheostat in ON. R34 (5 MΩ)
+  is split at its wiper, with R35 (270 kΩ) across the wiper-to-ground
+  segment. C5 returns directly to the 6BC8 grid ladder at R3/R4.
+  ATTACK and RELEASE run from 0 (counterclockwise) to 1 (clockwise).
+- The two 0.1 µF V2-to-V3 coupling capacitors and both plate-feedback
+  paths are shared with the line bench. The regulated and main supply
+  sources are fixed bench boundaries.
+
+```sh
+python3 scripts/ua176_closed_loop.py --output /tmp/ua176-closed-loop
+```
+
+The bench compares each ratio position with S4 ON and OFF at +4 dBu and
+1 kHz. It measures output gain reduction, settled control voltage, ripple
+and output harmonics at each pad position. The C5 release check starts at
+−3 V with input silent and measures 63% voltage recovery. The labels on
+S5 describe switch positions. The nominal compression slopes still require
+calibration against hardware data.
+
+- [UA 176 C-10476 schematic](https://funkwerkes.com/web/wp-content/techdocs/MixedProAudio/Universal-Audio-176-Compressor-Schematic.pdf)
+- [RCA 6AL5 pinout and characteristics](https://w140.com/tekwiki/images/5/54/RCA_6AL5_data_sheet.pdf)
+- [Replacement tap measurements and S5 threshold discussion](https://groupdiy.com/threads/universal-audio-176-compressor-threshold-points.68522/)
