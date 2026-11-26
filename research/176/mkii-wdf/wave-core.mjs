@@ -95,4 +95,29 @@ function selfTest(){
  return {rcSamples:100,transformerSecondary:1.2,diodeVoltage:step.v[0],diodeIterations:step.iterations,coupledPortConstraintTest:"pass"};
 }
 
-export {adaptor,nonlinearStep,selfTest};
+function prepareNonlinear(ad,indices,current,tol=1e-6){
+ const n=indices.length,S=indices.map(i=>indices.map(j=>ad.S[i][j])),Z=indices.map(i=>ad.Z[i][i]);
+ const set=new Set(indices),linear=ad.S[0].map((_,i)=>i).filter(i=>!set.has(i));
+ function evaluate(v,rhs){
+  const i=current(v),b=v.map((x,j)=>x-Z[j]*i[j]);
+  return {b,f:v.map((x,j)=>{let y=x+Z[j]*i[j]-rhs[j];for(let k=0;k<n;k++)y-=S[j][k]*b[k];return y})};
+ }
+ const norm=x=>Math.max(...x.map(Math.abs));
+ return function step(b,e,guess){
+  const rhs=indices.map(i=>{let x=dot(ad.T[i],e);for(const j of linear)x+=ad.S[i][j]*b[j];return x;});
+  let v=guess.slice(),r=evaluate(v,rhs);
+  for(let it=0;it<40;it++){
+   if(norm(r.f)<tol){const bb=b.slice();indices.forEach((p,k)=>bb[p]=r.b[k]);return {v,b:bb,a:ad.waves(bb,e),iterations:it};}
+   const J=zeros(n,n);
+   for(let k=0;k<n;k++){
+    const h=1e-6*Math.max(1,Math.abs(v[k])),u=v.slice();u[k]+=h;
+    const f=evaluate(u,rhs).f;for(let j=0;j<n;j++)J[j][k]=(f[j]-r.f[j])/h;
+   }
+   const d=solve(J,r.f.map(x=>-x));let accepted=false;
+   for(let s=1;s>=1/4096;s*=.5){const u=v.map((x,k)=>x+s*d[k]),t=evaluate(u,rhs);if(norm(t.f)<norm(r.f)){v=u;r=t;accepted=true;break;}}
+   if(!accepted)throw Error("reduced nonlinear wave line search failed; residual "+norm(r.f));
+  }
+  throw Error("reduced nonlinear wave convergence failed; residual "+norm(r.f));
+ };
+}
+export {adaptor,nonlinearStep,selfTest,prepareNonlinear};
