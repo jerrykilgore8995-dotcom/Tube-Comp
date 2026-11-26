@@ -99,6 +99,7 @@ constexpr int linearMapDoublings = 4;
 constexpr double sdirkGamma = .2928932188134524756; // 1 - 1/sqrt(2)
 constexpr int phaseTaps = 2 * Live176::phaseLatency + 1;
 constexpr int detectorStart = deviceCount - 2;
+constexpr double referenceTap = .29;
 using Complex = std::complex<double>;
 
 #ifndef UA176_PHASE_REFERENCE
@@ -262,7 +263,7 @@ struct Live176::Circuit {
         phaseVoltage[deviceVoltages] *= 10. / controls.output;
         for (int i = 0; i < 2; ++i) {
             auto& voltage = phaseVoltage[deviceOffsets[detectorStart + i]];
-            voltage *= controls.tap / .29;
+            voltage *= controls.tap / referenceTap;
             if (hpGain > 0) {
                 const double step = hpGain * (voltage - phaseHighPass[i]);
                 voltage -= phaseHighPass[i] + step;
@@ -676,6 +677,8 @@ bool Live176::exportPhaseReference(const char* path, double bias)
     live.circuit->phaseReference = file;
     live.circuit->referenceBias = bias;
     LiveControls controls;
+    controls.tap = static_cast<float>(referenceTap);
+    controls.biasResistance = 6800;
     controls.limiting = bias != 0;
     controls.output = 10;
     const bool ready = live.prepare(44100, controls);

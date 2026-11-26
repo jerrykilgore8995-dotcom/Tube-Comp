@@ -27,9 +27,9 @@ constexpr std::array<const char*, 7> controlIds{
 constexpr std::array<const char*, 7> controlNames{
     "Input", "Compression ratio", "Input vernier", "Attack", "Output vernier", "Output", "Release"
 };
-#endif
 constexpr std::array<float, 4> tap{.12f, .29f, .58f, 1.f};
 constexpr std::array<float, 4> bias{1000, 6800, 20000, 47000};
+#endif
 
 State::ParameterLayout parameters()
 {
@@ -264,12 +264,14 @@ public:
         controls.output = std::pow(10.f, (40 - get("output")) / 20);
 #ifdef UA176_LIVE
         controls.sidechainHz = get("sidechainHpf");
+        controls.tap = ua176::ratioSettings[r].tap;
+        controls.biasResistance = ua176::ratioSettings[r].biasResistance;
 #else
         controls.inputVernier = get("inputVernier");
         controls.outputVernier = get("outputVernier");
-#endif
         controls.tap = tap[r];
         controls.biasResistance = bias[r];
+#endif
         controls.attack = get("attack");
 #ifdef UA176_LIVE
         controls.doubleTiming = get("double") > .5f;

@@ -14,8 +14,6 @@ int main(int argc, char**)
     constexpr double deadline = 1000. * block / rate;
     constexpr double sourcePeak = 3.474135043921514;
     constexpr double tau = 6.283185307179586;
-    constexpr std::array<float, 4> taps{.12f, .29f, .58f, 1.f};
-    constexpr std::array<float, 4> bias{1000, 6800, 20000, 47000};
     constexpr std::array<int, 4> ratios{2, 4, 8, 12};
     const int channels = argc > 1 ? 2 : 1;
     std::array<ua176::Live176, 2> simulators;
@@ -34,8 +32,8 @@ int main(int argc, char**)
         const int frequency = setting == 9 ? 20000 : setting >= 7 ? 50 : setting == 5 ? 10000 : 1000;
         ua176::LiveControls knobs;
         knobs.output = 1;
-        knobs.tap = taps[ratioIndex];
-        knobs.biasResistance = bias[ratioIndex];
+        knobs.tap = ua176::ratioSettings[ratioIndex].tap;
+        knobs.biasResistance = ua176::ratioSettings[ratioIndex].biasResistance;
         knobs.limiting = setting == 4 || setting == 9 ? 0 : 1;
         knobs.doubleTiming = setting == 6;
         knobs.sidechainHz = setting == 8 ? 350 : 0;
@@ -95,7 +93,7 @@ int main(int argc, char**)
             bassCv = controlSum;
         if (setting == 8 && !(controlSum - bassCv > 2))
             return 8;
-        if ((setting == 0 && (rms < 6.70 || rms > 7.02 || controlSum < -3.55 || controlSum > -3.4))
+        if ((setting == 0 && (rms < 3.60 || rms > 3.82 || controlSum < -4.45 || controlSum > -4.24))
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }

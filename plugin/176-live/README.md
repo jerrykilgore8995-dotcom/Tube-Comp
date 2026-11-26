@@ -17,7 +17,11 @@ The right vernier position adjusts a first-order digital sidechain HPF from
 the transformer windings and existing reflected detector-current path.
 The 6AL5 current law is interpolated from a monotone table. The grid diode
 junction capacitances use fixed zero-bias values. Gain reduction indication
-uses the scaled control voltage. The supply retains load-dependent sag and
+uses the scaled control voltage. The Live ratio settings fit the two
+detector parameters (T3 tap fraction and 6AL5 bias return) to the transfer
+chart from the original UA 176 hardware manual. The fit uses settled 1 kHz
+measurements from 5 to 19 dB of gain reduction and a shared level offset
+for all four ratios. The supply retains load-dependent sag and
 0B2 regulation. It averages the mains transformer and rectifier while
 retaining C11D before the choke, C11A/B/C after the choke, C8B and C9B at
 the T3 B+ node, C9A on the V2 feed, C10 on the regulated rail and C8A
