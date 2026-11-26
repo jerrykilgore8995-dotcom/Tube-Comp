@@ -1,0 +1,150 @@
+name: 176 detector ripple isolation
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-detector-ripple.yml']
+  workflow_dispatch:
+jobs:
+  detector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        include:
+          - {"f":20,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":20,"ratio":2,"attack":0,"release":0}
+          - {"f":20,"ratio":2,"attack":1,"release":1}
+          - {"f":20,"ratio":2,"attack":1,"release":0}
+          - {"f":20,"ratio":2,"attack":0,"release":1}
+          - {"f":20,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":20,"ratio":4,"attack":0,"release":0}
+          - {"f":20,"ratio":4,"attack":1,"release":1}
+          - {"f":20,"ratio":4,"attack":1,"release":0}
+          - {"f":20,"ratio":4,"attack":0,"release":1}
+          - {"f":20,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":20,"ratio":8,"attack":0,"release":0}
+          - {"f":20,"ratio":8,"attack":1,"release":1}
+          - {"f":20,"ratio":8,"attack":1,"release":0}
+          - {"f":20,"ratio":8,"attack":0,"release":1}
+          - {"f":20,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":20,"ratio":12,"attack":0,"release":0}
+          - {"f":20,"ratio":12,"attack":1,"release":1}
+          - {"f":20,"ratio":12,"attack":1,"release":0}
+          - {"f":20,"ratio":12,"attack":0,"release":1}
+          - {"f":30,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":30,"ratio":2,"attack":0,"release":0}
+          - {"f":30,"ratio":2,"attack":1,"release":1}
+          - {"f":30,"ratio":2,"attack":1,"release":0}
+          - {"f":30,"ratio":2,"attack":0,"release":1}
+          - {"f":30,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":30,"ratio":4,"attack":0,"release":0}
+          - {"f":30,"ratio":4,"attack":1,"release":1}
+          - {"f":30,"ratio":4,"attack":1,"release":0}
+          - {"f":30,"ratio":4,"attack":0,"release":1}
+          - {"f":30,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":30,"ratio":8,"attack":0,"release":0}
+          - {"f":30,"ratio":8,"attack":1,"release":1}
+          - {"f":30,"ratio":8,"attack":1,"release":0}
+          - {"f":30,"ratio":8,"attack":0,"release":1}
+          - {"f":30,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":30,"ratio":12,"attack":0,"release":0}
+          - {"f":30,"ratio":12,"attack":1,"release":1}
+          - {"f":30,"ratio":12,"attack":1,"release":0}
+          - {"f":30,"ratio":12,"attack":0,"release":1}
+          - {"f":50,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":50,"ratio":2,"attack":0,"release":0}
+          - {"f":50,"ratio":2,"attack":1,"release":1}
+          - {"f":50,"ratio":2,"attack":1,"release":0}
+          - {"f":50,"ratio":2,"attack":0,"release":1}
+          - {"f":50,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":50,"ratio":4,"attack":0,"release":0}
+          - {"f":50,"ratio":4,"attack":1,"release":1}
+          - {"f":50,"ratio":4,"attack":1,"release":0}
+          - {"f":50,"ratio":4,"attack":0,"release":1}
+          - {"f":50,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":50,"ratio":8,"attack":0,"release":0}
+          - {"f":50,"ratio":8,"attack":1,"release":1}
+          - {"f":50,"ratio":8,"attack":1,"release":0}
+          - {"f":50,"ratio":8,"attack":0,"release":1}
+          - {"f":50,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":50,"ratio":12,"attack":0,"release":0}
+          - {"f":50,"ratio":12,"attack":1,"release":1}
+          - {"f":50,"ratio":12,"attack":1,"release":0}
+          - {"f":50,"ratio":12,"attack":0,"release":1}
+          - {"f":100,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":100,"ratio":2,"attack":0,"release":0}
+          - {"f":100,"ratio":2,"attack":1,"release":1}
+          - {"f":100,"ratio":2,"attack":1,"release":0}
+          - {"f":100,"ratio":2,"attack":0,"release":1}
+          - {"f":100,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":100,"ratio":4,"attack":0,"release":0}
+          - {"f":100,"ratio":4,"attack":1,"release":1}
+          - {"f":100,"ratio":4,"attack":1,"release":0}
+          - {"f":100,"ratio":4,"attack":0,"release":1}
+          - {"f":100,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":100,"ratio":8,"attack":0,"release":0}
+          - {"f":100,"ratio":8,"attack":1,"release":1}
+          - {"f":100,"ratio":8,"attack":1,"release":0}
+          - {"f":100,"ratio":8,"attack":0,"release":1}
+          - {"f":100,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":100,"ratio":12,"attack":0,"release":0}
+          - {"f":100,"ratio":12,"attack":1,"release":1}
+          - {"f":100,"ratio":12,"attack":1,"release":0}
+          - {"f":100,"ratio":12,"attack":0,"release":1}
+          - {"f":200,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":200,"ratio":2,"attack":0,"release":0}
+          - {"f":200,"ratio":2,"attack":1,"release":1}
+          - {"f":200,"ratio":2,"attack":1,"release":0}
+          - {"f":200,"ratio":2,"attack":0,"release":1}
+          - {"f":200,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":200,"ratio":4,"attack":0,"release":0}
+          - {"f":200,"ratio":4,"attack":1,"release":1}
+          - {"f":200,"ratio":4,"attack":1,"release":0}
+          - {"f":200,"ratio":4,"attack":0,"release":1}
+          - {"f":200,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":200,"ratio":8,"attack":0,"release":0}
+          - {"f":200,"ratio":8,"attack":1,"release":1}
+          - {"f":200,"ratio":8,"attack":1,"release":0}
+          - {"f":200,"ratio":8,"attack":0,"release":1}
+          - {"f":200,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":200,"ratio":12,"attack":0,"release":0}
+          - {"f":200,"ratio":12,"attack":1,"release":1}
+          - {"f":200,"ratio":12,"attack":1,"release":0}
+          - {"f":200,"ratio":12,"attack":0,"release":1}
+          - {"f":1000,"ratio":2,"attack":0.5,"release":0.8}
+          - {"f":1000,"ratio":2,"attack":0,"release":0}
+          - {"f":1000,"ratio":2,"attack":1,"release":1}
+          - {"f":1000,"ratio":2,"attack":1,"release":0}
+          - {"f":1000,"ratio":2,"attack":0,"release":1}
+          - {"f":1000,"ratio":4,"attack":0.5,"release":0.8}
+          - {"f":1000,"ratio":4,"attack":0,"release":0}
+          - {"f":1000,"ratio":4,"attack":1,"release":1}
+          - {"f":1000,"ratio":4,"attack":1,"release":0}
+          - {"f":1000,"ratio":4,"attack":0,"release":1}
+          - {"f":1000,"ratio":8,"attack":0.5,"release":0.8}
+          - {"f":1000,"ratio":8,"attack":0,"release":0}
+          - {"f":1000,"ratio":8,"attack":1,"release":1}
+          - {"f":1000,"ratio":8,"attack":1,"release":0}
+          - {"f":1000,"ratio":8,"attack":0,"release":1}
+          - {"f":1000,"ratio":12,"attack":0.5,"release":0.8}
+          - {"f":1000,"ratio":12,"attack":0,"release":0}
+          - {"f":1000,"ratio":12,"attack":1,"release":1}
+          - {"f":1000,"ratio":12,"attack":1,"release":0}
+          - {"f":1000,"ratio":12,"attack":0,"release":1}
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - name: Isolate CV ripple and compare attack topology
+        run: /usr/bin/python3 detector-spice-audit.py ${{ matrix.f }} ${{ matrix.ratio }} ${{ matrix.attack }} ${{ matrix.release }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detector-${{ strategy.job-index }}
+          path: |
+            research/176/mkii-wdf/detector-spice-results.json
+            research/176/mkii-wdf/spice-*.log
