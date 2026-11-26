@@ -123,7 +123,9 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  detector("V4A","DET_A","DET_K1");detector("V4B","DET_A","DET_K2");
  const enabled=opts.enabled??true;
  R("R_S4_ON","CV","ATK_IN",enabled?.001:1e12,false);R("R_S4_OFF","CV","0",enabled?1e12:.001,false);
- R("R32","ATK_IN","DET_A",1e4);R("R33","ATK_IN","DET_A",Math.max(.001,25000*(1-attack)));
+ // C-10476: R32 shunts only CCW-to-wiper section of R33.
+ if(opts.oldAttack){R("R32","ATK_IN","DET_A",1e4);R("R33","ATK_IN","DET_A",Math.max(.001,25000*(1-attack)));}
+ else {R("R32","ATK_IN","ATK_WIPER",1e4);R("R33","ATK_IN","ATK_WIPER",Math.max(.001,25000*attack));R("R33","ATK_WIPER","DET_A",Math.max(.001,25000*(1-attack)));}
  R("R34A","DET_A","REL_WIPER",Math.max(.001,5e6*(1-release)));R("R34B","REL_WIPER","0",Math.max(.001,5e6*release));R("R35","REL_WIPER","0",270e3);
  // Observe differential winding voltages via existing passive port voltages.
  const obsNames=["T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
