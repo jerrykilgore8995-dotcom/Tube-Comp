@@ -66,6 +66,9 @@ internal sealed partial class FrontEnd
             (v, a, b));
     }
 
+    // Use one fixed line-stage pairing in the exported Live circuit.
+    private double LineHalfScale(bool isA) => export ? (isA ? 1.025 : .975) : 1;
+
     private void LineTube(string p, string g, string k, bool ax7)
     {
         Expression vp = Node(p).V - Node(k).V;
@@ -85,28 +88,30 @@ internal sealed partial class FrontEnd
         var kvb = ax7 ? 300 : 1247.69;
         var x = kp * (1 / mu + (vg - (ax7 ? 0 : .6206)) * Binary.Power(kvb + vp * vp, -.5));
         var exponent = ax7 ? 1.4 : 1.181;
-        var gain = 2 / (ax7 ? 1060 : 945.75);
+        var isA = p.EndsWith("A");
+        var scale = LineHalfScale(isA);
+        var gain = scale * 2 / (ax7 ? 1060 : 945.75);
         Expression plateLaw = export
             ? Call.New("plate", vp, vg, kp / mu, kp, kp, kvb, ax7 ? 0 : -.6206, gain, exponent)
             : gain * PositivePow(vp * Softplus(x) / kp, exponent);
         Current("I_" + p, p, k, plateLaw, (vp, p, k), (vg, g, k));
-        R(p, k, 1e9);
-        C(g, k, ax7 ? 2.3e-12 : 2.9e-12);
-        C(g, p, ax7 ? 2.4e-12 : 2.5e-12);
-        C(p, k, ax7 ? .9e-12 : .5e-12);
+        R(p, k, 1e9 * scale);
+        C(g, k, (ax7 ? 2.3e-12 : 2.9e-12) * scale);
+        C(g, p, (ax7 ? 2.4e-12 : 2.5e-12) * scale);
+        C(p, k, (ax7 ? .9e-12 : .5e-12) * scale);
         if (ax7)
         {
             var junction = g + "_D";
-            R(g, junction, 2001);
+            R(g, junction, 2001 * scale);
             GridDiode(g, junction, k, 1);
-            C(junction, k, 10e-12);
+            C(junction, k, 10e-12 * scale);
         }
         else
         {
             Expression denominator = 6.624 + vp;
             Current("IG_" + p, g, k,
                 (.00082 + .162 / Call.If(denominator > 1, denominator, 1)) *
-                (2 * mu / 945.75) * PositivePow(vg + 1.03, 1.3), (vp, p, k), (vg, g, k));
+                (scale * 2 * mu / 945.75) * PositivePow(vg + 1.03, 1.3), (vp, p, k), (vg, g, k));
         }
     }
 
@@ -145,23 +150,24 @@ internal sealed partial class FrontEnd
 
     private void LineStage(Settings settings)
     {
-        R("NEXT_P", "0", 20e3);
-        R("NEXT_N", "0", 20e3);
+        R("NEXT_P", "0", 20e3 * LineHalfScale(true));
+        R("NEXT_N", "0", 20e3 * LineHalfScale(false));
         LineTube("V2PA", "NEXT_P", "V2KA", true);
         LineTube("V2PB", "NEXT_N", "V2KB", true);
-        R("V2KA", "V2_RETURN", 2200);
-        R("V2KB", "V2_RETURN", 2200);
+        R("V2KA", "V2_RETURN", 2200 * LineHalfScale(true));
+        R("V2KB", "V2_RETURN", 2200 * LineHalfScale(false));
         R("V2_RETURN", "0", 2200);
         R("T3_CT", "V2_SUPPLY", 47e3);
         C("V2_SUPPLY", "0", 10e-6);
         foreach (var side in new[] { "A", "B" })
         {
-            R("V3P" + side, "FEEDBACK_" + side, 180e3);
-            R("FEEDBACK_" + side, "0", 180e3);
-            C("FEEDBACK_" + side, "V2K" + side, .47e-6);
-            R("V2P" + side, "V2_SUPPLY", 220e3);
-            C("V2P" + side, "V3G" + side, .1e-6);
-            R("V3G" + side, "0", 1.2e6);
+            var part = LineHalfScale(side == "A");
+            R("V3P" + side, "FEEDBACK_" + side, 180e3 * part);
+            R("FEEDBACK_" + side, "0", 180e3 * part);
+            C("FEEDBACK_" + side, "V2K" + side, .47e-6 * part);
+            R("V2P" + side, "V2_SUPPLY", 220e3 * part);
+            C("V2P" + side, "V3G" + side, .1e-6 * part);
+            R("V3G" + side, "0", 1.2e6 * part);
             LineTube("V3P" + side, "V3G" + side, "V3K", false);
         }
         R("V3K", "0", 330);

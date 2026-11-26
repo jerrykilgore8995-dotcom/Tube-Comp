@@ -376,10 +376,18 @@ public:
         knobs[2].onValueChange = [this] {
             knobs[2].setTooltip(juce::String(knobs[2].getValue(), 0) + "% dry");
         };
+        hpfFrequency.setJustificationType(juce::Justification::centred);
+        hpfFrequency.setFont(juce::FontOptions(9.f));
+        hpfFrequency.setColour(juce::Label::textColourId, juce::Colour(0xffe3d4ad));
+        hpfFrequency.setBorderSize(juce::BorderSize<int>(0));
+        hpfFrequency.setInterceptsMouseClicks(false, false);
+        addAndMakeVisible(hpfFrequency);
         knobs[4].onValueChange = [this] {
             const auto hz = knobs[4].getValue();
+            const auto frequency = juce::String(hz, 0) + " Hz";
+            hpfFrequency.setText(frequency, juce::dontSendNotification);
             knobs[4].setTooltip(hz == 0 ? juce::String("Sidechain HPF off")
-                                      : juce::String(hz, 0) + " Hz sidechain HPF");
+                                      : frequency + " sidechain HPF");
         };
         knobs[2].onValueChange();
         knobs[4].onValueChange();
@@ -408,6 +416,7 @@ public:
     {
 #ifdef UA176_LIVE
         doubleSwitch.setBounds(811, 48, 41, 38);
+        hpfFrequency.setBounds(742, 194, 60, 11);
 #endif
         constexpr std::array<int, 7> x{237, 370, 370, 772, 772, 904, 1035};
         constexpr std::array<int, 7> y{121, 67, 166, 67, 166, 121, 67};
@@ -487,6 +496,7 @@ private:
     };
     DoubleLook doubleLook;
     juce::TextButton doubleSwitch{"Double"};
+    juce::Label hpfFrequency;
     std::unique_ptr<State::ButtonAttachment> doubleAttachment;
 #endif
     Processor& processor;
