@@ -109,8 +109,9 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
   ls.push(cfg.L/cfg.turns**2);ids.push(L("T3:LS","T3:OUT_RAW","T3_N",ls.at(-1)));
   for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)mutual.push([ids[i],ids[j],2*cfg.k*Math.sqrt(ls[i]*ls[j])/dt]);
   R("T3:RS","T3:OUT_RAW","T3:OUT_LEAK",cfg.secondaryDcr,false);L("T3:LSLeak","T3:OUT_LEAK","T3_P",cfg.secondaryLeak);
-  R("T3:RC","V3PA","V3PB",500e3,false);C("T3:CS","T3_P","T3_N",cfg.cap,false);
-  addCore("T3","V3PA","V3PB",cfg.L,Math.SQRT2*.775*10**(28/20)*cfg.turns/(2*Math.PI*50),{saturation:.35});
+  constraint("T3:coreVoltage",[...branch("T3:CORE","0"),...ids.slice(0,8).flatMap(i=>ports[i].inc.map(([j,v])=>[j,-v]))],()=>0);
+  R("T3:RC","T3:CORE","0",500e3,false);C("T3:CS","T3_P","T3_N",cfg.cap,false);
+  addCore("T3","T3:CORE","0",cfg.L,Math.SQRT2*.775*10**(28/20)*cfg.turns/(2*Math.PI*50),{saturation:.35});
   const j={2:1,4:2,8:3,12:4}[ratio];
   R("T3:TAPA",j===4?"V3PA":"T3:A"+j,"TAP_A",.001,false);
   R("T3:TAPB",j===4?"V3PB":"T3:B"+j,"TAP_B",.001,false);
