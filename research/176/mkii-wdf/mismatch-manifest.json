@@ -1,247 +1,247 @@
 {
   "source": "ua176-input-stage:spice/176/powered.cir",
   "seed": "176-MKII-v1",
-  "notes": "Fixed physical top-level resistors and capacitors; exclude ideal switches, external loads, transformer equivalent parameters and potentiometer segments; triode BPL scale ±2.5%, no independent gm/rp tuning. Ratio switch resistors and pots still nominal pending physical control inventory.",
+  "notes": "Fixed deterministic physical-component mismatch. Plate feed/feedback resistors ±1–2%; other discrete resistors and pot totals ±1.5–5%; discrete capacitors ±1–2%. Shared pot segments keep their common total tolerance. Physical ratio return resistors separately varied. Excludes external source/load, ideal switches, transformer winding equivalent parameters and intrinsic tube parasitics. 12AX7/12BH7 plate-current law ±2.5% about nominal, a 5% difference relative to mean at the same voltages; no independent gm/rp tuning. This is an unmeasured tolerance sample, not hardware characterization.",
   "records": [
     {
       "name": "R2",
       "nominal": "10k",
-      "fraction": -0.017302784700877965
+      "fraction": -0.020329203407745806
     },
     {
       "name": "R3",
       "nominal": "6.8k",
-      "fraction": -0.017029340632725508
+      "fraction": 0.04408124724635855
     },
     {
       "name": "R4",
       "nominal": "6.8k",
-      "fraction": -0.01894344910979271
+      "fraction": -0.02730971440207213
     },
     {
       "name": "R5",
       "nominal": "10k",
-      "fraction": -0.01867000504164025
+      "fraction": -0.034463887396268544
     },
     {
       "name": "C5",
       "nominal": ".1u",
-      "fraction": -0.01074730065651238
+      "fraction": 0.014901523194275797
     },
     {
       "name": "R7",
       "nominal": "47",
-      "fraction": -0.018123116905335336
+      "fraction": -0.0456988783669658
     },
     {
       "name": "R8",
       "nominal": "47",
-      "fraction": -0.01566212029196322
+      "fraction": -0.037513737066183245
     },
     {
       "name": "R9",
       "nominal": "330",
-      "fraction": -0.015388676223810762
+      "fraction": 0.04951755454996601
     },
     {
       "name": "R11",
       "nominal": "330",
-      "fraction": -0.025641970396973194
+      "fraction": 0.035539170897100125
     },
     {
       "name": "C10",
       "nominal": ".1u",
-      "fraction": 0.017434640554711223
+      "fraction": 0.013530017458833754
     },
     {
       "name": "R12",
       "nominal": "4.7k",
-      "fraction": -0.013118689847178757
+      "fraction": 0.017487859884276986
     },
     {
       "name": "R14",
       "nominal": "4.7k",
-      "fraction": -0.013274943600408734
+      "fraction": -0.018119728686288
     },
     {
       "name": "C11D",
       "nominal": "20u",
-      "fraction": -0.015088972565717996
+      "fraction": -0.016799676320515572
     },
     {
       "name": "C11A",
       "nominal": "20u",
-      "fraction": -0.015479606948792935
+      "fraction": -0.011336667709983886
     },
     {
       "name": "C11B",
       "nominal": "20u",
-      "fraction": -0.015245226318947971
+      "fraction": -0.019805043754167855
     },
     {
       "name": "C11C",
       "nominal": "20u",
-      "fraction": -0.01532335319556296
+      "fraction": 0.0194259429583326
     },
     {
       "name": "R44",
       "nominal": "1k",
-      "fraction": 0.032509100297465926
+      "fraction": 0.042570375201758
     },
     {
       "name": "C8B",
       "nominal": "20u",
-      "fraction": -0.011933459131978453
+      "fraction": -0.011200025496073067
     },
     {
       "name": "R43",
       "nominal": "10k",
-      "fraction": 0.032235656229313465
+      "fraction": -0.026302029315847904
     },
     {
       "name": "R15",
       "nominal": "20k",
-      "fraction": -0.026735746669583026
+      "fraction": -0.021549423607066274
     },
     {
       "name": "R17",
       "nominal": "20k",
-      "fraction": -0.02728263480588794
+      "fraction": -0.03613117115804926
     },
     {
       "name": "R19",
       "nominal": "2.2k",
-      "fraction": -0.027829522942192854
+      "fraction": 0.04116453888360411
     },
     {
       "name": "R20",
       "nominal": "2.2k",
-      "fraction": -0.032475674725137654
+      "fraction": -0.04313715201336891
     },
     {
       "name": "R16",
       "nominal": "2.2k",
-      "fraction": -0.02700919073773548
+      "fraction": -0.018306891447864473
     },
     {
       "name": "R22",
       "nominal": "{FBRES}",
-      "fraction": -0.015149303674697877
+      "fraction": 0.016059355400502684
     },
     {
       "name": "R18",
       "nominal": "180k",
-      "fraction": -0.027556078874040393
+      "fraction": 0.03910767596447841
     },
     {
       "name": "C1",
       "nominal": ".47u",
-      "fraction": -0.010434793150052428
+      "fraction": -0.017612082744017245
     },
     {
       "name": "R25",
       "nominal": "{FBRES}",
-      "fraction": -0.014602415538392961
+      "fraction": 0.01738967926707119
     },
     {
       "name": "R21",
       "nominal": "180k",
-      "fraction": -0.032202230656985194
+      "fraction": 0.029135786769911645
     },
     {
       "name": "C2",
       "nominal": ".47u",
-      "fraction": -0.010512920026667417
+      "fraction": 0.011827959781512618
     },
     {
       "name": "R23",
       "nominal": "220k",
-      "fraction": -0.015071176798082888
+      "fraction": -0.01498841398395598
     },
     {
       "name": "R24",
       "nominal": "220k",
-      "fraction": -0.01468054241500795
+      "fraction": -0.017947956048883495
     },
     {
       "name": "C3",
       "nominal": ".1u",
-      "fraction": -0.010591046903282404
+      "fraction": 0.017099134754389525
     },
     {
       "name": "C4",
       "nominal": ".1u",
-      "fraction": -0.010669173779897392
+      "fraction": -0.012979031144641339
     },
     {
       "name": "R27",
       "nominal": "1.2meg",
-      "fraction": -0.03165534252068028
+      "fraction": 0.03513035730458796
     },
     {
       "name": "R29",
       "nominal": "1.2meg",
-      "fraction": -0.030014678111765534
+      "fraction": -0.04455322309397161
     },
     {
       "name": "R28",
       "nominal": "330",
-      "fraction": -0.03028812217991799
+      "fraction": 0.020865526222623883
     },
     {
       "name": "C9B",
       "nominal": "10u",
-      "fraction": -0.015215472914278508
+      "fraction": 0.012004895559512079
     },
     {
       "name": "R26",
       "nominal": "47k",
-      "fraction": -0.03192878658883273
+      "fraction": -0.04034434267086909
     },
     {
       "name": "C9A",
       "nominal": "10u",
-      "fraction": -0.014981092284433544
+      "fraction": 0.01557912849355489
     },
     {
       "name": "C6",
       "nominal": ".5u",
-      "fraction": -0.010825427533127367
+      "fraction": -0.018181548919528723
     },
     {
       "name": "C7",
       "nominal": ".5u",
-      "fraction": -0.010903554409742356
+      "fraction": -0.018686920488253236
     },
     {
       "name": "R36",
       "nominal": "220k",
-      "fraction": 0.03362133964663372
+      "fraction": -0.043264108630828566
     },
     {
       "name": "R37",
       "nominal": "220k",
-      "fraction": 0.03334789557848126
+      "fraction": 0.023150002288166435
     },
     {
       "name": "R38",
       "nominal": "82k",
-      "fraction": 0.03635578032815829
+      "fraction": -0.02396472912048921
     },
     {
       "name": "C8A",
       "nominal": "20u",
-      "fraction": -0.012167839761823417
+      "fraction": 0.01745873099192977
     },
     {
       "name": "R32",
       "nominal": "10k",
-      "fraction": 0.03471511591924355
+      "fraction": -0.046727729544509204
     },
     {
       "name": "R35",
       "nominal": "270k",
-      "fraction": 0.032801007442176344
+      "fraction": -0.04374188321176917
     },
     {
       "name": "XV2A",
@@ -262,6 +262,96 @@
       "name": "XV3B",
       "model": "UA176_12BH7",
       "plateCurrentScale": 0.975
+    },
+    {
+      "name": "R1",
+      "nominal": "{max(1u,300*VERNIER)}",
+      "fraction": -0.027292608423158525,
+      "sharedPot": "R1"
+    },
+    {
+      "name": "R6A",
+      "nominal": "{max(1m,100*CATHBAL)}",
+      "fraction": -0.024504331497009844,
+      "sharedPot": "R6A/R6B"
+    },
+    {
+      "name": "R6B",
+      "nominal": "{max(1m,100*(1-CATHBAL))}",
+      "fraction": -0.024504331497009844,
+      "sharedPot": "R6A/R6B"
+    },
+    {
+      "name": "R10A",
+      "nominal": "{max(1m,1k*METERZERO)}",
+      "fraction": 0.04078346287598834,
+      "sharedPot": "R10A/R10B"
+    },
+    {
+      "name": "R10B",
+      "nominal": "{max(1m,1k*(1-METERZERO))}",
+      "fraction": 0.04078346287598834,
+      "sharedPot": "R10A/R10B"
+    },
+    {
+      "name": "R13A",
+      "nominal": "{max(1m,1k*PLATEBAL)}",
+      "fraction": 0.015474654794670643,
+      "sharedPot": "R13A/R13B"
+    },
+    {
+      "name": "R13B",
+      "nominal": "{max(1m,1k*(1-PLATEBAL))}",
+      "fraction": 0.015474654794670643,
+      "sharedPot": "R13A/R13B"
+    },
+    {
+      "name": "R30",
+      "nominal": "{max(1m,300*OUTVERNIER)}",
+      "fraction": -0.02981849768199027,
+      "sharedPot": "R30"
+    },
+    {
+      "name": "R33",
+      "nominal": "{max(1m,25k*(1-ATTACK))}",
+      "fraction": -0.028050694165285675,
+      "sharedPot": "R33"
+    },
+    {
+      "name": "R34A",
+      "nominal": "{max(1m,5meg*(1-RELEASE))}",
+      "fraction": -0.03663335028802976,
+      "sharedPot": "R34A/R34B"
+    },
+    {
+      "name": "R34B",
+      "nominal": "{max(1m,5meg*RELEASE)}",
+      "fraction": -0.03663335028802976,
+      "sharedPot": "R34A/R34B"
+    },
+    {
+      "name": "R47",
+      "nominal": "1k",
+      "fraction": 0.03840648523764685,
+      "ratio": 2
+    },
+    {
+      "name": "R46",
+      "nominal": "6.8k",
+      "fraction": -0.020503182536922397,
+      "ratio": 4
+    },
+    {
+      "name": "R45",
+      "nominal": "20k",
+      "fraction": 0.028986334507353606,
+      "ratio": 8
+    },
+    {
+      "name": "R39",
+      "nominal": "47k",
+      "fraction": -0.03754555393010378,
+      "ratio": 12
     }
   ]
 }
