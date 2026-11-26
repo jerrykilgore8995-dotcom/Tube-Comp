@@ -8,7 +8,7 @@ def run(db,loss,mode,frozen=None):
     amp=2*np.sqrt(2)*.775*10**(db/20)
     s=deck
     for k,v in dict(AMP=amp,FREQ=f,RATIO=int(ratio),ATTACK=attack,RELEASE=release,LOSSDB=loss,LIMITING=int(mode!='off')).items():
-        s=re.sub(r'(?<=\b'+k+r'=)[^\s]+',str(v),s,count=1)
+        s=re.sub(r'(?m)(^\.param[^\n]*?\b'+k+r'=)[^\s]+',lambda m:m.group(1)+str(v),s,count=1)
     if mode=='old':
         s=re.sub(r'^R32 ATK_IN ATK_WIPER (.*)$',r'R32 ATK_IN DET_A \1',s,flags=re.M)
         s=re.sub(r'^R33A .*\nR33B ATK_WIPER DET_A (.*)$',r'R33 ATK_IN DET_A \1',s,flags=re.M)
