@@ -125,6 +125,9 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  R("R_S4_ON","CV","ATK_IN",enabled?.001:1e12,false);R("R_S4_OFF","CV","0",enabled?1e12:.001,false);
  R("R32","ATK_IN","DET_A",1e4);R("R33","ATK_IN","DET_A",Math.max(.001,25000*(1-attack)));
  R("R34A","DET_A","REL_WIPER",Math.max(.001,5e6*(1-release)));R("R34B","REL_WIPER","0",Math.max(.001,5e6*release));R("R35","REL_WIPER","0",270e3);
+ // Observe differential winding voltages via existing passive port voltages.
+ const obsNames=["T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
+ const obs=obsNames.map(name=>{const index=ports.findIndex(p=>p.name===name);if(index<0)throw Error(name);return index;});
  const cv=ports.findIndex(p=>p.name==="C5"),rect=ports.findIndex(p=>p.name==="C11D"),reg=ports.findIndex(p=>p.name==="C10"),bplus=ports.findIndex(p=>p.name==="C8B");
  const mat=(n,m)=>Array.from({length:n},()=>Array(m).fill(0));
  const A=mat(nodes.size,ports.length),Z=mat(ports.length,ports.length),Q=mat(nodes.size,constraints.length);
@@ -144,7 +147,7 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
   for(const m of magnetics)m.core.commit((r.a[m.p]+r.b[m.p])/2);
   const voltage=i=>(r.a[i]+r.b[i])/2;
   for(let j=0;j<ports.length;j++){if(ports[j].type==="C")b[j]=r.a[j];else if(ports[j].type==="L")b[j]=-r.a[j];}
-  return {audio:voltage(output),cv:voltage(cv),rect:voltage(rect),reg:voltage(reg),bplus:voltage(bplus),iterations:r.iterations};
+  return {audio:voltage(output),cv:voltage(cv),rect:voltage(rect),reg:voltage(reg),bplus:voltage(bplus),iterations:r.iterations,...Object.fromEntries(obsNames.map((name,i)=>[name,voltage(obs[i])])),...Object.fromEntries(magnetics.map(m=>[m.name+":Iexcess",(r.a[m.p]-r.b[m.p])/(2*ports[m.p].z)]))};
  }
  return {step,magneticDiagnostics:()=>Object.fromEntries(magnetics.map(m=>[m.name,m.core.diagnostics()])),inventory:{nodes:nodes.size,ports:ports.length,nonlinear:indices.length,idealConstraints:constraints.length,couplings:mutual.length},ports:ports.map(p=>p.name)};
 }
