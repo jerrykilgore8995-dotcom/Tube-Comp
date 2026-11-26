@@ -18,7 +18,10 @@ the transformer windings and existing reflected detector-current path.
 The 6AL5 current law is interpolated from a monotone table. The grid diode
 junction capacitances use fixed zero-bias values. Gain reduction indication
 uses the scaled control voltage. The supply retains load-dependent sag and
-0B2 regulation and averages out mains ripple and rectifier startup.
+0B2 regulation. It averages the mains transformer and rectifier while
+retaining C11D before the choke, C11A/B/C after the choke, C8B and C9B at
+the T3 B+ node, C9A on the V2 feed, C10 on the regulated rail and C8A
+on the detector bias feed.
 
 At 44.1 kHz, the source response is reconstructed at the device ports
 from the continuous circuit, interpolating between operating points

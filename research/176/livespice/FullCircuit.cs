@@ -122,23 +122,22 @@ internal sealed partial class FrontEnd
             R("HV_B_OC", "HV_B", 100);
             foreach (var a in new[] { "HV_A", "HV_B" })
                 Current("I_" + a, a, "RECT", .00331 * PositivePow(Node(a).V - Node("RECT").V, 1.5));
-            C("RECT", "0", 20e-6);
-            L("RECT", "CHOKE_END", 10);
-            R("CHOKE_END", "FILTER", 150);
-            C("FILTER", "0", 60e-6);
             Current("I_REG", "REG", "0", PositivePow(Node("REG").V - 107.55, 1) / 33);
         }
         else
         {
-            // Warm, averaged replacement for T4, rectifier and choke. The effective
-            // upstream source resistance retains load-dependent B+ and sag.
-            // Fit to the warmed ngspice supply at 55, 60 and 65 mA.
+            // Average T4 and the rectifier while retaining the original
+            // reservoir and choke filter. The total series resistance still
+            // matches the warmed supply fit at 55, 60 and 65 mA.
             V("FILTER_AVERAGE", "SUPPLY_DC", "0", 439.417);
-            R("SUPPLY_DC", "FILTER", 678.671);
-            C("FILTER", "0", 60e-6);
+            R("SUPPLY_DC", "RECT", 528.671);
             V("REG_REFERENCE", "REG_DC", "0", 107.55);
             R("REG", "REG_DC", 33);
         }
+        C("RECT", "0", 20e-6); // C11D
+        L("RECT", "CHOKE_END", 10);
+        R("CHOKE_END", "FILTER", 150);
+        C("FILTER", "0", 60e-6); // C11A, C11B and C11C
         R("FILTER", "T3_CT", 1000);
         C("T3_CT", "0", 30e-6); // C8B and C9B share this node
         R("T3_CT", "REG", 10e3);
