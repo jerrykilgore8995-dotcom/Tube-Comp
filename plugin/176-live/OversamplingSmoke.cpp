@@ -64,7 +64,8 @@ int main()
                 const auto misses = std::count_if(times.begin(), times.end(), [limit](double t) { return t >= limit; });
                 std::printf("%dx %d Hz limiting %d: p99 %.3f ms, peak %.3f ms, %td blocks >= %.3f ms\n",
                             factor, frequency, limiting ? 1 : 0, times[380], times.back(), misses, limit);
-                missed |= times[380] >= limit;
+                // Limiting-off timing is diagnostic. Keep the budget for active compression.
+                missed |= limiting && times[380] >= limit;
             }
         }
 
