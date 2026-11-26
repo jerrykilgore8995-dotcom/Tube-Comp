@@ -1,0 +1,30 @@
+name: 176 corrected JBB WDF retest
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-jbb-retest.yml']
+  workflow_dispatch:
+jobs:
+  retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        freq: [20, 50, 100]
+        model: [GE, Philips, legacy]
+        timing: ['0 0', '0.5 0.8', '1 1']
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node jbb-retest.mjs ${{ matrix.freq }} 4 ${{ matrix.timing }} ${{ matrix.model }} 44100 20
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jbb-${{ strategy.job-index }}
+          path: research/176/mkii-wdf/jbb-results.json
