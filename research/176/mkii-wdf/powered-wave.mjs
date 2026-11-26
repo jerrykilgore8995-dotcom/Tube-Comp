@@ -1,10 +1,11 @@
 // Fixed-control offline 176 full-topology WDF prototype. See model differences in README.
 import {adaptor,nonlinearStep,prepareNonlinear} from './wave-core.mjs';
+import {magneticCore} from './magnetic-core.mjs';
 function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const fs=opts.fs??44100,dt=1/fs,ratio=opts.ratio??2,loss=opts.loss??20,attack=opts.attack??.5,release=opts.release??.8;
  const factors=Object.fromEntries(manifest.records.filter(x=>x.fraction!==undefined).map(x=>[x.name,1+x.fraction]));
  const fac=(name)=>factors[name]??1;
- const nodes=new Map(),ports=[],constraints=[],mutual=[],devices=[];
+ const nodes=new Map(),ports=[],constraints=[],mutual=[],devices=[],magnetics=[];
  const node=n=>{if(n==="0")return -1;if(!nodes.has(n))nodes.set(n,nodes.size);return nodes.get(n)};
  const branch=(a,b)=>[[node(a),1],[node(b),-1]].filter(x=>x[0]>=0);
  const port=(name,a,b,z,type)=>{if(!(z>0))throw Error(name);ports.push({name,inc:branch(a,b),z,type});return ports.length-1};
@@ -41,11 +42,20 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
    if(type==="6BC8")diode(n+":grid",g,k,1e-9,1.5,2000,1e-12,1e-9);
    if(type==="12AX7"){R(n+":RG",g,n+":GD",2000,false);diode(n+":grid",n+":GD",k,1e-9,1,1,10e-12,1e-9);}
  };
+ const addCore=(name,a,b,L,lambdaKnee,settings={})=>{
+  if(opts.magnetics===false)return;
+  const config={fs,L,lambdaKnee,...settings,...(opts.cores?.[name]??{})};
+  const core=magneticCore(config),p=N(name+":MAG",a,b,Math.max(1,2*L/dt/1000));
+  device([p],v=>[core.current(v[0])]);magnetics.push({name,p,core});
+ };
  const transformer=(n,ip,inn,op,on,p)=>{
   const f=x=>n+":"+x;
   R(f("RP1"),ip,f("P1"),p.rp/2,false);R(f("RP2"),inn,f("PN"),p.rp/2,false);
   L(f("Lleak"),f("P1"),f("PP"),p.ll);L(f("Lmag"),f("PP"),f("PN"),p.lm);
   R(f("Rcore"),f("PP"),f("PN"),p.rc,false);
+  // Catalog level converted to an initial 50 Hz flux anchor, not a measured saturation threshold.
+  if(n==="T1")addCore(n,f("PP"),f("PN"),p.lm,Math.SQRT2*.775*10**(8/20)/(2*Math.PI*50),{saturation:.35});
+  if(n==="T2")addCore(n,f("PP"),f("PN"),p.lm,Math.SQRT2*Math.sqrt(.001*10**(15/10)*15000)*2.3/(2*Math.PI*50),{saturation:.35});
   T(f("turns"),f("PP"),f("PN"),f("SPLUS"),f("SMINUS"),p.n);
   R(f("RS1"),f("SPLUS"),op,p.rs/2,false);R(f("RS2"),f("SMINUS"),on,p.rs/2,false);
   C(f("Csec"),op,on,p.cs,false);C(f("Cwin1"),f("PP"),op,p.cw,false);C(f("Cwin2"),f("PN"),on,p.cw,false);
@@ -88,6 +98,8 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  L("T3:LLA","T3:PLEAKA","T3:HALF_A",.05);L("T3:LLB","T3:PLEAKB","T3:HALF_B",.05);
  const lp=[62.5,62.5,250/81],li=[L("T3:LPA","T3:HALF_A","T3_CT",lp[0]),L("T3:LPB","T3_CT","T3:HALF_B",lp[1]),L("T3:LS","T3:OUT_RAW","T3_N",lp[2])];
  for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)mutual.push([li[i],li[j],2*.99999*Math.sqrt(lp[i]*lp[j])/dt]);
+ // Full primary flux is common to both half-windings; excess current is reflected by the coupled network.
+ addCore("T3","T3:HALF_A","T3:HALF_B",250,Math.SQRT2*.775*10**(28/20)*9/(2*Math.PI*50),{saturation:.35});
  R("T3:RC","T3:HALF_A","T3:HALF_B",500e3,false);R("T3:RS","T3:OUT_RAW","T3_P",1,false);C("T3:CS","T3_P","T3_N",80e-12,false);
  const sel={2:[.12,1000,"R47"],4:[.29,6800,"R46"],8:[.58,20000,"R45"],12:[1,47000,"R39"]}[ratio];if(!sel)throw Error("invalid ratio");
  T("T3:TAPA","V3PA","T3_CT","TAP_A","T3_CT",opts.tap??sel[0]);T("T3:TAPB","V3PB","T3_CT","TAP_B","T3_CT",opts.tap??sel[0]);
@@ -129,10 +141,11 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
   const t=n/fs,e=constraints.map(x=>x.voltage(t,input));
   const r=solveStep(b,e,guess);
   guess=r.v;n++;
+  for(const m of magnetics)m.core.commit((r.a[m.p]+r.b[m.p])/2);
   const voltage=i=>(r.a[i]+r.b[i])/2;
   for(let j=0;j<ports.length;j++){if(ports[j].type==="C")b[j]=r.a[j];else if(ports[j].type==="L")b[j]=-r.a[j];}
   return {audio:voltage(output),cv:voltage(cv),rect:voltage(rect),reg:voltage(reg),bplus:voltage(bplus),iterations:r.iterations};
  }
- return {step,inventory:{nodes:nodes.size,ports:ports.length,nonlinear:indices.length,idealConstraints:constraints.length,couplings:mutual.length},ports:ports.map(p=>p.name)};
+ return {step,magneticDiagnostics:()=>Object.fromEntries(magnetics.map(m=>[m.name,m.core.diagnostics()])),inventory:{nodes:nodes.size,ports:ports.length,nonlinear:indices.length,idealConstraints:constraints.length,couplings:mutual.length},ports:ports.map(p=>p.name)};
 }
 export function create176(manifest,opts){return build176(adaptor,prepareNonlinear,manifest,opts);}
