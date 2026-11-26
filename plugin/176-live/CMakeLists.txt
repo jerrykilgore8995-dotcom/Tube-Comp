@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(UA176Live VERSION 0.1.9 LANGUAGES C CXX)
+project(UA176Live VERSION 0.2.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -24,7 +24,13 @@ add_custom_command(OUTPUT "${phaseProfiles}"
     DEPENDS UA176PhaseReference "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
     VERBATIM)
 
-add_library(UA176LiveCircuit STATIC Live176.cpp "${phaseProfiles}")
+set(oversampleData "${CMAKE_CURRENT_BINARY_DIR}/OversampleData.h")
+add_custom_command(OUTPUT "${oversampleData}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
+        "$<TARGET_FILE:UA176PhaseReference>" "${phaseProfiles}" --oversampling "${oversampleData}"
+    DEPENDS UA176PhaseReference "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
+    VERBATIM)
+add_library(UA176LiveCircuit STATIC Live176.cpp Oversampled176.cpp "${phaseProfiles}" "${oversampleData}")
 set_target_properties(UA176LiveCircuit PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(UA176LiveCircuit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 if(MSVC)
@@ -34,6 +40,8 @@ else()
 endif()
 add_executable(UA176LiveSmoke Smoke.cpp)
 target_link_libraries(UA176LiveSmoke PRIVATE UA176LiveCircuit)
+add_executable(UA176OversamplingSmoke OversamplingSmoke.cpp)
+target_link_libraries(UA176OversamplingSmoke PRIVATE UA176LiveCircuit)
 
 option(UA176_LIVE_BUILD_VST3 "Build the JUCE 176 Live plug-in" ON)
 if(UA176_LIVE_BUILD_VST3)

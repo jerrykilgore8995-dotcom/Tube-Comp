@@ -31,11 +31,16 @@ At 44.1 kHz, the source response is reconstructed at the device ports
 from the continuous circuit, interpolating between operating points
 according to the detector control voltage. Newton solves the difference
 between those reference currents and the actual nonlinear device currents.
-This uses native-rate samples and incurs 32 samples of host-reported latency.
-Mix and bypass share the same delay. Other sample rates use the held-source
-solver without this reconstruction. The detector solves its piecewise diode
+The native calculation uses 32 samples of internal alignment at 44.1 kHz.
+Right-click the faceplate background to select 1x, 2x, or 4x oversampling.
+The selected mode is saved with the project. Oversampling is available at
+44.1, 48, 88.2, 96, 176.4, and 192 kHz. The 2x and 4x modes apply a source
+correction derived from the discrete solver and the continuous LiveSPICE
+circuit, then run the nonlinear solve at the higher rate between half-band
+resampling stages. All modes report 168 samples of latency so the switch,
+Mix, and bypass can stay aligned. The detector solves its piecewise diode
 law directly against its self-impedance before the coupled Newton solve.
 
 The Windows workflow generates the circuit from the pinned LiveSPICE sources,
 generates the source profiles using NumPy and SciPy, benchmarks the native
-solver, builds the VST3 and packages it.
+and oversampled solvers, builds the VST3 and packages it.

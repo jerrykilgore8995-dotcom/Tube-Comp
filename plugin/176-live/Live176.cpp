@@ -17,7 +17,13 @@ template<int count>
 double dot(const double* a, const double* b) noexcept
 {
     __m256d sum = _mm256_setzero_pd();
+    __m256d second = _mm256_setzero_pd();
     int j = 0;
+    for (; j + 8 <= count; j += 8) {
+        sum = _mm256_fmadd_pd(_mm256_loadu_pd(a + j), _mm256_loadu_pd(b + j), sum);
+        second = _mm256_fmadd_pd(_mm256_loadu_pd(a + j + 4), _mm256_loadu_pd(b + j + 4), second);
+    }
+    sum = _mm256_add_pd(sum, second);
     for (; j + 4 <= count; j += 4)
         sum = _mm256_fmadd_pd(_mm256_loadu_pd(a + j), _mm256_loadu_pd(b + j), sum);
     const __m128d half = _mm_add_pd(_mm256_castpd256_pd128(sum), _mm256_extractf128_pd(sum, 1));
@@ -278,14 +284,18 @@ struct Live176::Circuit {
 #endif
     }
 
+    unsigned implicitDetectors = 0;
+
     void prepareDetectorPorts() noexcept
     {
+        implicitDetectors = 0;
         for (int device = detectorStart; device < deviceCount; ++device) {
             const int port = deviceOffsets[device];
             const double resistance = -response[port * columns + device + 2];
             detectorResistance[device] = resistance;
             if (resistance <= 0)
                 continue;
+            implicitDetectors |= 1u << device;
             auto& incident = detectorIncident[device - detectorStart];
             for (int i = 0; i < DiodeTable::count; ++i)
                 incident[i] = diodeTable.voltage[i] + resistance * diodeTable.current[i];
@@ -405,7 +415,7 @@ struct Live176::Circuit {
 
     bool factorJacobian() noexcept
     {
-        devicesAt<true>(voltages.data(), slopes.data());
+        devicesAt<true>(voltages.data(), slopes.data(), implicitDetectors);
         for (int device = detectorStart; device < deviceCount; ++device)
             if (detectorResistance[device] > 0)
                 slopes[deviceOffsets[device]] = detectorSlope[device];
@@ -488,7 +498,7 @@ struct Live176::Circuit {
             const auto* row = response.data() + port * columns + 2;
             voltages[port] = portBase[port] + dot<deviceCount>(row, currents.data());
         }
-        devicesAt<false>(voltages.data(), evaluation.data());
+        devicesAt<false>(voltages.data(), evaluation.data(), implicitDetectors);
         for (int device = detectorStart; device < deviceCount; ++device) {
             const double resistance = detectorResistance[device];
             if (resistance <= 0)

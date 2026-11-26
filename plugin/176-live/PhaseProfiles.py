@@ -10,7 +10,7 @@ import numpy as np
 from scipy import linalg
 
 
-def read_reference(path):
+def read_reference(path, raw=False):
     with path.open("rb") as stream:
         nodes, states, devices, device_voltages, ports = np.fromfile(stream, np.int32, count=5)
         state_indices = np.fromfile(stream, np.int32, count=states)
@@ -30,6 +30,8 @@ def read_reference(path):
     for device in range(devices):
         region = slice(offsets[device], offsets[device + 1])
         jacobian[device, region] = slopes[region]
+    if raw:
+        return conductance, mass, sources[:, :devices + 2], observe, jacobian, state_indices
     conductance -= sources[:, 2:devices + 2] @ jacobian @ observe
     return conductance, mass, sources[:, 1], observe, slopes
 
@@ -79,6 +81,60 @@ def build_profile(path):
     return impulse.T, discrete_poles, discrete_weights.T, slopes
 
 
+def build_oversampled_source(path, host_rate, factor):
+    conductance, mass, sources, observe, jacobian, states = read_reference(path, raw=True)
+    rate = host_rate * factor
+    main_output = observe.shape[0] - 6
+    # Reproduce the held-input SDIRK map from Live176::setup, then close
+    # its device currents at the end of the sample with the DC Jacobian.
+    gamma = 1 - 1 / np.sqrt(2.)
+    scale = 16 * rate / gamma
+    nodal = linalg.solve(conductance + scale * mass,
+                         np.column_stack((sources, scale * mass[:, states])))
+    held = sources.shape[1]
+    ports_and_states = np.vstack((observe, np.eye(len(conductance))[states]))
+    response = ports_and_states @ nodal
+    identity_tail = np.hstack((np.zeros((len(states), held)), np.eye(len(states))))
+    for weight in ((1 - gamma) / gamma, 1, 1, 1, 1):
+        response = (np.hstack((response[:, :held], np.zeros_like(response[:, held:])))
+                    + response[:, held:] @ ((1 - weight) * identity_tail
+                                              + weight * response[observe.shape[0]:]))
+    device_cols = response[:, 2:held]
+    h = np.column_stack((response[:, 1], response[:, held:]))
+    implicit = np.eye(len(jacobian)) - jacobian @ device_cols[:len(observe)]
+    h += device_cols @ linalg.solve(implicit, jacobian @ h[:len(observe)])
+    source, transition = h[len(observe):, 0], h[len(observe):, 1:]
+    probe, direct = h[main_output, 1:], h[main_output, 0]
+    transition, (state_scale, _) = linalg.matrix_balance(transition, permute=False, separate=True)
+    source = source / state_scale
+    probe = probe * state_scale
+    closed = conductance - sources[:, 2:held] @ jacobian @ observe
+    hz = np.r_[np.geomspace(20, 500, 60), np.linspace(510, 20000, 340),
+               np.linspace(20020, min(21000, host_rate * .475), 22)]
+    continuous, discrete = [], []
+    eye = np.eye(len(states))
+    for f in hz:
+        continuous.append(observe[main_output] @ linalg.solve(closed + 2j * np.pi * f * mass,
+                                                              sources[:, 1]))
+        q = np.exp(-2j * np.pi * f / rate)
+        discrete.append(direct + q * probe @ linalg.solve(eye - q * transition, source))
+    target = np.asarray(continuous) / discrete
+    taps = np.arange(-24, 25)
+    grid = np.exp(-2j * np.pi * hz[:, None] * taps / host_rate)
+    # Anchor DC and constrain the fit above the verified audio band.
+    upper = np.linspace(hz[-1] + 50, host_rate / 2, 28)
+    stop = np.exp(-2j * np.pi * upper[:, None] * taps / host_rate)
+    matrix = np.vstack((grid, 50 * np.ones((1, len(taps))), .02 * stop))
+    desired = np.r_[target, 50 * 1., .02 * np.ones(len(upper))]
+    coeff = linalg.lstsq(np.vstack((matrix.real, matrix.imag, 1e-4 * np.eye(len(taps)))),
+                         np.r_[desired.real, desired.imag, np.zeros(len(taps))])[0]
+    band = (hz >= 20) & (hz <= 20000)
+    error = (grid @ coeff)[band] / target[band]
+    if np.max(np.abs(np.angle(error, deg=True))) > 1 or np.max(np.abs(20 * np.log10(abs(error)))) > .15:
+        raise ValueError("Oversampled solver source correction missed the transfer target")
+    return coeff
+
+
 def initializer(values):
     if isinstance(values, np.ndarray):
         return "{" + ", ".join(initializer(value) for value in values) + "}"
@@ -91,10 +147,28 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("reference", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--oversampling", type=Path)
     args = parser.parse_args()
     profiles = []
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "reference.bin"
+        if args.oversampling:
+            subprocess.run([str(args.reference.resolve()), str(path), "0"], check=True)
+            from scipy.signal import firwin
+            halfband = firwin(193, .5, window=("kaiser", 8.96))
+            halfband[::2] = 0
+            halfband[96] = .5
+            with args.oversampling.open("w", encoding="utf-8") as out:
+                print("// Generated from the continuous and discrete LiveSPICE circuit.", file=out)
+                print(f"constexpr std::array<double, 193> halfband{initializer(halfband)};", file=out)
+                print("constexpr double sourceCorrection[6][2][49]{", file=out)
+                for rate in (44100, 48000, 88200, 96000, 176400, 192000):
+                    print("  {", file=out)
+                    for factor in (2, 4):
+                        print(f"    {initializer(build_oversampled_source(path, rate, factor))},", file=out)
+                    print("  },", file=out)
+                print("};", file=out)
+            return
         for bias in (0, -1.75, -3.5, -4.75, -6.5):
             subprocess.run([str(args.reference.resolve()), str(path), str(bias)], check=True)
             profiles.append((bias, *build_profile(path)))

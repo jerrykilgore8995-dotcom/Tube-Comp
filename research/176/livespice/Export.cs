@@ -106,7 +106,7 @@ internal sealed partial class FrontEnd
         }
         writer.WriteLine("}");
         var index = 0;
-        writer.WriteLine("template<bool derivative> void devicesAt(const double* v, double* out) {");
+        writer.WriteLine("template<bool derivative> void devicesAt(const double* v, double* out, unsigned implicitDetectors = 0) {");
         foreach (var (device, row) in devices.Select((d, i) => (d, i)))
         {
             var symbols = device.Voltages.Select((_, j) => (Expr)Variable.New("v" + j)).ToArray();
@@ -115,8 +115,10 @@ internal sealed partial class FrontEnd
                 writer.WriteLine($"    const double p{index + j} = v[{index + j}];");
             if (device.Law is Call call && call.Target.Name == "detector")
             {
-                writer.WriteLine($"    double a{row}, b{row}; detector(p{index}, a{row}, b{row});");
-                writer.WriteLine($"    if constexpr (derivative) out[{index}] = b{row}; else out[{row}] = a{row};");
+                writer.WriteLine($"    if (!(implicitDetectors & (1u << {row}))) {{");
+                writer.WriteLine($"        double a{row}, b{row}; detector(p{index}, a{row}, b{row});");
+                writer.WriteLine($"        if constexpr (derivative) out[{index}] = b{row}; else out[{row}] = a{row};");
+                writer.WriteLine("    }");
             }
             else if (device.Law is Call plate && plate.Target.Name == "plate")
             {

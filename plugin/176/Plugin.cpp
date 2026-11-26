@@ -6,7 +6,7 @@
 #include "SpiceStream.h"
 #include "UA176Art.h"
 #ifdef UA176_LIVE
-#include "../176-live/Live176.h"
+#include "../176-live/Oversampled176.h"
 #endif
 
 namespace {
@@ -61,6 +61,9 @@ State::ParameterLayout parameters()
         "Meter", juce::StringArray{"Gain reduction", "Input", "Output"}, 0));
 #ifdef UA176_LIVE
     result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"double", 1}, "Double", false));
+    result.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"oversampling", 1},
+        "Oversampling", juce::StringArray{"1x", "2x", "4x"}, 0,
+        juce::AudioParameterChoiceAttributes().withAutomatable(false)));
 #endif
     return result;
 }
@@ -94,17 +97,26 @@ public:
 #ifdef UA176_LIVE
     void prepareToPlay(double sampleRate, int) override
     {
-        liveLatency = ua176::Live176::latency(sampleRate);
-        setLatencySamples(liveLatency);
+        setLatencySamples(ua176::Oversampled176::latency);
         liveDry = {};
-        liveDryPosition = {};
+        liveDryPosition = 0;
         mix.reset(sampleRate, .010);
         mix.setCurrentAndTargetValue(get("mix") * .01f);
+        modeBlend.reset(sampleRate, .004);
+        modeBlend.setCurrentAndTargetValue(1);
+        modeWarmup = 0;
+        canOversample = ua176::Oversampled176::supportsOversampling(sampleRate);
+        activeMode = requestedOversampling();
         const auto controls = readControls();
-        good.fill(false);
-        for (int c = 0; c < getTotalNumInputChannels(); ++c)
-            good[static_cast<std::size_t>(c)] = simulators[static_cast<std::size_t>(c)].prepare(sampleRate, controls);
-        status.store(good[0] ? 1 : 2);
+        for (int index = 0; index < static_cast<int>(liveModes.size()); ++index)
+            good[static_cast<std::size_t>(index)] = (index == 0 || canOversample)
+                && liveModes[static_cast<std::size_t>(index)].prepare(sampleRate, 1 << index, controls);
+        status.store(good[activeMode] ? 1 : 2);
+    }
+
+    int requestedOversampling() const noexcept
+    {
+        return canOversample ? juce::jlimit(0, 2, static_cast<int>(get("oversampling"))) : 0;
     }
 
     void releaseResources() override {}
@@ -128,32 +140,41 @@ public:
         bool failed = false;
         constexpr double scale = ua176::SpiceStream::fullScalePeak;
         mix.setTargetValue(get("mix") * .01f);
-        for (int c = 0; c < getTotalNumInputChannels(); ++c) {
-            auto& simulator = simulators[static_cast<std::size_t>(c)];
-            const bool ready = good[static_cast<std::size_t>(c)] && simulator.setControls(controls);
-            auto* samples = block.getWritePointer(c);
-            auto& delay = liveDry[static_cast<std::size_t>(c)];
-            auto& position = liveDryPosition[static_cast<std::size_t>(c)];
-            for (int i = 0; i < block.getNumSamples(); ++i) {
-                const float drySample = samples[i];
-                inputPeak = std::max(inputPeak, std::abs(drySample));
-                const float dryAmount = mix.getNextValue();
-                double volts = 0, cv = 0;
-                const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
-                float alignedDry = drySample;
-                if (liveLatency > 0) {
-                    alignedDry = delay[position];
-                    delay[position] = drySample;
-                    position = (position + 1) % delay.size();
-                }
-                samples[i] = alignedDry;
-                if (solved && on) {
-                    samples[i] = ua176::dryMix(static_cast<float>(volts / scale), alignedDry, dryAmount);
-                    reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
-                }
-                failed |= !solved;
-                outputPeak = std::max(outputPeak, std::abs(samples[i]));
+        const int requested = requestedOversampling();
+        if (requested != activeMode && good[requested]) {
+            modeBlend.setTargetValue(0);
+            if (!modeBlend.isSmoothing()) {
+                activeMode = requested;
+                liveModes[activeMode].resetResampling();
+                modeWarmup = 2 * ua176::Oversampled176::latency;
             }
+        } else if (modeWarmup == 0) {
+            modeBlend.setTargetValue(1);
+        }
+
+        auto& simulator = liveModes[activeMode];
+        const bool ready = good[activeMode] && simulator.setControls(controls);
+        auto* samples = block.getWritePointer(0);
+        for (int i = 0; i < block.getNumSamples(); ++i) {
+            const float drySample = samples[i];
+            inputPeak = std::max(inputPeak, std::abs(drySample));
+            const float dryAmount = mix.getNextValue();
+            const float blend = modeBlend.getNextValue();
+            if (modeWarmup > 0)
+                --modeWarmup;
+            double volts = 0, cv = 0;
+            const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
+            const float alignedDry = liveDry[liveDryPosition];
+            liveDry[liveDryPosition] = drySample;
+            liveDryPosition = (liveDryPosition + 1) % liveDry.size();
+            samples[i] = alignedDry;
+            if (solved && on) {
+                samples[i] = ua176::dryMix(static_cast<float>(volts / scale), alignedDry,
+                    1 - (1 - dryAmount) * blend);
+                reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
+            }
+            failed |= !solved;
+            outputPeak = std::max(outputPeak, std::abs(samples[i]));
         }
         levelIn.store(inputPeak);
         levelOut.store(outputPeak);
@@ -324,12 +345,13 @@ public:
     std::atomic<int> status{0};
 private:
 #ifdef UA176_LIVE
-    std::array<ua176::Live176, 2> simulators;
-    std::array<bool, 2> good{};
-    std::array<std::array<float, ua176::Live176::phaseLatency>, 2> liveDry{};
-    std::array<std::size_t, 2> liveDryPosition{};
-    int liveLatency = 0;
-    juce::SmoothedValue<float> mix;
+    std::array<ua176::Oversampled176, 3> liveModes;
+    std::array<bool, 3> good{};
+    std::array<float, ua176::Oversampled176::latency> liveDry{};
+    std::size_t liveDryPosition = 0;
+    int activeMode = 0, modeWarmup = 0;
+    bool canOversample = true;
+    juce::SmoothedValue<float> mix, modeBlend;
 #else
     std::array<ua176::SpiceStream, 2> simulators;
     std::array<std::array<float, ua176::SpiceStream::latency>, 2> dry{};
@@ -441,6 +463,24 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override
     {
+#ifdef UA176_LIVE
+        if (event.mods.isPopupMenu()) {
+            juce::PopupMenu menu;
+            menu.addSectionHeader("Oversampling");
+            const int current = static_cast<int>(processor.get("oversampling"));
+            const bool supported = ua176::Oversampled176::supportsOversampling(processor.getSampleRate());
+            constexpr std::array<const char*, 3> names{"1x", "2x", "4x"};
+            for (int index = 0; index < static_cast<int>(names.size()); ++index)
+                menu.addItem(index + 1, names[static_cast<std::size_t>(index)], index == 0 || supported,
+                    index == current);
+            auto editor = juce::Component::SafePointer<Editor>(this);
+            menu.showMenuAsync(juce::PopupMenu::Options(), [editor](int choice) {
+                if (editor && choice > 0)
+                    editor->processor.set("oversampling", (choice - 1) * .5f);
+            });
+            return;
+        }
+#endif
         const auto p = event.getPosition();
         if (juce::Rectangle<int>{1048, 142, 42, 48}.contains(p))
             processor.set("on", processor.get("on") > .5f ? 0.f : 1.f);

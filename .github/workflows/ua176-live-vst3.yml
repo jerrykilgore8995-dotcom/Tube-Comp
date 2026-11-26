@@ -38,12 +38,17 @@ jobs:
         run: |
           cmake -S plugin/176-live -B build-176-live -G "Visual Studio 17 2022" -A x64 "-DLIVE176_DECK=$env:LIVE176_DECK"
           if ($LASTEXITCODE -ne 0) { throw "176 Live configuration failed" }
-          cmake --build build-176-live --config Release --target UA176LiveSmoke --parallel 4
+          cmake --build build-176-live --config Release --target UA176LiveSmoke UA176OversamplingSmoke --parallel 4
           if ($LASTEXITCODE -ne 0) { throw "176 Live benchmark failed to build" }
           for ($attempt = 1; $attempt -le 3; $attempt++) {
             & build-176-live/Release/UA176LiveSmoke.exe
             if ($LASTEXITCODE -eq 0) { break }
             if ($LASTEXITCODE -ne 5 -or $attempt -eq 3) { throw "176 Live did not pass the performance and convergence tests" }
+          }
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            & build-176-live/Release/UA176OversamplingSmoke.exe
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($LASTEXITCODE -ne 5 -or $attempt -eq 3) { throw "176 Live oversampling missed its transfer, aliasing or block-time targets" }
           }
       - name: Compile and package the Windows x64 VST3
         shell: pwsh
