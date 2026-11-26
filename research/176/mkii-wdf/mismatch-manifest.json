@@ -1,0 +1,267 @@
+{
+  "source": "ua176-input-stage:spice/176/powered.cir",
+  "seed": "176-MKII-v1",
+  "notes": "Fixed physical top-level resistors and capacitors; exclude ideal switches, external loads, transformer equivalent parameters and potentiometer segments; triode BPL scale ±2.5%, no independent gm/rp tuning. Ratio switch resistors and pots still nominal pending physical control inventory.",
+  "records": [
+    {
+      "name": "R2",
+      "nominal": "10k",
+      "fraction": -0.017302784700877965
+    },
+    {
+      "name": "R3",
+      "nominal": "6.8k",
+      "fraction": -0.017029340632725508
+    },
+    {
+      "name": "R4",
+      "nominal": "6.8k",
+      "fraction": -0.01894344910979271
+    },
+    {
+      "name": "R5",
+      "nominal": "10k",
+      "fraction": -0.01867000504164025
+    },
+    {
+      "name": "C5",
+      "nominal": ".1u",
+      "fraction": -0.01074730065651238
+    },
+    {
+      "name": "R7",
+      "nominal": "47",
+      "fraction": -0.018123116905335336
+    },
+    {
+      "name": "R8",
+      "nominal": "47",
+      "fraction": -0.01566212029196322
+    },
+    {
+      "name": "R9",
+      "nominal": "330",
+      "fraction": -0.015388676223810762
+    },
+    {
+      "name": "R11",
+      "nominal": "330",
+      "fraction": -0.025641970396973194
+    },
+    {
+      "name": "C10",
+      "nominal": ".1u",
+      "fraction": 0.017434640554711223
+    },
+    {
+      "name": "R12",
+      "nominal": "4.7k",
+      "fraction": -0.013118689847178757
+    },
+    {
+      "name": "R14",
+      "nominal": "4.7k",
+      "fraction": -0.013274943600408734
+    },
+    {
+      "name": "C11D",
+      "nominal": "20u",
+      "fraction": -0.015088972565717996
+    },
+    {
+      "name": "C11A",
+      "nominal": "20u",
+      "fraction": -0.015479606948792935
+    },
+    {
+      "name": "C11B",
+      "nominal": "20u",
+      "fraction": -0.015245226318947971
+    },
+    {
+      "name": "C11C",
+      "nominal": "20u",
+      "fraction": -0.01532335319556296
+    },
+    {
+      "name": "R44",
+      "nominal": "1k",
+      "fraction": 0.032509100297465926
+    },
+    {
+      "name": "C8B",
+      "nominal": "20u",
+      "fraction": -0.011933459131978453
+    },
+    {
+      "name": "R43",
+      "nominal": "10k",
+      "fraction": 0.032235656229313465
+    },
+    {
+      "name": "R15",
+      "nominal": "20k",
+      "fraction": -0.026735746669583026
+    },
+    {
+      "name": "R17",
+      "nominal": "20k",
+      "fraction": -0.02728263480588794
+    },
+    {
+      "name": "R19",
+      "nominal": "2.2k",
+      "fraction": -0.027829522942192854
+    },
+    {
+      "name": "R20",
+      "nominal": "2.2k",
+      "fraction": -0.032475674725137654
+    },
+    {
+      "name": "R16",
+      "nominal": "2.2k",
+      "fraction": -0.02700919073773548
+    },
+    {
+      "name": "R22",
+      "nominal": "{FBRES}",
+      "fraction": -0.015149303674697877
+    },
+    {
+      "name": "R18",
+      "nominal": "180k",
+      "fraction": -0.027556078874040393
+    },
+    {
+      "name": "C1",
+      "nominal": ".47u",
+      "fraction": -0.010434793150052428
+    },
+    {
+      "name": "R25",
+      "nominal": "{FBRES}",
+      "fraction": -0.014602415538392961
+    },
+    {
+      "name": "R21",
+      "nominal": "180k",
+      "fraction": -0.032202230656985194
+    },
+    {
+      "name": "C2",
+      "nominal": ".47u",
+      "fraction": -0.010512920026667417
+    },
+    {
+      "name": "R23",
+      "nominal": "220k",
+      "fraction": -0.015071176798082888
+    },
+    {
+      "name": "R24",
+      "nominal": "220k",
+      "fraction": -0.01468054241500795
+    },
+    {
+      "name": "C3",
+      "nominal": ".1u",
+      "fraction": -0.010591046903282404
+    },
+    {
+      "name": "C4",
+      "nominal": ".1u",
+      "fraction": -0.010669173779897392
+    },
+    {
+      "name": "R27",
+      "nominal": "1.2meg",
+      "fraction": -0.03165534252068028
+    },
+    {
+      "name": "R29",
+      "nominal": "1.2meg",
+      "fraction": -0.030014678111765534
+    },
+    {
+      "name": "R28",
+      "nominal": "330",
+      "fraction": -0.03028812217991799
+    },
+    {
+      "name": "C9B",
+      "nominal": "10u",
+      "fraction": -0.015215472914278508
+    },
+    {
+      "name": "R26",
+      "nominal": "47k",
+      "fraction": -0.03192878658883273
+    },
+    {
+      "name": "C9A",
+      "nominal": "10u",
+      "fraction": -0.014981092284433544
+    },
+    {
+      "name": "C6",
+      "nominal": ".5u",
+      "fraction": -0.010825427533127367
+    },
+    {
+      "name": "C7",
+      "nominal": ".5u",
+      "fraction": -0.010903554409742356
+    },
+    {
+      "name": "R36",
+      "nominal": "220k",
+      "fraction": 0.03362133964663372
+    },
+    {
+      "name": "R37",
+      "nominal": "220k",
+      "fraction": 0.03334789557848126
+    },
+    {
+      "name": "R38",
+      "nominal": "82k",
+      "fraction": 0.03635578032815829
+    },
+    {
+      "name": "C8A",
+      "nominal": "20u",
+      "fraction": -0.012167839761823417
+    },
+    {
+      "name": "R32",
+      "nominal": "10k",
+      "fraction": 0.03471511591924355
+    },
+    {
+      "name": "R35",
+      "nominal": "270k",
+      "fraction": 0.032801007442176344
+    },
+    {
+      "name": "XV2A",
+      "model": "UA176_12AX7",
+      "plateCurrentScale": 1.025
+    },
+    {
+      "name": "XV2B",
+      "model": "UA176_12AX7",
+      "plateCurrentScale": 0.975
+    },
+    {
+      "name": "XV3A",
+      "model": "UA176_12BH7",
+      "plateCurrentScale": 1.025
+    },
+    {
+      "name": "XV3B",
+      "model": "UA176_12BH7",
+      "plateCurrentScale": 0.975
+    }
+  ]
+}
