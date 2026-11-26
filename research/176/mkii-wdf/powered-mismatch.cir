@@ -1,0 +1,380 @@
+176 MK II mismatch reference - powered circuit; no WDF yet
+* UA 176T input experiment. Scope: input attenuator and T1.
+* A negative terminal is explicit throughout the balanced input.
+* The balanced 600-ohm T-pad is the electrical equivalent of the T variant.
+.subckt UA176T_PAD INP INN OUTP OUTN params: LOSSDB=20
+.param KPAD={pow(10,LOSSDB/20)}
+.param ARM={max(1u,300*(KPAD-1)/(KPAD+1))}
+RINP INP MIDP {ARM}
+RINN INN MIDN {ARM}
+ROUTP MIDP OUTP {ARM}
+ROUTN MIDN OUTN {ARM}
+RSHUNT MIDP MIDN {1200*KPAD/max(1e-9,KPAD*KPAD-1)}
+.ends UA176T_PAD
+
+* Floating transformer equivalent. Defaults are the UTC O-1 candidate.
+* N, RP and RS are catalog values for the default UTC O-1.
+* LM, LL, RC, CS and CW are provisional pending original winding measurements.
+* The magnetizing branch is linear pending a measured saturation curve.
+.subckt UA176_TRANSFORMER INP INN OUTP OUTN params: N=10 RP=52 RS=3900 LM=3.3 LL=2m RC=100k CS=92p CW=15p
+RP1 INP P1 {RP/2}
+RP2 INN PN {RP/2}
+LLEAK P1 PP {LL}
+LMAG PP PN {LM}
+RCORE PP PN {RC}
+ETURNS SPLUS SMINUS PP PN {N}
+FTURNS PP PN ETURNS {-N}
+RS1 SPLUS OUTP {RS/2}
+RS2 SMINUS OUTN {RS/2}
+CSEC OUTP OUTN {CS}
+CWIN1 PP OUTP {CW}
+CWIN2 PN OUTN {CW}
+.ends UA176_TRANSFORMER
+
+* UTC A-19 as connected in the UA 176. Factory ratio is 2.3:1 in reverse.
+* A measured A-19 sample gives 346 H and 10k DCR on G-G at 100 Hz.
+* The 15k P-B side uses the 2.9k catalog DCR (one sample measured 3k).
+* Leakage, core loss, and capacitances are provisional.
+.subckt UA176_T2 G1 G2 P B
+XA19 G1 G2 P B UA176_TRANSFORMER N={1/2.3} RP=10k RS=2.9k
++ LM=346 LL=.10 RC=400k CS=60p CW=15p
+.ends UA176_T2
+
+* Test fixture for the nonlinear, bias-dependent grid load. The plate and
+* cathode environment are a bench approximation until the next UA stage lands.
+* Keep the plate law and interelectrode capacitances from the shared Sylvania
+* cell, and add the grid-current diode supplied with the 176 research model.
+.subckt UA176_GRID_FIXTURE G BIAS params: VRAIL=120 VK=2 RPLATE=4.7k
+VRAIL BPLUS 0 {VRAIL}
+VK K 0 {VK}
+RGRID G BIAS 25k
+RPLATE BPLUS P {RPLATE}
+XTUBE P G K V6BC8
+DGRID G K UA176_6BC8_GRID_DIODE
+.model UA176_6BC8_GRID_DIODE D(IS=1n RS=2k CJO=1p N=1.5 TT=1n)
+.ends UA176_GRID_FIXTURE
+
+* Koren cells supplied for the UA 176 project. Pin order P G K.
+* In the supplied PWR + PWRS form, positive arguments have a factor of two.
+.subckt UA176_12AX7_A P G K
+BPL P K I={1.025*(2*pow(uramp(V(P,K)/600*ln(1+exp(600*(.01+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.4)/1060)}
+RPK P K 1G
+CGK G K 2.3p
+CGP G P 2.4p
+CPK P K .9p
+RG G GD 2k
+DGRID GD K UA176_12AX7_A_GRID
+.model UA176_12AX7_A_GRID D(IS=1n RS=1 CJO=10p TT=1n)
+.ends UA176_12AX7_A
+
+.subckt UA176_12AX7_B P G K
+BPL P K I={0.975*(2*pow(uramp(V(P,K)/600*ln(1+exp(600*(.01+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.4)/1060)}
+RPK P K 1G
+CGK G K 2.3p
+CGP G P 2.4p
+CPK P K .9p
+RG G GD 2k
+DGRID GD K UA176_12AX7_B_GRID
+.model UA176_12AX7_B_GRID D(IS=1n RS=1 CJO=10p TT=1n)
+.ends UA176_12AX7_B
+
+.subckt UA176_12BH7_A P G K
+BPL P K I={1.025*(2*pow(uramp(V(P,K)/185.4*ln(1+exp(185.4*(1/18.02+(V(G,K)-.6206)/sqrt(1247.69+V(P,K)*V(P,K)))))),1.181)/945.75)}
+* Bound the denominator outside the fitted positive-plate-voltage region.
+BG G K I={(8.2e-4+.162/max(1,6.624+V(P,K)))*(2*18.02/945.75)*pow(uramp(V(G,K)+1.03),1.3)}
+RPK P K 1G
+CGK G K 2.9p
+CGP G P 2.5p
+CPK P K .5p
+.ends UA176_12BH7_A
+
+.subckt UA176_12BH7_B P G K
+BPL P K I={0.975*(2*pow(uramp(V(P,K)/185.4*ln(1+exp(185.4*(1/18.02+(V(G,K)-.6206)/sqrt(1247.69+V(P,K)*V(P,K)))))),1.181)/945.75)}
+* Bound the denominator outside the fitted positive-plate-voltage region.
+BG G K I={(8.2e-4+.162/max(1,6.624+V(P,K)))*(2*18.02/945.75)*pow(uramp(V(G,K)+1.03),1.3)}
+RPK P K 1G
+CGK G K 2.9p
+CGP G P 2.5p
+CPK P K .5p
+.ends UA176_12BH7_B
+
+* T3 output winding proxy. 9:1 plate-to-plate ratio from the Sowter 1285.
+* The winding DCR values approximate its total referred-secondary DCR.
+* Magnetizing inductance, leakage and capacitance are provisional.
+* The half-primaries are series-aiding from PA to PB with DC feed at CT.
+.subckt UA176_T3 PA CT PB OUTP OUTN TAPA TAPB params: TAPFRAC=1
+RPA PA PLEAKA 525
+RPB PB PLEAKB 525
+LLA PLEAKA HALF_A 50m
+LLB PLEAKB HALF_B 50m
+LPA HALF_A CT 62.5
+LPB CT HALF_B 62.5
+LS OUT_RAW OUTN {250/81}
+KAB LPA LPB .99999
+KAS LPA LS .99999
+KBS LPB LS .99999
+RC HALF_A HALF_B 500k
+RS OUT_RAW OUTP 1
+CS OUTP OUTN 80p
+* Selected symmetric tap pair. Mirror detector current to the plate ports
+* with the same turns fraction so the detector loads the main circuit.
+ETAPA TAPA CT PA CT {TAPFRAC}
+ETAPB TAPB CT PB CT {TAPFRAC}
+FTAPA PA CT ETAPA {-TAPFRAC}
+FTAPB PB CT ETAPB {-TAPFRAC}
+.ends UA176_T3
+
+* User-supplied 6AL5 single-diode fit. A zero-volt sense source makes the
+* current-dependent series drop explicit to ngspice's nodal solver.
+.subckt UA176_6AL5 A K
+VSENSE A ASENSE 0
+* At the origin a small current offset bounds the fractional-power derivative.
+BDROP ASENSE IDEAL V={pow(uramp(i(VSENSE)/.0032)+1e-9,.775)-pow(1e-9,.775)}
+D1 IDEAL OFFSET UA176_6AL5_EXP
+R2 IDEAL K 12.7G
+V2 OFFSET K -.867
+CAK A K 3.2p
+.model UA176_6AL5_EXP D(IS=66p XTI=3.15 N=3.15 RS=0)
+.ends UA176_6AL5
+
+* TUBE COMP - DATASHEET-ANCHORED VALVE CELLS (rev B / 2026-11-12)
+* These models correct the original hard 6BC8 cutoff and 6CG7 gain error.
+* A per-device parametric fit is NOT proof of a factory-original Altec unit.
+* 6BC8 model from published Sylvania plate-curve Koren parameter candidate,
+* also stored in models/6bc8_sylvania_curve_candidate.lib (source there).
+* See RCA 6BC8 datasheet: https://frank.pocnet.net/sheets/049/6/6BC8.pdf
+* The model at Va=150V has nonzero conduction at Vg=-10V; this is essential
+* for remote-cutoff gain reduction across many tens of dB.
+.subckt V6BC8 P G K
+BPL P K I={20.19891536u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+54.16463004*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)}
+Rleak P K 1000Meg
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
+.ends V6BC8
+
+* 6BC8 semiremote-cutoff candidate, fitted at TWO operating conditions.
+* This optional variant adds a very weak low-gm plate-current branch,
+* representing the low-mu sections of the semiremote-cutoff grid.
+* Numerical fit anchors:
+*  - RCA sheet at Va=150V and Rk=220R: Ip approx 10mA and gm=6200umho,
+*    grid grounded -> Vgk approx -2.2V; rp approx 5.3k.
+*  - factory 436C drawing at idle: 65V plates, (210-65)/47k=3.085mA,
+*    grid-cathode about -1V with 34R shared cathode.
+*  - RCA -13V sensitivity: gm about 50umho.
+*  - factory 20dB compressed: 285V plates, 290V plate-feed, 47k loads
+*    => (290-285)/47k = 0.1064mA PER HALF at about -30V bias.
+* Single-Koren V6BC8 yields only 0.000172mA at this last anchor (x618 low).
+* Fitted monotonic remote tail is NOT a manufacturer's plate curve;
+* independently verify against a real 6BC8 at the deep-negative bias.
+* DC positive grid current, heaters, and alternate supply sag are unmodeled.
+.subckt V6BC8_REMOTE P G K
+BPL P K I={20.2365654u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+59.22382604*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)+0.96348024m*pow(uramp(V(P,K)/150),1.69329672)/(1+exp(-(V(G,K)+14.76054299)/4.6849283))}
+Rleak P K 1000Meg
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
+.ends V6BC8_REMOTE
+
+* Improved semiremote 6BC8 tail, EXPONENTIAL over negative-grid range.
+* Current V6BC8_REMOTE candidate (sigmoid tail) has an unacceptable
+* nonmonotonic gain-vs-CV interval near -12..-18V despite lower THD.
+* An exponential tail has strictly positive gm that decreases monotonically
+* as Vg becomes more negative; the normal Koren cell behaves the same.
+* Fitted anchors as V6BC8_REMOTE (see above), but do NOT use as hardware
+* certification without measured published plate curves beyond -13V.
+* At Va=150/Vgk=-2.2: 10.06mA, gm=6214uS; at Va=65/Vgk=-1:
+* 3.09mA; at Va=150/Vgk=-13: gm=50uS; at Va=285/Vgk=-30:
+* 0.10638mA. Positive grid current and core magnetics remain unmodeled.
+.subckt V6BC8_REMOTE_EXP P G K
+BPL P K I={19.65702722u*pow(uramp(V(P,K)*ln(1+exp(1.794225622*(1+61.17656889*V(G,K)/sqrt(922.2704089+V(P,K)*V(P,K)))))/1.794225622),1.439822572)+0.35980862m*pow(uramp(V(P,K)/150),1.76348216)*exp((V(G,K)+13)/7.23198212)}
+Rleak P K 1000Meg
+CGK G K 3.9p
+CGA G P 3.7p
+CPK P K 1.8p
+.ends V6BC8_REMOTE_EXP
+
+* 6CG7: CC0 model fitted by Circuit Codex to published RCA anchor:
+* Va=250V / Vg=-8V -> 9mA, 2600umho, mu=20.
+* Further checkpoints at 90V/0V and 250V/-12.5V are approximate.
+* Upstream model: https://github.com/TheAnalogMaker/circuit-codex/blob/main/models/6cg7.inc
+* License: CC0 1.0 Universal. Heater and positive grid current not modeled.
+.subckt V6CG7 P G K
+BPL P K I={pow(uramp((V(P,K)/127.155)*ln(1+exp(127.155*(1/20+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.5)/1134.77}
+Rleak P K 1000Meg
+CGK G K 2.3p
+CGA G P 4p
+CPK P K 2.2p
+.ends V6CG7
+
+* Alternative independently published 6CG7 plate-curve candidate: GE 1963.
+* The GE Koren parameters (MU=21.86 EX=1.319 KG1=1248.5 KP=140.12
+* KVB=300) originate in GE-derived triode libraries. They are a
+* cross-check candidate, NOT a proof of the particular Altec factory tube.
+* Do not silently replace the RCA candidate until multiple anchor points
+* and the circuit operating-point measurements have been compared.
+.subckt V6CG7_GE P G K
+BPL P K I={pow(uramp((V(P,K)/140.12)*ln(1+exp(140.12*(1/21.86+V(G,K)/sqrt(300+V(P,K)*V(P,K)))))),1.319)/1248.5}
+Rleak P K 1000Meg
+CGK G K 2.9p
+CGA G P 4.7p
+CPK P K 2.7p
+.ends V6CG7_GE
+
+* 6AL5 diode remains a provisional forward characteristic.
+* Diode's 3.2-3.6pF element capacitance comes from Sylvania 6AL5 sheet.
+* Equivalent Is/N/Rs NOT a calibrated plate-current curve.
+.model D6AL5 D(Is=3n N=1.55 Rs=600 Cjo=3.4p M=0.40 Tt=65n)
+
+
+.param AMP=3.474135043921514 FREQ=1k SOURCE=600 LOSSDB=20
+.param LL=2m CS=92p HIGH=1 CATHBAL=.5 PLATEBAL=.5 METERZERO=.5 SUPPLY=108 VERNIER=0
+.param B3=315 OUTVERNIER=0 OUTPUTLOAD=600 FBRES=180k
+.param LIMITING=1 RATIO=2 ATTACK=.5 RELEASE=.8
+* S5 gangs a pair of primary taps and a resistor in the detector-bias divider.
+* Tap fractions are from one measured Sowter 1285, normalized to its 12:1 tap.
+.param TAPFRAC={ternary_fcn(RATIO==2,.12,ternary_fcn(RATIO==4,.29,ternary_fcn(RATIO==8,.58,1)))}
+.param RATIO_R={ternary_fcn(RATIO==2,1k,ternary_fcn(RATIO==4,6.8k,ternary_fcn(RATIO==8,20k,47k)))}
+VDRIVE DRIVEP DRIVEN DC 0 AC 1 SIN(0 {AMP} {FREQ})
+RCOMMON DRIVEN 0 1G
+RSOURCEP DRIVEP INP {SOURCE/2}
+RSOURCEN DRIVEN INN {SOURCE/2}
+XPAD INP INN PAD_P TN UA176T_PAD LOSSDB={LOSSDB}
+* R1 is the standard 176 series vernier. Zero ohms selects the 176T reference.
+R1 PAD_P TP {max(1u,300*VERNIER)}
+XT1 TP TN SEC_P SEC_N UA176_TRANSFORMER LL={LL} CS={CS}
+
+* R2-R5 differential gain ladder. HI takes the winding ends; LO takes the taps.
+R2 SEC_P TAP_P {(10k)*0.982697215}
+R3 TAP_P CV {(6.8k)*0.982970659}
+R4 CV TAP_N {(6.8k)*0.981056551}
+R5 TAP_N SEC_N {(10k)*0.981329995}
+RG_HI_P SEC_P GP {ternary_fcn(HIGH,1m,1T)}
+RG_LO_P TAP_P GP {ternary_fcn(HIGH,1T,1m)}
+RG_HI_N SEC_N GN {ternary_fcn(HIGH,1m,1T)}
+RG_LO_N TAP_N GN {ternary_fcn(HIGH,1T,1m)}
+
+* Control node at the R3/R4 junction in the normal test-switch position.
+C5 CV 0 {(.1u)*0.989252699}
+
+* Push-pull 6BC8 with the Sylvania law and supplied grid-current branch.
+XV1A PA GP KA V6BC8
+XV1B PB GN KB V6BC8
+DGRIDP GP KA UA176_6BC8_GRID_DIODE
+DGRIDN GN KB UA176_6BC8_GRID_DIODE
+.model UA176_6BC8_GRID_DIODE D(IS=1n RS=2k CJO=1p N=1.5 TT=1n)
+
+* R6 cathode balance pot, R10 meter-zero pot, unloaded GR meter tap.
+R6A KA KRETURN {max(1m,100*CATHBAL)}
+R6B KB KRETURN {max(1m,100*(1-CATHBAL))}
+R7 KA KRETURN {(47)*0.981876883}
+R8 KB KRETURN {(47)*0.984337880}
+R9 KRETURN 0 {(330)*0.984611324}
+R10A KRETURN METER {max(1m,1k*METERZERO)}
+R10B METER R11TOP {max(1m,1k*(1-METERZERO))}
+R11 R11TOP 0 {(330)*0.974358030}
+
+* The 0B2-regulated rail is held at nominal DC for this stage bench.
+C10 REG 0 {(.1u)*1.017434641}
+R12 PA PLATE_BAL_A {(4.7k)*0.986881310}
+R13A PLATE_BAL_A REG {max(1m,1k*PLATEBAL)}
+R13B REG PLATE_BAL_B {max(1m,1k*(1-PLATEBAL))}
+R14 PLATE_BAL_B PB {(4.7k)*0.986725056}
+
+* T2 G-G high-impedance winding across the plates, with F-F strapped.
+* Its P-B low-impedance winding drives the following grids.
+XT2 PA PB NEXT_P NEXT_N UA176_T2
+
+.param HV_HALF_PEAK=460
+* T4 high-voltage secondary equivalent, center-tapped and 180 degrees apart.
+* Secondary voltage and winding resistance are estimates for this bench.
+VT4A HV_A_OC 0 SIN(0 {HV_HALF_PEAK} 60)
+VT4B 0 HV_B_OC SIN(0 {HV_HALF_PEAK} 60)
+RT4A HV_A_OC HV_A 100
+RT4B HV_B_OC HV_B 100
+* Warm GZ34 approximation, 232 mA per plate at 17 V.
+BV5A HV_A RECT I={.00331*pow(uramp(V(HV_A,RECT)),1.5)}
+BV5B HV_B RECT I={.00331*pow(uramp(V(HV_B,RECT)),1.5)}
+C11D RECT 0 {(20u)*0.984911027}
+L1 RECT CHOKE_END 10
+RL1 CHOKE_END FILTER 150
+C11A FILTER 0 {(20u)*0.984520393}
+C11B FILTER 0 {(20u)*0.984754774}
+C11C FILTER 0 {(20u)*0.984676647}
+R44 FILTER T3_CT {(1k)*1.032509100}
+C8B T3_CT 0 {(20u)*0.988066541}
+R43 T3_CT REG {(10k)*1.032235656}
+* Lit-state 0B2 approximation. Ignition hysteresis and noise are omitted.
+BV6 REG 0 I={uramp(V(REG)-107.55)/33}
+
+* T2 drives both V2 grids directly. R15 and R17 return them to ground.
+R15 NEXT_P 0 {(20k)*0.973264253}
+R17 NEXT_N 0 {(20k)*0.972717365}
+XV2A V2PA NEXT_P V2KA UA176_12AX7_A
+XV2B V2PB NEXT_N V2KB UA176_12AX7_B
+R19 V2KA V2_RETURN {(2.2k)*0.972170477}
+R20 V2KB V2_RETURN {(2.2k)*0.967524325}
+R16 V2_RETURN 0 {(2.2k)*0.972990809}
+
+* Each V3 plate returns AC feedback to the corresponding V2 cathode.
+R22 V3PA FEEDBACK_A {(FBRES)*0.984850696}
+R18 FEEDBACK_A 0 {(180k)*0.972443921}
+C1 FEEDBACK_A V2KA {(.47u)*0.989565207}
+R25 V3PB FEEDBACK_B {(FBRES)*0.985397584}
+R21 FEEDBACK_B 0 {(180k)*0.967797769}
+C2 FEEDBACK_B V2KB {(.47u)*0.989487080}
+
+R23 V2PA V2_SUPPLY {(220k)*0.984928823}
+R24 V2PB V2_SUPPLY {(220k)*0.985319458}
+C3 V2PA V3GA {(.1u)*0.989408953}
+C4 V2PB V3GB {(.1u)*0.989330826}
+R27 V3GA 0 {(1.2meg)*0.968344657}
+R29 V3GB 0 {(1.2meg)*0.969985322}
+XV3A V3PA V3GA V3K UA176_12BH7_A
+XV3B V3PB V3GB V3K UA176_12BH7_B
+R28 V3K 0 {(330)*0.969711878}
+
+* Corrected C-10476 feed junction: T3 center tap, R26 and C9B.
+* The B+ supply upstream of this junction is a fixed bench boundary.
+C9B T3_CT 0 {(10u)*0.984784527}
+R26 T3_CT V2_SUPPLY {(47k)*0.968071213}
+C9A V2_SUPPLY 0 {(10u)*0.985018908}
+XT3 V3PA T3_CT V3PB T3_P T3_N TAP_A TAP_B UA176_T3 TAPFRAC={TAPFRAC}
+R30 T3_P OUT_P {max(1m,300*OUTVERNIER)}
+RLOAD OUT_P T3_N {OUTPUTLOAD}
+* Voltage datum of the isolated secondary for this differential test.
+VOUT_REF T3_N 0 0
+
+
+* C6/C7 block plate DC. R36/R37 bias the separate cathodes, pins 1 and 5.
+C6 TAP_A DET_K1 {(.5u)*0.989174572}
+C7 TAP_B DET_K2 {(.5u)*0.989096446}
+R36 DET_K1 DET_BIAS {(220k)*1.033621340}
+R37 DET_BIAS DET_K2 {(220k)*1.033347896}
+R38 REG DET_BIAS {(82k)*1.036355780}
+R_S5 DET_BIAS 0 {RATIO_R}
+C8A DET_BIAS 0 {(20u)*0.987832160}
+* Pins 7 and 2 are the tied anodes that pull C5 negative via the attack path.
+XV4A DET_A DET_K1 UA176_6AL5
+XV4B DET_A DET_K2 UA176_6AL5
+
+* S4 connects the timing path in ON and grounds the control node in OFF.
+R_S4_ON CV ATK_IN {ternary_fcn(LIMITING,1m,1T)}
+R_S4_OFF CV 0 {ternary_fcn(LIMITING,1T,1m)}
+R32 ATK_IN DET_A {(10k)*1.034715116}
+R33 ATK_IN DET_A {max(1m,25k*(1-ATTACK))}
+R34A DET_A REL_WIPER {max(1m,5meg*(1-RELEASE))}
+R34B REL_WIPER 0 {max(1m,5meg*RELEASE)}
+R35 REL_WIPER 0 {(270k)*1.032801007}
+
+.options method=gear maxord=2 reltol=1e-4 abstol=1e-10 vntol=1e-5
+.control
+set wr_singlescale
+set wr_vecnames
+set numdgt=15
+tran 10u 1.2 1.1 10u
+let audio = v(out_p,t3_n)
+wrdata powered.txt v(rect) v(filter) v(t3_ct) v(reg) v(cv) audio
+quit
+.endc
+.end
