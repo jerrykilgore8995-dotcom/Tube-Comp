@@ -1,6 +1,7 @@
 // Fixed-control offline 176 full-topology WDF prototype. See model differences in README.
 import {adaptor,nonlinearStep,prepareNonlinear} from './wave-core.mjs';
 import {magneticCore} from './magnetic-core.mjs';
+import {plateCurrent} from './triode-candidates.mjs';
 function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const fs=opts.fs??44100,dt=1/fs,ratio=opts.ratio??2,loss=opts.loss??20,attack=opts.attack??.5,release=opts.release??.8;
  const factors=Object.fromEntries(manifest.records.filter(x=>x.fraction!==undefined).map(x=>[x.name,1+x.fraction]));
@@ -31,12 +32,11 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const triode=(n,p,g,k,type,scale)=>{
    const a=N(n+":P",p,k,10000),b=N(n+":G",g,k,1000);
    R(n+":leak",p,k,1e9,false);
-   const pars=type==="6BC8"?[3.9,3.7,1.8]:type==="12AX7"?[2.3,2.4,.9]:[2.9,2.5,.5];
+   const pars=type==="6BC8"?(opts.tubeModels?.[type]==="legacy"?[3.9,3.7,1.8]:[3.9,1.2,.12]):type==="12AX7"?[2.3,2.4,.9]:[2.9,2.6,.5];
    C(n+":Cgk",g,k,pars[0]*1e-12,false);C(n+":Cgp",g,p,pars[1]*1e-12,false);C(n+":Cpk",p,k,pars[2]*1e-12,false);
    device([a,b],v=>{const [vp,vg]=v;let ip=0,ig=0;
-    if(type==="6BC8")ip=20.19891536e-6*Math.pow(pos(vp*sp(1.794225622*(1+54.16463004*vg/Math.sqrt(922.2704089+vp*vp)))/1.794225622),1.439822572);
-    if(type==="12AX7")ip=2*Math.pow(pos(vp/600*sp(600*(.01+vg/Math.sqrt(300+vp*vp)))),1.4)/1060;
-    if(type==="12BH7"){ip=2*Math.pow(pos(vp/185.4*sp(185.4*(1/18.02+(vg-.6206)/Math.sqrt(1247.69+vp*vp)))),1.181)/945.75;ig=(8.2e-4+.162/Math.max(1,6.624+vp))*(2*18.02/945.75)*Math.pow(pos(vg+1.03),1.3);}
+    ip=plateCurrent(type,vp,vg,opts.tubeModels?.[type]??'candidate');
+    if(type==="12BH7"){ig=(8.2e-4+.162/Math.max(1,6.624+vp))*(2*18.02/945.75)*Math.pow(pos(vg+1.03),1.3);}
     return [scale*ip,ig];
    });
    if(type==="6BC8")diode(n+":grid",g,k,1e-9,1.5,2000,1e-12,1e-9);
@@ -134,7 +134,7 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  else {R("R32","ATK_IN","ATK_WIPER",1e4);R("R33","ATK_IN","ATK_WIPER",Math.max(.001,25000*attack));R("R33","ATK_WIPER","DET_A",Math.max(.001,25000*(1-attack)));}
  R("R34A","DET_A","REL_WIPER",Math.max(.001,5e6*(1-release)));R("R34B","REL_WIPER","0",Math.max(.001,5e6*release));R("R35","REL_WIPER","0",270e3);
  // Observe differential winding voltages via existing passive port voltages.
- const obsNames=["T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
+ const obsNames=["V1A:P","V1B:P","V1A:G","V1B:G","V2A:P","V2B:P","V2A:G","V2B:G","V3A:P","V3B:P","V3A:G","V3B:G","T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
  const obs=obsNames.map(name=>{const index=ports.findIndex(p=>p.name===name);if(index<0)throw Error(name);return index;});
  const cv=ports.findIndex(p=>p.name==="C5"),rect=ports.findIndex(p=>p.name==="C11D"),reg=ports.findIndex(p=>p.name==="C10"),bplus=ports.findIndex(p=>p.name==="C8B");
  const mat=(n,m)=>Array.from({length:n},()=>Array(m).fill(0));
