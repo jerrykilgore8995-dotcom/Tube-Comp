@@ -81,7 +81,8 @@ def build_profile(path):
     return impulse.T, discrete_poles, discrete_weights.T, slopes
 
 
-def build_oversampled_source(path, host_rate, factor):
+def build_oversampled_source(path, factor):
+    host_rate = 44100
     conductance, mass, sources, observe, jacobian, states = read_reference(path, raw=True)
     rate = host_rate * factor
     main_output = observe.shape[0] - 6
@@ -147,7 +148,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("reference", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--oversampling", type=Path)
+    parser.add_argument("--oversampling", action="store_true")
     args = parser.parse_args()
     profiles = []
     with tempfile.TemporaryDirectory() as directory:
@@ -158,15 +159,12 @@ def main():
             halfband = firwin(193, .5, window=("kaiser", 8.96))
             halfband[::2] = 0
             halfband[96] = .5
-            with args.oversampling.open("w", encoding="utf-8") as out:
+            with args.output.open("w", encoding="utf-8") as out:
                 print("// Generated from the continuous and discrete LiveSPICE circuit.", file=out)
                 print(f"constexpr std::array<double, 193> halfband{initializer(halfband)};", file=out)
-                print("constexpr double sourceCorrection[6][2][49]{", file=out)
-                for rate in (44100, 48000, 88200, 96000, 176400, 192000):
-                    print("  {", file=out)
-                    for factor in (2, 4):
-                        print(f"    {initializer(build_oversampled_source(path, rate, factor))},", file=out)
-                    print("  },", file=out)
+                print("constexpr double sourceCorrection[2][49]{", file=out)
+                for factor in (2, 4):
+                    print(f"  {initializer(build_oversampled_source(path, factor))},", file=out)
                 print("};", file=out)
             return
         for bias in (0, -1.75, -3.5, -4.75, -6.5):

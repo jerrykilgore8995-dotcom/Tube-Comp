@@ -1,12 +1,9 @@
 #include "Oversampled176.h"
 
-#include <algorithm>
-
 namespace ua176 {
 namespace {
 #include "OversampleData.h"
 
-constexpr std::array<double, 6> rates{44100, 48000, 88200, 96000, 176400, 192000};
 constexpr int halfbandLatency = 96;
 constexpr int sourceLatency = 24;
 }
@@ -35,7 +32,7 @@ double Oversampled176::Halfband::down(double a, double b) noexcept
 
 bool Oversampled176::supportsOversampling(double rate) noexcept
 {
-    return std::find(rates.begin(), rates.end(), rate) != rates.end();
+    return rate == 44100;
 }
 
 void Oversampled176::resetResampling() noexcept
@@ -48,11 +45,9 @@ void Oversampled176::resetResampling() noexcept
 
 bool Oversampled176::prepare(double rate, int factor, const LiveControls& controls)
 {
-    const auto rateIndex = std::find(rates.begin(), rates.end(), rate);
-    mode = rateIndex != rates.end() && (factor == 2 || factor == 4) ? factor : 1;
+    mode = supportsOversampling(rate) && (factor == 2 || factor == 4) ? factor : 1;
     resetResampling();
-    correction = mode == 1 ? nullptr
-        : sourceCorrection[rateIndex - rates.begin()][mode == 4 ? 1 : 0];
+    correction = mode == 1 ? nullptr : sourceCorrection[mode == 4 ? 1 : 0];
     const int pathDelay = mode == 1 ? Live176::latency(rate)
         : halfbandLatency + sourceLatency + (mode == 4 ? halfbandLatency / 2 : 0);
     extraDelay = latency - pathDelay;

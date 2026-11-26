@@ -507,7 +507,12 @@ struct Live176::Circuit {
             const double drive = voltages[deviceOffsets[device]] + resistance * (currents[device] + phaseCurrent[device]);
             // Implicit one-port solve using the same piecewise-linear
             // diode law, with each breakpoint expressed as V + R*I.
-            if (drive < incident.front()) {
+            if (drive < -3.) {
+                // At this reverse voltage the exponential correction is
+                // below 3e-22 A, far below the nonlinear residual tolerance.
+                detectorSlope[device] = 1 / (12.7e9 + resistance);
+                evaluation[device] = (drive - 66e-12 * 12.7e9) * detectorSlope[device];
+            } else if (drive < incident.front()) {
                 double current = diodeTable.current.front() + (drive - incident.front()) / (resistance + 12.7e9);
                 double exact = 0, slope = 0;
                 detector(drive - resistance * current, exact, slope);
@@ -567,7 +572,7 @@ struct Live176::Circuit {
                 deviceCurrent = next;
                 return true;
             }
-            if (!predict || !factored || error > previousError * .20) {
+            if (!predict || !factored || error > previousError * (rate >= 176400 ? .55 : .20)) {
                 factored = factorJacobian();
                 if (!factored)
                     return false;

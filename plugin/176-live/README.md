@@ -34,7 +34,7 @@ between those reference currents and the actual nonlinear device currents.
 The native calculation uses 32 samples of internal alignment at 44.1 kHz.
 Right-click the faceplate background to select 1x, 2x, or 4x oversampling.
 The selected mode is saved with the project. Oversampling is available at
-44.1, 48, 88.2, 96, 176.4, and 192 kHz. The 2x and 4x modes apply a source
+44.1 kHz. Other rates run the native solver. The 2x and 4x modes apply a source
 correction derived from the discrete solver and the continuous LiveSPICE
 circuit, then run the nonlinear solve at the higher rate between half-band
 resampling stages. All modes report 168 samples of latency so the switch,

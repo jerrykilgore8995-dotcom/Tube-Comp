@@ -27,7 +27,7 @@ add_custom_command(OUTPUT "${phaseProfiles}"
 set(oversampleData "${CMAKE_CURRENT_BINARY_DIR}/OversampleData.h")
 add_custom_command(OUTPUT "${oversampleData}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
-        "$<TARGET_FILE:UA176PhaseReference>" "${phaseProfiles}" --oversampling "${oversampleData}"
+        "$<TARGET_FILE:UA176PhaseReference>" "${oversampleData}" --oversampling
     DEPENDS UA176PhaseReference "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
     VERBATIM)
 add_library(UA176LiveCircuit STATIC Live176.cpp Oversampled176.cpp "${phaseProfiles}" "${oversampleData}")
