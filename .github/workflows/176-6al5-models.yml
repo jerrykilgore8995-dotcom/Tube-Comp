@@ -1,0 +1,28 @@
+name: 176 MK II 6AL5 model comparison
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-6al5-models.yml']
+  workflow_dispatch:
+jobs:
+  detector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        freq: [20, 50, 100]
+        gr: [5, 10, 15]
+        timing: ['0 0', '0.5 0.8', '1 1']
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - run: /usr/bin/python3 detector-model-sweep.py ${{ matrix.freq }} 4 ${{ matrix.gr }} ${{ matrix.timing }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detector-model-${{ strategy.job-index }}
+          path: research/176/mkii-wdf/detector-model-results.json
