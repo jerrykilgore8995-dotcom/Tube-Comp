@@ -1,0 +1,34 @@
+name: 176 CV ratio and timing validation
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-cv-validation.yml']
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {ratio: 2, mode: ratio}
+          - {ratio: 4, mode: ratio}
+          - {ratio: 8, mode: ratio}
+          - {ratio: 12, mode: ratio}
+          - {ratio: 4, mode: fast}
+          - {ratio: 4, mode: slow}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node research/176/mkii-wdf/cv-validation.mjs ${{ matrix.ratio }} ${{ matrix.mode }} | tee result.txt
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cv-${{ matrix.ratio }}-${{ matrix.mode }}
+          path: |
+            result.txt
+            timing-*.json
