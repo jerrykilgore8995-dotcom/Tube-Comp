@@ -1,0 +1,209 @@
+name: 176 original transformer detector sweep
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-transformer-detector.yml']
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        include:
+          - {"f":20,"ratio":2,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":2,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":2,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":2,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":2,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":4,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":4,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":4,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":4,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":8,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":8,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":8,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":8,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":12,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":12,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":20,"ratio":12,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":20,"ratio":12,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":2,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":2,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":2,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":2,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":4,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":4,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":4,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":4,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":8,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":8,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":8,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":8,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":12,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":12,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":50,"ratio":12,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":50,"ratio":12,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":2,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":2,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":2,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":2,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":4,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":4,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":4,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":4,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":8,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":8,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":8,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":8,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":5,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":12,"target":5,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":5,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":5,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":5,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":10,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":12,"target":10,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":10,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":10,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":10,"turns":7.0710678,"L":400,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":15,"turns":9,"L":250,"taps":"old"}
+          - {"f":100,"ratio":12,"target":15,"turns":7.0710678,"L":250,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":15,"turns":7.0710678,"L":55,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":15,"turns":7.0710678,"L":100,"taps":"factory"}
+          - {"f":100,"ratio":12,"target":15,"turns":7.0710678,"L":400,"taps":"factory"}
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ngspice python3-numpy python3-scipy
+      - run: /usr/bin/python3 transformer-detector-sweep.py ${{ matrix.f }} ${{ matrix.ratio }} ${{ matrix.target }} ${{ matrix.turns }} ${{ matrix.L }} ${{ matrix.taps }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xfmr-${{ strategy.job-index }}
+          path: |
+            research/176/mkii-wdf/xfmr-result.json
+            research/176/mkii-wdf/xfmr.log
