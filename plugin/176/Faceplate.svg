@@ -89,6 +89,10 @@
 <text x="370.00" y="26.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">COMP. RATIO</text>
 <text x="772.00" y="26.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">ATTACK</text>
 <text x="1035.00" y="26.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">RELEASE</text>
+<text id="attack-slow" x="737" y="103" fill="#e3d4ad" font-size="8" letter-spacing=".55">SLOW</text>
+<text id="attack-fast" x="807" y="103" fill="#e3d4ad" font-size="8" letter-spacing=".55">FAST</text>
+<text id="release-slow" x="1000" y="103" fill="#e3d4ad" font-size="8" letter-spacing=".55">SLOW</text>
+<text id="release-fast" x="1070" y="103" fill="#e3d4ad" font-size="8" letter-spacing=".55">FAST</text>
 <text x="370.00" y="123.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">VERNIER</text>
 <text x="772.00" y="123.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">VERNIER</text>
 <text x="1070.00" y="130.00" fill="#e3d4ad" font-size="9" letter-spacing="1.25">ON</text>
