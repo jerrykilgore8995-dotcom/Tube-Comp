@@ -16,8 +16,11 @@ The right vernier position adjusts a first-order digital sidechain HPF from
 0 Hz (bypass) to 350 Hz. The filter acts at the detector taps, preserving
 the transformer windings and existing reflected detector-current path.
 The 6AL5 current law is interpolated from a monotone table. The grid diode
-junction capacitances use fixed zero-bias values. Gain reduction indication
-uses the scaled control voltage. The Live ratio settings fit the two
+junction capacitances use fixed zero-bias values. The GR meter compares
+aligned 10 ms RMS windows from the wet output and an otherwise identical
+circuit with limiting disabled. It holds measured peaks for 250 ms. The
+reference runs outside the audio callback while the editor is open in GR
+mode. The reading is shown in dB before Mix. The Live ratio settings fit the two
 detector parameters (T3 tap fraction and 6AL5 bias return) to the transfer
 chart from the original UA 176 hardware manual. The fit uses settled 1 kHz
 measurements from 5 to 19 dB of gain reduction and a shared level offset

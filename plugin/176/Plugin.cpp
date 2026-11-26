@@ -6,7 +6,7 @@
 #include "SpiceStream.h"
 #include "UA176Art.h"
 #ifdef UA176_LIVE
-#include "../176-live/Oversampled176.h"
+#include "../176-live/GainReductionMeter.h"
 #endif
 
 namespace {
@@ -97,6 +97,8 @@ public:
 #ifdef UA176_LIVE
     void prepareToPlay(double sampleRate, int) override
     {
+        grMeter.disconnect();
+        meterRate = sampleRate;
         setLatencySamples(ua176::Oversampled176::latency);
         liveDry = {};
         liveDryPosition = 0;
@@ -136,7 +138,8 @@ public:
         juce::ScopedNoDenormals guard;
         midi.clear();
         const auto controls = readControls();
-        float inputPeak = 0, outputPeak = 0, reduction = 0;
+        meterBypassed.store(!on || controls.limiting <= .5f, std::memory_order_relaxed);
+        float inputPeak = 0, outputPeak = 0;
         bool failed = false;
         constexpr double scale = ua176::SpiceStream::fullScalePeak;
         mix.setTargetValue(get("mix") * .01f);
@@ -146,6 +149,7 @@ public:
             if (!modeBlend.isSmoothing()) {
                 activeMode = requested;
                 liveModes[activeMode].resetResampling();
+                grMeter.disconnect();
                 modeWarmup = 2 * ua176::Oversampled176::latency;
             }
         } else if (modeWarmup == 0) {
@@ -154,6 +158,10 @@ public:
 
         auto& simulator = liveModes[activeMode];
         const bool ready = good[activeMode] && simulator.setControls(controls);
+        const bool measure = ready && on && controls.limiting > .5f && modeWarmup == 0
+            && grMeter.isEnabled() && static_cast<int>(get("meter")) == 0;
+        if (!measure) grMeter.disconnect();
+        int meterSamples = 0;
         auto* samples = block.getWritePointer(0);
         for (int i = 0; i < block.getNumSamples(); ++i) {
             const float drySample = samples[i];
@@ -163,7 +171,8 @@ public:
             if (modeWarmup > 0)
                 --modeWarmup;
             double volts = 0, cv = 0;
-            const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
+            const double sourceVolts = 2 * scale * drySample;
+            const bool solved = ready && simulator.step(sourceVolts, volts, cv);
             const float alignedDry = liveDry[liveDryPosition];
             liveDry[liveDryPosition] = drySample;
             liveDryPosition = (liveDryPosition + 1) % liveDry.size();
@@ -171,16 +180,29 @@ public:
             if (solved && on) {
                 samples[i] = ua176::dryMix(static_cast<float>(volts / scale), alignedDry,
                     1 - (1 - dryAmount) * blend);
-                reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
+            }
+            if (measure && solved) {
+                meterInput[meterSamples] = sourceVolts;
+                meterOutput[meterSamples++] = volts;
+                if (meterSamples == ua176::GainReductionMeter::chunkSize || i + 1 == block.getNumSamples()) {
+                    grMeter.submit(meterRate, 1 << activeMode, controls,
+                                   meterInput.data(), meterOutput.data(), meterSamples);
+                    meterSamples = 0;
+                }
+            } else if (measure) {
+                grMeter.disconnect();
+                meterSamples = 0;
             }
             failed |= !solved;
             outputPeak = std::max(outputPeak, std::abs(samples[i]));
         }
         levelIn.store(inputPeak);
         levelOut.store(outputPeak);
-        gr.store(reduction);
         status.store(failed ? 2 : 1);
     }
+
+    ua176::GainReductionMeter grMeter;
+    std::atomic<bool> meterBypassed{false};
 #else
     void prepareToPlay(double sampleRate, int) override
     {
@@ -348,6 +370,8 @@ private:
     std::array<ua176::Oversampled176, 3> liveModes;
     std::array<bool, 3> good{};
     std::array<float, ua176::Oversampled176::latency> liveDry{};
+    std::array<double, ua176::GainReductionMeter::chunkSize> meterInput{}, meterOutput{};
+    double meterRate = 44100;
     std::size_t liveDryPosition = 0;
     int activeMode = 0, modeWarmup = 0;
     bool canOversample = true;
@@ -425,6 +449,7 @@ public:
         powerSwitch.setTooltip("Power");
         addAndMakeVisible(powerSwitch);
         powerAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "on", powerSwitch);
+        processor.grMeter.start();
 #endif
         setSize(1140, 218);
         startTimerHz(30);
@@ -436,6 +461,7 @@ public:
 #ifdef UA176_LIVE
         doubleSwitch.setLookAndFeel(nullptr);
         powerSwitch.setLookAndFeel(nullptr);
+        processor.grMeter.stop();
 #endif
         for (auto& knob : knobs) knob.setLookAndFeel(nullptr);
     }
@@ -459,9 +485,22 @@ public:
     {
         g.fillAll(juce::Colour(0xff403939));
         if (panel) panel->draw(g, 1.f);
-        const float angle = juce::degreesToRadians(-53.f + 106.f * needle);
+        float angle = juce::degreesToRadians(-53.f + 106.f * needle);
+#ifdef UA176_LIVE
+        if (showGainReduction) angle = gainReductionAngle(std::max(0.f, measuredReduction));
+#endif
         g.setColour(juce::Colour(0xff39261c));
         g.drawLine(565, 126, 565 + 65 * std::sin(angle), 126 - 65 * std::cos(angle), 1.4f);
+#ifdef UA176_LIVE
+        g.setFont(juce::FontOptions(9.f));
+        if (showGainReduction) {
+            const auto label = measuredReduction < 0 ? juce::String("— dB GR")
+                : juce::String(measuredReduction, 1) + " dB GR";
+            g.drawText(label, 591, 99, 51, 17, juce::Justification::centred);
+        } else {
+            g.drawText("VU", 549, 99, 42, 17, juce::Justification::centred);
+        }
+#endif
 #ifndef UA176_LIVE
         if (processor.get("on") < .5f) {
             g.setColour(juce::Colours::black.withAlpha(.5f));
@@ -507,6 +546,10 @@ private:
     void timerCallback() override
     {
         const auto meter = static_cast<int>(processor.get("meter"));
+#ifdef UA176_LIVE
+        showGainReduction = meter == 0;
+        measuredReduction = processor.meterBypassed.load(std::memory_order_relaxed) ? 0.f : processor.grMeter.read();
+#endif
         float value = 1.f - processor.gr.load() / 22.f;
         if (meter != 0) {
             const float peak = meter == 1 ? processor.levelIn.load() : processor.levelOut.load();
@@ -528,6 +571,21 @@ private:
     }
 
 #ifdef UA176_LIVE
+    static float gainReductionAngle(float reduction)
+    {
+        // The original panel uses unequally spaced markings.
+        constexpr std::array<float, 7> marks{0, 1, 3, 5, 7, 10, 20};
+        constexpr std::array<float, 7> x{593.2f, 577.5f, 561.8f, 546.1f, 530.4f, 514.7f, 499.f};
+        constexpr std::array<float, 7> y{68.9f, 65.4f, 65.4f, 68.9f, 75.4f, 84.1f, 94.f};
+        const auto angle = [&](std::size_t i) { return std::atan2(x[i] - 565, 124 - y[i]); };
+        for (std::size_t i = 1; i < marks.size(); ++i)
+            if (reduction <= marks[i])
+                return juce::jmap(reduction, marks[i - 1], marks[i], angle(i - 1), angle(i));
+        return angle(marks.size() - 1);
+    }
+
+    bool showGainReduction = true;
+    float measuredReduction = ua176::GainReductionMeter::unavailable;
     struct RingButtonLook final : juce::LookAndFeel_V4 {
         RingButtonLook(juce::uint32 onColour, float diameter, float centreY, bool showLabel)
             : onColour(onColour), diameter(diameter), centreY(centreY), showLabel(showLabel) {}

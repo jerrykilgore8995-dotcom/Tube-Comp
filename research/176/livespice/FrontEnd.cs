@@ -166,10 +166,8 @@ internal sealed partial class FrontEnd
         R("KB", "KRETURN", 50);
         R("KA", "KRETURN", 47);
         R("KB", "KRETURN", 47);
-        R("KRETURN", "0", 330);
-        R("KRETURN", "METER", 500);
-        R("METER", "R11TOP", 500);
-        R("R11TOP", "0", 330);
+        // Fold the unloaded meter-tap divider into the cathode return.
+        R("KRETURN", "0", 330.0 * 1330.0 / (330.0 + 1330.0));
 
         C("REG", "0", .1e-6);
 

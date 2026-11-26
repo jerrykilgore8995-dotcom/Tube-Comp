@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
-project(UA176Live VERSION 0.2.1 LANGUAGES C CXX)
+project(UA176Live VERSION 0.2.2 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Threads REQUIRED)
 
 if(NOT EXISTS "${LIVE176_DECK}")
     message(FATAL_ERROR "Set LIVE176_DECK to the generated Live176Deck.h")
@@ -30,7 +31,9 @@ add_custom_command(OUTPUT "${oversampleData}"
         "$<TARGET_FILE:UA176PhaseReference>" "${oversampleData}" --oversampling
     DEPENDS UA176PhaseReference "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
     VERBATIM)
-add_library(UA176LiveCircuit STATIC Live176.cpp Oversampled176.cpp "${phaseProfiles}" "${oversampleData}")
+add_library(UA176LiveCircuit STATIC Live176.cpp Oversampled176.cpp GainReductionMeter.cpp
+    "${phaseProfiles}" "${oversampleData}")
+target_link_libraries(UA176LiveCircuit PUBLIC Threads::Threads)
 set_target_properties(UA176LiveCircuit PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(UA176LiveCircuit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 if(MSVC)
@@ -55,6 +58,7 @@ if(UA176_LIVE_BUILD_VST3)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${panel}")
     file(READ "${panel}" livePanel)
     string(REGEX REPLACE "<g id=\"legacy-power\">([^<]*<[^/][^>]*>)*[^<]*</g>" "" livePanel "${livePanel}")
+    string(REGEX REPLACE "<text x=\"570[.]00\" y=\"109[.]00\"[^>]*>VU</text>" "" livePanel "${livePanel}")
     string(REGEX REPLACE "(<text x=\"370[.]00\" y=\"123[.]00\"[^>]*>)VERNIER" "\\1MIX" livePanel "${livePanel}")
     string(REGEX REPLACE "(<text x=\"772[.]00\" y=\"123[.]00\"[^>]*>)VERNIER" "\\1SC HPF" livePanel "${livePanel}")
     set(livePanelFile "${CMAKE_CURRENT_BINARY_DIR}/Faceplate.svg")
