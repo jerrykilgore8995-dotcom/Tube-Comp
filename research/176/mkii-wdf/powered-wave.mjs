@@ -67,7 +67,13 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  R("PAD:ROUTP","PAD:MP","PAD_P",arm,false);R("PAD:ROUTN","PAD:MN","TN",arm,false);R("PAD:RSHUNT","PAD:MP","PAD:MN",1200*kpad/Math.max(1e-9,kpad*kpad-1),false);
  R("R1","PAD_P","TP",Math.max(1e-6,300*(opts.vernier??0)));
  transformer("T1","TP","TN","SEC_P","SEC_N",{n:10,rp:52,rs:3900,ll:.002,lm:3.3,rc:1e5,cs:92e-12,cw:15e-12});
- R("R2","SEC_P","CV",27000);R("R5","CV","SEC_N",27000);
+ // Optional diagnostic synchronous CV ripple cancellation; not a physical component.
+ const rippleHz=opts.cvRippleHz??0,period=rippleHz>0?Math.max(4,Math.round(fs/rippleHz)):0;
+ const rippleBins=new Float64Array(period),previousBins=new Float64Array(period);
+ let rippleIndex=0,rippleSum=0,rippleMean=0,rippleCycles=0,correction=0;
+ if(period)V("CV_RIPPLE_CANCEL","CV_APPLIED","CV",()=>correction);
+ const cvNode=period?"CV_APPLIED":"CV";
+ R("R2","SEC_P",cvNode,27000);R("R5",cvNode,"SEC_N",27000);
  R("RG_P","SEC_P","GP",.001,false);R("RG_N","SEC_N","GN",.001,false);
  C("C5","CV","0",.1e-6);
  triode("V1A","PA","GP","KA","6BC8",1);triode("V1B","PB","GN","KB","6BC8",1);
@@ -171,13 +177,15 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const solveStep=prepareNonlinear(ad,indices,current,opts.tol??1e-6);
  let b=Array(ports.length).fill(0),guess=Array(indices.length).fill(0),n=0;
  function step(input){
+  if(period)correction=rippleCycles>=2?-(previousBins[rippleIndex]-rippleMean):0;
   const t=n/fs,e=constraints.map(x=>x.voltage(t,input));
   const r=solveStep(b,e,guess);
   guess=r.v;n++;
   for(const m of magnetics)m.core.commit((r.a[m.p]+r.b[m.p])/2);
   const voltage=i=>(r.a[i]+r.b[i])/2;
   for(let j=0;j<ports.length;j++){if(ports[j].type==="C")b[j]=r.a[j];else if(ports[j].type==="L")b[j]=-r.a[j];}
-  return {audio:voltage(output),cv:voltage(cv),rect:voltage(rect),reg:voltage(reg),bplus:voltage(bplus),iterations:r.iterations,...Object.fromEntries(obsNames.map((name,i)=>[name,voltage(obs[i])])),...Object.fromEntries(magnetics.map(m=>[m.name+":Iexcess",(r.a[m.p]-r.b[m.p])/(2*ports[m.p].z)]))};
+  if(period){const raw=voltage(cv);rippleBins[rippleIndex]=raw;rippleSum+=raw;if(++rippleIndex===period){previousBins.set(rippleBins);rippleMean=rippleSum/period;rippleSum=0;rippleIndex=0;rippleCycles++;}}
+  return {audio:voltage(output),cv:voltage(cv),cvApplied:voltage(cv)+correction,rect:voltage(rect),reg:voltage(reg),bplus:voltage(bplus),iterations:r.iterations,...Object.fromEntries(obsNames.map((name,i)=>[name,voltage(obs[i])])),...Object.fromEntries(magnetics.map(m=>[m.name+":Iexcess",(r.a[m.p]-r.b[m.p])/(2*ports[m.p].z)]))};
  }
  return {step,magneticDiagnostics:()=>Object.fromEntries(magnetics.map(m=>[m.name,m.core.diagnostics()])),inventory:{nodes:nodes.size,ports:ports.length,nonlinear:indices.length,idealConstraints:constraints.length,couplings:mutual.length},ports:ports.map(p=>p.name)};
 }
