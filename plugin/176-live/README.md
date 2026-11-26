@@ -9,7 +9,8 @@ from LiveSPICE. For each control setting it precomputes a stiffly accurate
 linear state transition over one host sample, with source and device currents
 held over that interval. The nonlinear device currents are solved at the
 host sample rate. The input and output pads,
-detector mode, attack, release, and ratio affect the circuit. The left
+detector mode, attack, release, and ratio affect the circuit. The attack
+control is a linear 1 MΩ rheostat, with minimum resistance at Fast. The left
 vernier position blends in dry signal, from 0% dry by default to 100% dry.
 The dry signal follows the modeled wet path's inverted polarity.
 The right vernier position adjusts a first-order digital sidechain HPF from

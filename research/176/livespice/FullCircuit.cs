@@ -266,8 +266,7 @@ internal sealed partial class FrontEnd
         }
         AdjustableR("CV", "ATK_IN", settings.Limiting ? .001 : 1e12, "limitOn");
         AdjustableR("CV", "0", settings.Limiting ? 1e12 : .001, "limitOff");
-        R("ATK_IN", "DET_A", 10e3);
-        AdjustableR("ATK_IN", "DET_A", Math.Max(.001, 25e3 * (1 - settings.Attack)), "attack");
+        AdjustableR("ATK_IN", "DET_A", Math.Max(.001, 1e6 * (1 - settings.Attack)), "attack");
         AdjustableR("DET_A", "REL_WIPER", Math.Max(.001, 5e6 * (1 - settings.Release)), "releaseUpper");
         AdjustableR("REL_WIPER", "0", Math.Max(.001, 5e6 * settings.Release), "releaseLower");
         R("REL_WIPER", "0", 270e3);

@@ -129,7 +129,7 @@ ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtere
     p.limitOff = c.limiting > .5 ? 1e-12 : 1000.;
     p.tap = c.tap;
     p.ratioBias = 1 / static_cast<double>(c.biasResistance);
-    p.attack = 1 / std::max(.001, 25e3 * (1 - c.attack));
+    p.attack = 1 / std::max(.001, 1e6 * (1 - c.attack));
     p.releaseUpper = 1 / std::max(.001, 5e6 * (1 - c.release));
     p.releaseLower = 1 / std::max(.001, 5e6 * c.release);
     return p;

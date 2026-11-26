@@ -93,14 +93,15 @@ int main(int argc, char**)
             bassCv = controlSum;
         if (setting == 8 && !(controlSum - bassCv > 2))
             return 8;
-        if ((setting == 0 && (rms < 4.49 || rms > 4.73 || controlSum < -5.65 || controlSum > -5.43))
+        if ((setting == 0 && (rms < 5.52 || rms > 5.78 || controlSum < -5.36 || controlSum > -5.16))
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }
-    // Change the pad during playback and measure across its output load.
+    // Measure the output pad during playback with the detector disconnected.
     auto& simulator = simulators[0];
     ua176::LiveControls knobs;
     knobs.output = 1;
+    knobs.limiting = 0;
     if (!simulator.prepare(rate, knobs))
         return 6;
     double openRms = 0;
@@ -128,7 +129,6 @@ int main(int argc, char**)
     }
     // Compare the fundamental through the whole circuit with limiting off.
     knobs.output = 10;
-    knobs.limiting = 0;
     double midband = 0;
     for (int frequency : {1000, 30, 50, 100, 500, 3000, 5000, 10000, 15000, 18000, 19500, 20000}) {
         if (!simulator.prepare(rate, knobs))
