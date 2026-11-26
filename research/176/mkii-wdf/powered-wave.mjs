@@ -1,6 +1,6 @@
 // Fixed-control offline 176 full-topology WDF prototype. See model differences in README.
-import {adaptor,nonlinearStep} from './wave-core.mjs';
-function build176(adaptor,nonlinearStep,manifest,opts={}){
+import {adaptor,nonlinearStep,prepareNonlinear} from './wave-core.mjs';
+function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const fs=opts.fs??44100,dt=1/fs,ratio=opts.ratio??2,loss=opts.loss??20,attack=opts.attack??.5,release=opts.release??.8;
  const factors=Object.fromEntries(manifest.records.filter(x=>x.fraction!==undefined).map(x=>[x.name,1+x.fraction]));
  const fac=(name)=>factors[name]??1;
@@ -123,10 +123,11 @@ function build176(adaptor,nonlinearStep,manifest,opts={}){
  const indices=ports.flatMap((p,i)=>p.type==="N"?[i]:[]);
  const indexMap=new Map(indices.map((x,i)=>[x,i]));
  const current=v=>{const i=Array(v.length).fill(0);for(const d of devices){const ix=d.indices.map(x=>indexMap.get(x)),out=d.fn(ix.map(x=>v[x]));ix.forEach((p,j)=>i[p]+=out[j]);}return i};
+ const solveStep=prepareNonlinear(ad,indices,current,opts.tol??1e-6);
  let b=Array(ports.length).fill(0),guess=Array(indices.length).fill(0),n=0;
  function step(input){
   const t=n/fs,e=constraints.map(x=>x.voltage(t,input));
-  const r=nonlinearStep(ad,b,e,indices,current,guess,opts.tol??1e-6);
+  const r=solveStep(b,e,guess);
   guess=r.v;n++;
   const voltage=i=>(r.a[i]+r.b[i])/2;
   for(let j=0;j<ports.length;j++){if(ports[j].type==="C")b[j]=r.a[j];else if(ports[j].type==="L")b[j]=-r.a[j];}
@@ -134,4 +135,4 @@ function build176(adaptor,nonlinearStep,manifest,opts={}){
  }
  return {step,inventory:{nodes:nodes.size,ports:ports.length,nonlinear:indices.length,idealConstraints:constraints.length,couplings:mutual.length},ports:ports.map(p=>p.name)};
 }
-export function create176(manifest,opts){return build176(adaptor,nonlinearStep,manifest,opts);}
+export function create176(manifest,opts){return build176(adaptor,prepareNonlinear,manifest,opts);}
