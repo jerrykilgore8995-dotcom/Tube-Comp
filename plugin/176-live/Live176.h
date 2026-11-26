@@ -22,6 +22,8 @@ inline float dryMix(float wet, float dry, float amount) noexcept
 
 class Live176 {
 public:
+    static constexpr int phaseLatency = 32;
+    static int latency(double rate) noexcept { return rate == 44100 ? phaseLatency : 0; }
     Live176();
     ~Live176();
     bool prepare(double rate, const LiveControls&);
@@ -29,6 +31,10 @@ public:
     bool step(double sourceVolts, double& outputVolts, double& cv) noexcept;
     double bPlus() const noexcept;
     double regulated() const noexcept;
+    double interstage() const noexcept;
+#ifdef UA176_PHASE_REFERENCE
+    static bool exportPhaseReference(const char*, double bias);
+#endif
 private:
     struct Circuit;
     std::unique_ptr<Circuit> circuit;

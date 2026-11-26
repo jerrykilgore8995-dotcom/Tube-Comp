@@ -65,6 +65,9 @@ internal sealed partial class FrontEnd
         using var writer = new StreamWriter(file);
         writer.WriteLine("// Generated from the LiveSPICE 176 circuit. Do not edit.");
         writer.WriteLine($"constexpr int nodeCount = {x.Length}, deviceCount = {devices.Count};");
+        var controlNode = Array.IndexOf(x, ControlVoltage);
+        var controlEquation = Array.FindIndex(equations, equation => !equation[derivatives[controlNode]].EqualsZero());
+        writer.WriteLine($"constexpr int controlNode = {controlNode}, controlEquation = {controlEquation};");
         var states = Enumerable.Range(0, x.Length).Where(i => equations.Any(eq => !eq[derivatives[i]].EqualsZero())).ToArray();
         writer.WriteLine($"constexpr int stateCount = {states.Length};");
         writer.WriteLine($"constexpr int stateIndices[] = {{ {string.Join(", ", states)} }};");
@@ -89,7 +92,9 @@ internal sealed partial class FrontEnd
                 writer.WriteLine($"    b[{i} * (deviceCount + 3)] = {Cxx(-eq[1], controlSymbols)};");
         }
         writer.WriteLine("}");
-        var voltages = devices.SelectMany(d => d.Voltages).Concat(new[] { Output, ControlVoltage, BPlus, Regulated, DetectorSense }).ToArray();
+        var voltages = devices.SelectMany(d => d.Voltages).Concat(new[] {
+            Output, ControlVoltage, BPlus, Regulated, DetectorSense, Node("NEXT_P").V - Node("NEXT_N").V
+        }).ToArray();
         writer.WriteLine($"constexpr int portCount = {voltages.Length};");
         writer.WriteLine("void ports(double* z) {");
         for (int i = 0; i < voltages.Length; i++)

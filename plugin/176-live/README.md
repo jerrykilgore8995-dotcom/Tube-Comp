@@ -20,5 +20,15 @@ junction capacitances use fixed zero-bias values. Gain reduction indication
 uses the scaled control voltage. The supply retains load-dependent sag and
 0B2 regulation and averages out mains ripple and rectifier startup.
 
+At 44.1 kHz, the source response is reconstructed at the device ports
+from the continuous circuit, interpolating between operating points
+according to the detector control voltage. Newton solves the difference
+between those reference currents and the actual nonlinear device currents.
+This uses native-rate samples and incurs 32 samples of host-reported latency.
+Mix and bypass share the same delay. Other sample rates use the held-source
+solver without this reconstruction. The detector solves its piecewise diode
+law directly against its self-impedance before the coupled Newton solve.
+
 The Windows workflow generates the circuit from the pinned LiveSPICE sources,
-benchmarks the native solver, builds the VST3 and packages it.
+generates the source profiles using NumPy and SciPy, benchmarks the native
+solver, builds the VST3 and packages it.

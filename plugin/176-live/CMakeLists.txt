@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(UA176Live VERSION 0.1.5 LANGUAGES C CXX)
+project(UA176Live VERSION 0.1.6 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -8,7 +8,23 @@ if(NOT EXISTS "${LIVE176_DECK}")
 endif()
 configure_file("${LIVE176_DECK}" "${CMAKE_CURRENT_BINARY_DIR}/Live176Deck.h" COPYONLY)
 
-add_library(UA176LiveCircuit STATIC Live176.cpp)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(UA176PhaseReference PhaseReference.cpp Live176.cpp)
+target_include_directories(UA176PhaseReference PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_compile_definitions(UA176PhaseReference PRIVATE UA176_PHASE_REFERENCE=1)
+if(MSVC)
+    target_compile_options(UA176PhaseReference PRIVATE /arch:AVX2)
+else()
+    target_compile_options(UA176PhaseReference PRIVATE -mavx2 -mfma)
+endif()
+set(phaseProfiles "${CMAKE_CURRENT_BINARY_DIR}/PhaseProfiles.h")
+add_custom_command(OUTPUT "${phaseProfiles}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
+        "$<TARGET_FILE:UA176PhaseReference>" "${phaseProfiles}"
+    DEPENDS UA176PhaseReference "${CMAKE_CURRENT_SOURCE_DIR}/PhaseProfiles.py"
+    VERBATIM)
+
+add_library(UA176LiveCircuit STATIC Live176.cpp "${phaseProfiles}")
 set_target_properties(UA176LiveCircuit PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(UA176LiveCircuit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 if(MSVC)

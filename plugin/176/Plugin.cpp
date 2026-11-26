@@ -94,7 +94,10 @@ public:
 #ifdef UA176_LIVE
     void prepareToPlay(double sampleRate, int) override
     {
-        setLatencySamples(0);
+        liveLatency = ua176::Live176::latency(sampleRate);
+        setLatencySamples(liveLatency);
+        liveDry = {};
+        liveDryPosition = {};
         mix.reset(sampleRate, .010);
         mix.setCurrentAndTargetValue(get("mix") * .01f);
         const auto controls = readControls();
@@ -108,9 +111,18 @@ public:
 
     void processBlock(juce::AudioBuffer<float>& block, juce::MidiBuffer& midi) override
     {
+        processLiveBlock(block, midi, get("on") > .5f);
+    }
+
+    void processBlockBypassed(juce::AudioBuffer<float>& block, juce::MidiBuffer& midi) override
+    {
+        processLiveBlock(block, midi, false);
+    }
+
+    void processLiveBlock(juce::AudioBuffer<float>& block, juce::MidiBuffer& midi, bool on)
+    {
         juce::ScopedNoDenormals guard;
         midi.clear();
-        const bool on = get("on") > .5f;
         const auto controls = readControls();
         float inputPeak = 0, outputPeak = 0, reduction = 0;
         bool failed = false;
@@ -120,14 +132,23 @@ public:
             auto& simulator = simulators[static_cast<std::size_t>(c)];
             const bool ready = good[static_cast<std::size_t>(c)] && simulator.setControls(controls);
             auto* samples = block.getWritePointer(c);
+            auto& delay = liveDry[static_cast<std::size_t>(c)];
+            auto& position = liveDryPosition[static_cast<std::size_t>(c)];
             for (int i = 0; i < block.getNumSamples(); ++i) {
                 const float drySample = samples[i];
                 inputPeak = std::max(inputPeak, std::abs(drySample));
                 const float dryAmount = mix.getNextValue();
                 double volts = 0, cv = 0;
                 const bool solved = ready && simulator.step(2 * scale * drySample, volts, cv);
+                float alignedDry = drySample;
+                if (liveLatency > 0) {
+                    alignedDry = delay[position];
+                    delay[position] = drySample;
+                    position = (position + 1) % delay.size();
+                }
+                samples[i] = alignedDry;
                 if (solved && on) {
-                    samples[i] = ua176::dryMix(static_cast<float>(volts / scale), drySample, dryAmount);
+                    samples[i] = ua176::dryMix(static_cast<float>(volts / scale), alignedDry, dryAmount);
                     reduction = std::max(reduction, static_cast<float>(-cv * 3.5));
                 }
                 failed |= !solved;
@@ -303,6 +324,9 @@ private:
 #ifdef UA176_LIVE
     std::array<ua176::Live176, 2> simulators;
     std::array<bool, 2> good{};
+    std::array<std::array<float, ua176::Live176::phaseLatency>, 2> liveDry{};
+    std::array<std::size_t, 2> liveDryPosition{};
+    int liveLatency = 0;
     juce::SmoothedValue<float> mix;
 #else
     std::array<ua176::SpiceStream, 2> simulators;

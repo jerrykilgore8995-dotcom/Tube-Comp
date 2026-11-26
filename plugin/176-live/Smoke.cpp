@@ -28,15 +28,15 @@ int main(int argc, char**)
     std::array<double, block> tone{};
     std::vector<double> times;
     times.reserve(blocks);
-    for (int setting = 0; setting < 9; ++setting) {
+    for (int setting = 0; setting < 10; ++setting) {
         const int ratioIndex = setting >= 6 ? 1 : setting == 5 ? 3 : setting % 4;
         const int ratio = ratios[ratioIndex];
-        const int frequency = setting >= 7 ? 50 : setting == 5 ? 10000 : 1000;
+        const int frequency = setting == 9 ? 20000 : setting >= 7 ? 50 : setting == 5 ? 10000 : 1000;
         ua176::LiveControls knobs;
         knobs.output = 1;
         knobs.tap = taps[ratioIndex];
         knobs.biasResistance = bias[ratioIndex];
-        knobs.limiting = setting == 4 ? 0 : 1;
+        knobs.limiting = setting == 4 || setting == 9 ? 0 : 1;
         knobs.doubleTiming = setting == 6;
         knobs.sidechainHz = setting == 8 ? 350 : 0;
         for (auto& simulator : simulators)
@@ -136,7 +136,7 @@ int main(int argc, char**)
         if (!simulator.prepare(rate, knobs))
             return 9;
         constexpr int capture = rate / 10;
-        double real = 0, imag = 0;
+        double real = 0, imag = 0, interstageReal = 0, interstageImag = 0;
         for (int i = 0; i < 5 * capture; ++i) {
             const double phase = tau * frequency * i / rate;
             const double sine = std::sin(phase);
@@ -144,8 +144,12 @@ int main(int argc, char**)
             if (!simulator.step(sourcePeak * sine, volts, cv))
                 return 9;
             if (i >= 4 * capture) {
-                real += volts * sine;
-                imag += volts * std::cos(phase);
+                const double aligned = tau * frequency * (i - ua176::Live176::latency(rate)) / rate;
+                const double inPhase = std::sin(aligned), quadrature = std::cos(aligned);
+                real += volts * inPhase;
+                imag += volts * quadrature;
+                interstageReal += simulator.interstage() * inPhase;
+                interstageImag += simulator.interstage() * quadrature;
             }
         }
         const double fundamental = std::hypot(real, imag);
@@ -155,6 +159,18 @@ int main(int argc, char**)
         std::printf("Through response at %d Hz: %+.3f dB vs 1 kHz\n", frequency, relative);
         if (!std::isfinite(relative) || std::abs(relative) > 1)
             return 9;
+        if (frequency == 10000 || frequency == 20000) {
+            const double outputPhase = 360 / tau * std::atan2(imag, real);
+            const double interstagePhase = 360 / tau * std::atan2(interstageImag, interstageReal);
+            std::printf("Aligned phase at %d Hz: output %+.2f degrees, interstage %+.2f degrees\n",
+                        frequency, outputPhase, interstagePhase);
+            const double outputReference = frequency == 10000 ? 149.01 : 117.92;
+            const double interstageReference = frequency == 10000 ? 159.59 : 138.78;
+            if (!std::isfinite(outputPhase) || !std::isfinite(interstagePhase)
+                || std::abs(std::remainder(outputPhase - outputReference, 360)) > 3
+                || std::abs(std::remainder(interstagePhase - interstageReference, 360)) > 3)
+                return 9;
+        }
     }
     return missedDeadline ? 5 : 0;
 }

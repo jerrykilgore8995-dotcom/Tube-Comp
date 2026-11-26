@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <complex>
+#include <cstdio>
 #include <limits>
 #include <immintrin.h>
 
@@ -87,7 +89,7 @@ void plateLaw(double vp, double vg, double offset, double gridScale, double knee
 
 #include "Live176Deck.h"
 
-constexpr int deviceVoltages = portCount - 5;
+constexpr int deviceVoltages = portCount - 6;
 constexpr int observations = stateCount + portCount;
 static_assert(observations <= nodeCount);
 constexpr int filterInput = deviceCount + 2;
@@ -95,6 +97,13 @@ constexpr int historyOffset = filterInput + 1;
 constexpr int columns = historyOffset + stateCount;
 constexpr int linearMapDoublings = 4;
 constexpr double sdirkGamma = .2928932188134524756; // 1 - 1/sqrt(2)
+constexpr int phaseTaps = 2 * Live176::phaseLatency + 1;
+constexpr int detectorStart = deviceCount - 2;
+using Complex = std::complex<double>;
+
+#ifndef UA176_PHASE_REFERENCE
+#include "PhaseProfiles.h"
+#endif
 
 ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtered)
 {
@@ -196,8 +205,106 @@ struct Live176::Circuit {
     std::array<double, deviceVoltages> slopes{};
     double rail = 0, regulator = 0;
     double hpGain = 0, hpState = 0;
+    std::array<double, portCount> phaseVoltage{};
+    std::array<double, deviceCount> phaseCurrent{}, detectorSlope{}, detectorResistance{};
+    std::array<std::array<double, DiodeTable::count>, 2> detectorIncident{};
+#ifndef UA176_PHASE_REFERENCE
+    std::array<double, 2 * phaseTaps> phaseHistory{};
+    std::array<std::array<Complex, maxPhaseModes>, phaseProfiles.size()> phaseState{};
+    std::array<double, 2> phaseHighPass{};
+    double phaseBias = 0, phaseBiasBlend = 0;
+    int phaseCursor = 0;
+#else
+    std::FILE* phaseReference = nullptr;
+    double referenceBias = 0;
+#endif
 
     Circuit() { ports(z.data()); }
+
+    double reconstructSource(double input) noexcept
+    {
+#ifndef UA176_PHASE_REFERENCE
+        if (!configured || !Live176::latency(rate))
+            return input;
+        phaseHistory[phaseCursor] = phaseHistory[phaseCursor + phaseTaps] = input * (10. / controls.input);
+        const auto* samples = phaseHistory.data() + phaseCursor;
+        phaseCursor = (phaseCursor + phaseTaps - 1) % phaseTaps;
+        phaseVoltage.fill(0);
+        phaseCurrent.fill(0);
+        std::size_t first = 0;
+        while (first + 2 < phaseProfiles.size() && phaseBias < phaseProfiles[first + 1].bias)
+            ++first;
+        const auto& lo = phaseProfiles[first];
+        const auto& hi = phaseProfiles[first + 1];
+        const double fraction = std::clamp((phaseBias - lo.bias) / (hi.bias - lo.bias), 0., 1.);
+        for (std::size_t i = 0; i < phaseProfiles.size(); ++i) {
+            const auto& profile = phaseProfiles[i];
+            auto& state = phaseState[i];
+            for (int mode = 0; mode < profile.modes; ++mode)
+                state[mode] = profile.poles[mode] * state[mode] + samples[Live176::phaseLatency];
+            const double weight = i == first ? 1 - fraction : i == first + 1 ? fraction : 0;
+            if (weight == 0)
+                continue;
+            std::array<double, portCount> voltage{};
+            for (int port = 0; port < portCount; ++port)
+                voltage[port] = dot<phaseTaps>(profile.impulse[port], samples);
+            for (int mode = 0; mode < profile.modes; ++mode)
+                for (int port = 0; port < portCount; ++port)
+                    voltage[port] += std::real(profile.weights[mode][port] * state[mode]);
+            for (int port = 0; port < portCount; ++port)
+                phaseVoltage[port] += weight * voltage[port];
+            // Subtract the reconstructed linear device current. Newton
+            // solves the residual current against the total port voltage.
+            for (int device = 0; device < deviceCount; ++device)
+                for (int port = deviceOffsets[device]; port < deviceOffsets[device + 1]; ++port)
+                    phaseCurrent[device] += weight * profile.slopes[port] * voltage[port];
+        }
+        phaseVoltage[deviceVoltages] *= 10. / controls.output;
+        for (int i = 0; i < 2; ++i) {
+            auto& voltage = phaseVoltage[deviceOffsets[detectorStart + i]];
+            voltage *= controls.tap / .29;
+            if (hpGain > 0) {
+                const double step = hpGain * (voltage - phaseHighPass[i]);
+                voltage -= phaseHighPass[i] + step;
+                phaseHighPass[i] += 2 * step;
+            } else {
+                phaseHighPass[i] = voltage;
+            }
+        }
+        return 0;
+#else
+        return input;
+#endif
+    }
+
+    void prepareDetectorPorts() noexcept
+    {
+        for (int device = detectorStart; device < deviceCount; ++device) {
+            const int port = deviceOffsets[device];
+            const double resistance = -response[port * columns + device + 2];
+            detectorResistance[device] = resistance;
+            if (resistance <= 0)
+                continue;
+            auto& incident = detectorIncident[device - detectorStart];
+            for (int i = 0; i < DiodeTable::count; ++i)
+                incident[i] = diodeTable.voltage[i] + resistance * diodeTable.current[i];
+        }
+    }
+
+#ifdef UA176_PHASE_REFERENCE
+    void dumpLinearCircuit() noexcept
+    {
+        devicesAt<true>(voltages.data(), slopes.data());
+        const int sizes[]{nodeCount, stateCount, deviceCount, deviceVoltages, portCount};
+        std::fwrite(sizes, sizeof(int), 5, phaseReference);
+        std::fwrite(stateIndices, sizeof(int), stateCount, phaseReference);
+        std::fwrite(deviceOffsets, sizeof(int), deviceCount + 1, phaseReference);
+        for (const auto& block : {std::pair{a.data(), a.size()}, std::pair{d.data(), d.size()},
+                                  std::pair{b.data(), b.size()}, std::pair{z.data(), z.size()},
+                                  std::pair{slopes.data(), slopes.size()}})
+            std::fwrite(block.first, sizeof(double), block.second, phaseReference);
+    }
+#endif
 
     // Compose an affine map F with itself, optionally keeping a weighted
     // contribution from F. Each composed state map uses the same held sources.
@@ -227,6 +334,16 @@ struct Live176::Circuit {
         const double g = filtered ? std::tan(3.14159265358979323846 * frequency / rate) : 0;
         const double nextHpGain = g / (1 + g);
         stamp(electrical(next, nextHpGain, filtered), a.data(), d.data(), b.data());
+#ifdef UA176_PHASE_REFERENCE
+        if (phaseReference) {
+            if (dc) {
+                a[controlEquation * nodeCount + controlNode] += 1e5;
+                b[controlEquation * historyOffset] += 1e5 * referenceBias;
+            } else {
+                dumpLinearCircuit();
+            }
+        }
+#endif
         const double scale = dc ? 0 : std::ldexp(rate, linearMapDoublings) / sdirkGamma;
         for (int row = 0; row < nodeCount; ++row) {
             std::copy_n(b.data() + row * historyOffset, historyOffset, rhs.data() + row * columns);
@@ -261,6 +378,7 @@ struct Live176::Circuit {
         if (!std::all_of(candidate.begin(), candidate.end(), [](double value) { return std::isfinite(value); }))
             return false;
         response.swap(candidate);
+        prepareDetectorPorts();
         hpGain = nextHpGain;
         if (next.sidechainHz <= 0)
             hpState = 0;
@@ -278,7 +396,7 @@ struct Live176::Circuit {
         std::copy(previous.begin(), previous.end(), feed.begin() + historyOffset);
         for (int port = 0; port < deviceVoltages; ++port) {
             const auto* row = response.data() + port * columns;
-            portBase[port] = row[0] * feed[0] + row[1] * feed[1]
+            portBase[port] = phaseVoltage[port] + row[0] * feed[0] + row[1] * feed[1]
                 + row[filterInput] * hpState
                 + dot<stateCount>(row + historyOffset, feed.data() + historyOffset);
         }
@@ -287,6 +405,9 @@ struct Live176::Circuit {
     bool factorJacobian() noexcept
     {
         devicesAt<true>(voltages.data(), slopes.data());
+        for (int device = detectorStart; device < deviceCount; ++device)
+            if (detectorResistance[device] > 0)
+                slopes[deviceOffsets[device]] = detectorSlope[device];
         activeCount = inactiveCount = 0;
         for (int i = 0; i < deviceCount; ++i) {
             double slope = 0;
@@ -302,6 +423,8 @@ struct Live176::Circuit {
         for (int i = 0; i < activeCount; ++i) {
             const int device = active[i];
             const auto coefficient = [&](int other) {
+                if (device == other && detectorResistance[device] > 0)
+                    return 1.0;
                 double value = device == other ? 1 : 0;
                 for (int k = deviceOffsets[device]; k < deviceOffsets[device + 1]; ++k)
                     value -= slopes[k] * response[k * columns + other + 2];
@@ -365,6 +488,29 @@ struct Live176::Circuit {
             voltages[port] = portBase[port] + dot<deviceCount>(row, currents.data());
         }
         devicesAt<false>(voltages.data(), evaluation.data());
+        for (int device = detectorStart; device < deviceCount; ++device) {
+            const double resistance = detectorResistance[device];
+            if (resistance <= 0)
+                continue;
+            const auto& incident = detectorIncident[device - detectorStart];
+            const double drive = voltages[deviceOffsets[device]] + resistance * (currents[device] + phaseCurrent[device]);
+            // Implicit one-port solve using the same piecewise-linear
+            // diode law, with each breakpoint expressed as V + R*I.
+            if (drive < incident.front()) {
+                double current = diodeTable.current.front() + (drive - incident.front()) / (resistance + 12.7e9);
+                double exact = 0, slope = 0;
+                detector(drive - resistance * current, exact, slope);
+                detectorSlope[device] = slope / (1 + resistance * slope);
+                evaluation[device] = current + (exact - current) / (1 + resistance * slope);
+            } else {
+                const auto upper = std::upper_bound(incident.begin(), incident.end(), drive);
+                const auto i = std::min<std::size_t>(upper - incident.begin(), DiodeTable::count - 1);
+                detectorSlope[device] = (diodeTable.current[i] - diodeTable.current[i-1]) / (incident[i] - incident[i-1]);
+                evaluation[device] = diodeTable.current[i-1] + detectorSlope[device] * (drive - incident[i-1]);
+            }
+        }
+        for (int device = 0; device < deviceCount; ++device)
+            evaluation[device] -= phaseCurrent[device];
     }
 
     double backtrack(const std::array<double, deviceCount>& currents, double damping, double error) noexcept
@@ -446,12 +592,12 @@ struct Live176::Circuit {
     double observe(int row) const noexcept
     {
         const auto* coefficients = response.data() + row * columns;
-        return dot<columns>(coefficients, feed.data());
+        return dot<columns>(coefficients, feed.data()) + (row < portCount ? phaseVoltage[row] : 0);
     }
 
     bool advance(double audio, double supply, int budget, double& output, double& cv) noexcept
     {
-        preparePorts(audio, supply);
+        preparePorts(reconstructSource(audio), supply);
         if ((!configured || !newton(std::min(budget, controls.limiting > .5 ? 7 : 14), true))
             && !newton(budget, false)
             && (!configured || !newton(budget, false, true)))
@@ -459,10 +605,13 @@ struct Live176::Circuit {
         std::copy(deviceCurrent.begin(), deviceCurrent.end(), feed.begin() + 2);
         output = observe(deviceVoltages);
         cv = observe(deviceVoltages + 1);
+#ifndef UA176_PHASE_REFERENCE
+        phaseBias += phaseBiasBlend * (cv - phaseBias);
+#endif
         rail = observe(deviceVoltages + 2);
         regulator = observe(deviceVoltages + 3);
         if (hpGain > 0)
-            hpState += 2 * hpGain * (observe(deviceVoltages + 4) - hpState);
+            hpState += 2 * hpGain * (observe(deviceVoltages + 4) - phaseVoltage[deviceVoltages + 4] - hpState);
         else if (!configured && controls.sidechainHz > 0)
             hpState = observe(deviceVoltages + 4);
         for (int state = 0; state < stateCount; ++state)
@@ -480,12 +629,25 @@ bool Live176::prepare(double rate, const LiveControls& knobs)
     circuit->previous.fill(0);
     circuit->configured = false;
     circuit->hpState = 0;
+    circuit->phaseVoltage.fill(0);
+    circuit->phaseCurrent.fill(0);
+#ifndef UA176_PHASE_REFERENCE
+    circuit->phaseHistory.fill(0);
+    circuit->phaseState = {};
+    circuit->phaseHighPass.fill(0);
+    circuit->phaseCursor = 0;
+    circuit->phaseBias = 0;
+    circuit->phaseBiasBlend = 1 - std::exp(-1 / (.0065 * rate));
+#endif
     if (!circuit->setup(knobs, true))
         return false;
     double audio = 0, cv = 0;
     for (int i = 1; i <= 40; ++i)
         if (!circuit->advance(0, i / 40., 60, audio, cv))
             return false;
+#ifndef UA176_PHASE_REFERENCE
+    circuit->phaseBias = cv;
+#endif
     circuit->configured = circuit->setup(knobs, false);
     return circuit->configured;
 }
@@ -502,5 +664,23 @@ bool Live176::step(double input, double& output, double& cv) noexcept
 
 double Live176::bPlus() const noexcept { return circuit->rail; }
 double Live176::regulated() const noexcept { return circuit->regulator; }
+double Live176::interstage() const noexcept { return circuit->observe(deviceVoltages + 5); }
+
+#ifdef UA176_PHASE_REFERENCE
+bool Live176::exportPhaseReference(const char* path, double bias)
+{
+    Live176 live;
+    auto* file = std::fopen(path, "wb");
+    if (!file)
+        return false;
+    live.circuit->phaseReference = file;
+    live.circuit->referenceBias = bias;
+    LiveControls controls;
+    controls.limiting = bias != 0;
+    controls.output = 10;
+    const bool ready = live.prepare(44100, controls);
+    return std::fclose(file) == 0 && ready;
+}
+#endif
 
 }
