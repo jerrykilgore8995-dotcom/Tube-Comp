@@ -67,10 +67,8 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  R("PAD:ROUTP","PAD:MP","PAD_P",arm,false);R("PAD:ROUTN","PAD:MN","TN",arm,false);R("PAD:RSHUNT","PAD:MP","PAD:MN",1200*kpad/Math.max(1e-9,kpad*kpad-1),false);
  R("R1","PAD_P","TP",Math.max(1e-6,300*(opts.vernier??0)));
  transformer("T1","TP","TN","SEC_P","SEC_N",{n:10,rp:52,rs:3900,ll:.002,lm:3.3,rc:1e5,cs:92e-12,cw:15e-12});
- R("R2","SEC_P","TAP_P",1e4);R("R3","TAP_P","CV",6800);R("R4","CV","TAP_N",6800);R("R5","TAP_N","SEC_N",1e4);
- const hi=opts.high??true;
- R("RG_HI_P","SEC_P","GP",hi?.001:1e12,false);R("RG_LO_P","TAP_P","GP",hi?1e12:.001,false);
- R("RG_HI_N","SEC_N","GN",hi?.001:1e12,false);R("RG_LO_N","TAP_N","GN",hi?1e12:.001,false);
+ R("R2","SEC_P","CV",27000);R("R5","CV","SEC_N",27000);
+ R("RG_P","SEC_P","GP",.001,false);R("RG_N","SEC_N","GN",.001,false);
  C("C5","CV","0",.1e-6);
  triode("V1A","PA","GP","KA","6BC8",1);triode("V1B","PB","GN","KB","6BC8",1);
  R("R6A","KA","KRETURN",50);R("R6B","KB","KRETURN",50);R("R7","KA","KRETURN",47);R("R8","KB","KRETURN",47);R("R9","KRETURN","0",330);
@@ -129,9 +127,8 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  detector("V4A","DET_A","DET_K1");detector("V4B","DET_A","DET_K2");
  const enabled=opts.enabled??true;
  R("R_S4_ON","CV","ATK_IN",enabled?.001:1e12,false);R("R_S4_OFF","CV","0",enabled?1e12:.001,false);
- // C-10476: R32 shunts only CCW-to-wiper section of R33.
- if(opts.oldAttack){R("R32","ATK_IN","DET_A",1e4);R("R33","ATK_IN","DET_A",Math.max(.001,25000*(1-attack)));}
- else {R("R32","ATK_IN","ATK_WIPER",1e4);R("R33","ATK_IN","ATK_WIPER",Math.max(.001,25000*attack));R("R33","ATK_WIPER","DET_A",Math.max(.001,25000*(1-attack)));}
+ // JBB R33: 1M rheostat, wiper strapped to input end.
+ R("R33","ATK_IN","DET_A",Math.max(.001,1e6*(1-attack)));
  R("R34A","DET_A","REL_WIPER",Math.max(.001,5e6*(1-release)));R("R34B","REL_WIPER","0",Math.max(.001,5e6*release));R("R35","REL_WIPER","0",270e3);
  // Observe differential winding voltages via existing passive port voltages.
  const obsNames=["R7","R8","R9","R19","R20","R16","R28","R26","R44","V1A:P","V1B:P","V1A:G","V1B:G","V2A:P","V2B:P","V2A:G","V2B:G","V3A:P","V3B:P","V3A:G","V3B:G","T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
