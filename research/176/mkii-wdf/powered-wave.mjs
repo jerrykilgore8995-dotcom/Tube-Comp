@@ -93,6 +93,28 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  R("R27","V3GA","0",120e3);R("R29","V3GB","0",120e3);
  triode("V3A","V3PA","V3GA","V3K","12BH7",1.025);triode("V3B","V3PB","V3GB","V3K","12BH7",.975);R("R28","V3K","0",330);
  R("R26","T3_CT","V2_SUPPLY",47e3);C("C9","V2_SUPPLY","0",16e-6);
+ const sel={2:[.12,1000,"R47"],4:[.29,6800,"R46"],8:[.58,20000,"R45"],12:[1,47000,"R39"]}[ratio];if(!sel)throw Error("invalid ratio");
+ if(opts.segmentedT3){
+  const cfg={L:250,turns:9,dcr:1050,leak:.1,secondaryDcr:1,secondaryLeak:0.0001,cap:80e-12,k:.99999,...opts.t3};
+  const fractions=[0,.12,.29,.58,1],delta=fractions.slice(1).map((x,i)=>x-fractions[i]),ls=[],ids=[];
+  const winding=(tag,reverse)=>{
+   for(let j=0;j<4;j++){
+    const f=delta[j],a=j===0?"T3_CT":"T3:"+tag+(j),b=j===3?(tag==="A"?"V3PA":"V3PB"):"T3:"+tag+(j+1),x="T3:"+tag+":R"+j,y="T3:"+tag+":L"+j;
+    R("T3:"+tag+":DCR"+j,a,x,cfg.dcr*.5*f,false);
+    L("T3:"+tag+":leak"+j,x,y,cfg.leak*.5*f);
+    const l=cfg.L*(f/2)**2;ls.push(l);ids.push(L("T3:"+tag+":mag"+j,reverse?y:b,reverse?b:y,l));
+   }
+  };
+  winding("A",false);winding("B",true);
+  ls.push(cfg.L/cfg.turns**2);ids.push(L("T3:LS","T3:OUT_RAW","T3_N",ls.at(-1)));
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)mutual.push([ids[i],ids[j],2*cfg.k*Math.sqrt(ls[i]*ls[j])/dt]);
+  R("T3:RS","T3:OUT_RAW","T3:OUT_LEAK",cfg.secondaryDcr,false);L("T3:LSLeak","T3:OUT_LEAK","T3_P",cfg.secondaryLeak);
+  R("T3:RC","V3PA","V3PB",500e3,false);C("T3:CS","T3_P","T3_N",cfg.cap,false);
+  addCore("T3","V3PA","V3PB",cfg.L,Math.SQRT2*.775*10**(28/20)*cfg.turns/(2*Math.PI*50),{saturation:.35});
+  const j={2:1,4:2,8:3,12:4}[ratio];
+  R("T3:TAPA",j===4?"V3PA":"T3:A"+j,"TAP_A",.001,false);
+  R("T3:TAPB",j===4?"V3PB":"T3:B"+j,"TAP_B",.001,false);
+ }else{
  R("T3:RPA","V3PA","T3:PLEAKA",525,false);R("T3:RPB","V3PB","T3:PLEAKB",525,false);
  L("T3:LLA","T3:PLEAKA","T3:HALF_A",.05);L("T3:LLB","T3:PLEAKB","T3:HALF_B",.05);
  const lp=[62.5,62.5,250/81],li=[L("T3:LPA","T3:HALF_A","T3_CT",lp[0]),L("T3:LPB","T3_CT","T3:HALF_B",lp[1]),L("T3:LS","T3:OUT_RAW","T3_N",lp[2])];
@@ -100,8 +122,9 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  // Full primary flux is common to both half-windings; excess current is reflected by the coupled network.
  addCore("T3","T3:HALF_A","T3:HALF_B",250,Math.SQRT2*.775*10**(28/20)*9/(2*Math.PI*50),{saturation:.35});
  R("T3:RC","T3:HALF_A","T3:HALF_B",500e3,false);R("T3:RS","T3:OUT_RAW","T3_P",1,false);C("T3:CS","T3_P","T3_N",80e-12,false);
- const sel={2:[.12,1000,"R47"],4:[.29,6800,"R46"],8:[.58,20000,"R45"],12:[1,47000,"R39"]}[ratio];if(!sel)throw Error("invalid ratio");
  T("T3:TAPA","V3PA","T3_CT","TAP_A","T3_CT",opts.tap??sel[0]);T("T3:TAPB","V3PB","T3_CT","TAP_B","T3_CT",opts.tap??sel[0]);
+
+ }
  R("R30","T3_P","OUT_P",Math.max(.001,300*(opts.outvernier??0)));const output=R("RLOAD","OUT_P","T3_N",opts.load??600,false);
  V("VOUT_REF","T3_N","0",()=>0);
  C("C6","TAP_A","DET_K1",opts.detectorCap??.5e-6);C("C7","TAP_B","DET_K2",opts.detectorCap??.5e-6);
