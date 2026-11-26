@@ -104,7 +104,7 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  T("T3:TAPA","V3PA","T3_CT","TAP_A","T3_CT",opts.tap??sel[0]);T("T3:TAPB","V3PB","T3_CT","TAP_B","T3_CT",opts.tap??sel[0]);
  R("R30","T3_P","OUT_P",Math.max(.001,300*(opts.outvernier??0)));const output=R("RLOAD","OUT_P","T3_N",opts.load??600,false);
  V("VOUT_REF","T3_N","0",()=>0);
- C("C6","TAP_A","DET_K1",.5e-6);C("C7","TAP_B","DET_K2",.5e-6);
+ C("C6","TAP_A","DET_K1",opts.detectorCap??.5e-6);C("C7","TAP_B","DET_K2",opts.detectorCap??.5e-6);
  R("R36","DET_K1","DET_BIAS",220e3);R("R37","DET_BIAS","DET_K2",220e3);R("R38","REG","DET_BIAS",82e3);
  R("R_S5","DET_BIAS","0",(opts.bias??sel[1])*fac(sel[2]),false);C("C8A","DET_BIAS","0",20e-6);
  // Invert the original 6AL5 series voltage law including the 12.7G shunt.
