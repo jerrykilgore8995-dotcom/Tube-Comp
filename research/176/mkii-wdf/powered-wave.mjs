@@ -72,7 +72,8 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  C("C5","CV","0",.1e-6);
  triode("V1A","PA","GP","KA","6BC8",1);triode("V1B","PB","GN","KB","6BC8",1);
  R("R6A","KA","KRETURN",50);R("R6B","KB","KRETURN",50);R("R7","KA","KRETURN",47);R("R8","KB","KRETURN",47);R("R9","KRETURN","0",330);
- R("R10A","KRETURN","METER",500);R("R10B","METER","R11TOP",500);R("R11","R11TOP","0",330);
+ // No analog meter or meter-zero wiper. Preserve its unloaded DC bias return in a single passive equivalent.
+ R("KRETURN_BIAS","KRETURN","0",1000*fac("R10")+330*fac("R11"),false);
  C("C10","REG","0",.1e-6);
  R("R12","PA","PLATE_BAL_A",4700);R("R13A","PLATE_BAL_A","REG",500);R("R13B","REG","PLATE_BAL_B",500);R("R14","PLATE_BAL_B","PB",4700);
  transformer("T2","PA","PB","NEXT_P","NEXT_N",{n:1/2.3,rp:1e4,rs:2900,ll:.1,lm:346,rc:4e5,cs:60e-12,cw:15e-12});
