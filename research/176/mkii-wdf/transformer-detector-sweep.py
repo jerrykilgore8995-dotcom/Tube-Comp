@@ -13,7 +13,7 @@ base=re.sub(r'^LS OUT_RAW OUTN .*$',f'LS OUT_RAW OUTN {L/turns**2}',base,flags=r
 def run(loss,on):
     deck=base
     for k,v in dict(AMP=2*np.sqrt(2)*.775*10**(.2),FREQ=f,RATIO=ratio,LOSSDB=loss,LIMITING=int(on)).items():
-        deck=re.sub(r'(?<=\b'+k+r'=)[^\s]+',str(v),deck,count=1)
+        deck=re.sub(r'(?m)(^\.param[^\n]*?\b'+k+r'=)[^\s]+',lambda m:m.group(1)+str(v),deck,count=1)
     deck=re.sub(r'^tran .*$', 'tran 20u 3 2.5 20u',deck,flags=re.M)
     deck=deck.replace('v(cv) audio','v(cv) audio v(det_a) v(det_k1) v(det_k2) v(tap_a,t3_ct) v(tap_b,t3_ct)')
     Path('xfmr-run.cir').write_text(deck)
