@@ -98,7 +98,7 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  const lp=[62.5,62.5,250/81],li=[L("T3:LPA","T3:HALF_A","T3_CT",lp[0]),L("T3:LPB","T3_CT","T3:HALF_B",lp[1]),L("T3:LS","T3:OUT_RAW","T3_N",lp[2])];
  for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)mutual.push([li[i],li[j],2*.99999*Math.sqrt(lp[i]*lp[j])/dt]);
  // Full primary flux is common to both half-windings; excess current is reflected by the coupled network.
- addCore("T3","T3:HALF_A","T3:HALF_B",250,Math.SQRT2*.775*10**(28/20)*9/(2*Math.PI*50),{saturation:0});
+ addCore("T3","T3:HALF_A","T3:HALF_B",250,Math.SQRT2*.775*10**(28/20)*9/(2*Math.PI*50),{saturation:.35});
  R("T3:RC","T3:HALF_A","T3:HALF_B",500e3,false);R("T3:RS","T3:OUT_RAW","T3_P",1,false);C("T3:CS","T3_P","T3_N",80e-12,false);
  const sel={2:[.12,1000,"R47"],4:[.29,6800,"R46"],8:[.58,20000,"R45"],12:[1,47000,"R39"]}[ratio];if(!sel)throw Error("invalid ratio");
  T("T3:TAPA","V3PA","T3_CT","TAP_A","T3_CT",opts.tap??sel[0]);T("T3:TAPB","V3PB","T3_CT","TAP_B","T3_CT",opts.tap??sel[0]);
