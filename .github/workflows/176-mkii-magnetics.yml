@@ -1,0 +1,138 @@
+name: 176 MK II transformer magnetics audit
+on:
+  push:
+    branches: [176-mkii-magnetics]
+    paths: ['.github/workflows/176-mkii-magnetics.yml']
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        include:
+          - {"freq":20,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":5000,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":-18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":-18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":4,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":4,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":18,"loss":0,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":18,"loss":20,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":5,"load":600,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":5,"load":10000,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":50,"db":12,"loss":5,"load":10000,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":5,"load":600,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":5,"load":10000,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":100,"db":12,"loss":5,"load":10000,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":5,"load":600,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":5,"load":10000,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":1000,"db":12,"loss":5,"load":10000,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":5,"load":600,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":5,"load":10000,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":10000,"db":12,"loss":5,"load":10000,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20000,"db":12,"loss":5,"load":600,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":20000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":20000,"db":12,"loss":5,"load":10000,"enabled":0,"rate":176400,"ratio":4}
+          - {"freq":20000,"db":12,"loss":5,"load":10000,"enabled":1,"rate":176400,"ratio":4}
+          - {"freq":50,"db":18,"loss":5,"load":600,"enabled":1,"rate":44100,"ratio":4}
+          - {"freq":50,"db":18,"loss":5,"load":600,"enabled":1,"rate":88200,"ratio":4}
+          - {"freq":50,"db":18,"loss":5,"load":600,"enabled":1,"rate":352800,"ratio":4}
+          - {"freq":100,"db":18,"loss":5,"load":600,"enabled":1,"rate":44100,"ratio":4}
+          - {"freq":100,"db":18,"loss":5,"load":600,"enabled":1,"rate":88200,"ratio":4}
+          - {"freq":100,"db":18,"loss":5,"load":600,"enabled":1,"rate":352800,"ratio":4}
+          - {"freq":1000,"db":18,"loss":5,"load":600,"enabled":1,"rate":44100,"ratio":4}
+          - {"freq":1000,"db":18,"loss":5,"load":600,"enabled":1,"rate":88200,"ratio":4}
+          - {"freq":1000,"db":18,"loss":5,"load":600,"enabled":1,"rate":352800,"ratio":4}
+          - {"freq":10000,"db":18,"loss":5,"load":600,"enabled":1,"rate":44100,"ratio":4}
+          - {"freq":10000,"db":18,"loss":5,"load":600,"enabled":1,"rate":88200,"ratio":4}
+          - {"freq":10000,"db":18,"loss":5,"load":600,"enabled":1,"rate":352800,"ratio":4}
+          - {"freq":50,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":2}
+          - {"freq":1000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":2}
+          - {"freq":50,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":8}
+          - {"freq":1000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":8}
+          - {"freq":50,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":12}
+          - {"freq":1000,"db":12,"loss":5,"load":600,"enabled":1,"rate":176400,"ratio":12}
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: sudo apt-get update && sudo apt-get install -y python3-numpy python3-scipy
+      - name: Run linear and magnetic circuits under identical conditions
+        run: |
+          for magnetic in 0 1; do
+            node magnetic-audit.mjs ${{ matrix.freq }} ${{ matrix.db }} ${{ matrix.loss }} ${{ matrix.load }} ${{ matrix.enabled }} ${{ matrix.rate }} "$magnetic" ${{ matrix.ratio }} > magnetic-$magnetic.log 2>&1
+            /usr/bin/python3 magnetic-audit.py > result-$magnetic.log
+            mv magnetic-result.json result-$magnetic.json
+            mv magnetic-meta.json meta-$magnetic.json
+          done
+      - name: Summarize differential character
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import json,math
+          a,b=[json.load(open(f'result-{i}.json')) for i in [0,1]]
+          out={}
+          for k in a['stage_spectra']:
+              x,y=a['stage_spectra'][k],b['stage_spectra'][k]
+              out[k]={'level_change_db':20*math.log10(y['vpk_or_apk']/max(x['vpk_or_apk'],1e-30)), 'phase_change_deg':(y['phase_deg']-x['phase_deg']+180)%360-180,'linear_thd_pct':x['thd_pct'],'magnetic_thd_pct':y['thd_pct'],'linear_harmonics':x['harmonics_db'],'magnetic_harmonics':y['harmonics_db']}
+          print(json.dumps({'config':{k:b[k] for k in ('freq','db','loss','load','enabled','rate','ratio')},'core':b['core'],'differences':out},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: magnetic-${{ strategy.job-index }}
+          path: |
+            research/176/mkii-wdf/result-*.json
+            research/176/mkii-wdf/meta-*.json
+            research/176/mkii-wdf/*magnetic*.log
+            research/176/mkii-wdf/result-*.log
