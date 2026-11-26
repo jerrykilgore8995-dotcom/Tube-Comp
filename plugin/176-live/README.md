@@ -10,22 +10,25 @@ linear state transition over one host sample, with source and device currents
 held over that interval. The nonlinear device currents are solved at the
 host sample rate. The input and output pads,
 detector mode, attack, release, and ratio affect the circuit. The attack
-control is a linear 1 MΩ rheostat, with minimum resistance at Fast. The left
+control defaults to the stock 25 kΩ pot and 10 kΩ wiper shunt. Slow ATK
+selects a 1 MΩ rheostat. Both networks have minimum resistance at Fast. The left
 vernier position blends in dry signal, from 0% dry by default to 100% dry.
 The dry signal follows the modeled wet path's inverted polarity.
 The right vernier position adjusts a first-order digital sidechain HPF from
 0 Hz (bypass) to 350 Hz. The filter acts at the detector taps, preserving
 the transformer windings and existing reflected detector-current path.
-The 6AL5 current law is interpolated from a monotone table. The grid diode
+The CV ripple correction applies at the 6BC8 grid inputs when it detects a
+repeating bass waveform. The detector still uses the selected attack and
+release network. The 6AL5 current law is interpolated from a monotone table. The grid diode
 junction capacitances use fixed zero-bias values. The GR meter compares
 aligned 10 ms RMS windows from the wet output and an otherwise identical
 circuit with limiting disabled. It holds measured peaks for 250 ms. The
 reference runs outside the audio callback while the editor is open in GR
-mode. The reading is shown in dB before Mix. The Live ratio settings fit the two
-detector parameters (T3 tap fraction and 6AL5 bias return) to the transfer
-chart from the original UA 176 hardware manual. The fit uses settled 1 kHz
-measurements from 5 to 19 dB of gain reduction and a shared level offset
-for all four ratios. The supply retains load-dependent sag and
+mode. The reading is shown in dB before Mix. The detector uses effective
+T3 tap fractions from the ratio fit and the schematic 6AL5 bias returns:
+1 kΩ, 6.8 kΩ, 20 kΩ, and 47 kΩ from 2:1 through 12:1, with a shared
+68 kΩ feed from the regulated rail.
+The supply retains load-dependent sag and
 0B2 regulation. It averages the mains transformer and rectifier while
 retaining C11D before the choke, C11A/B/C after the choke, C8B and C9B at
 the T3 B+ node, C9A on the V2 feed, C10 on the regulated rail and C8A

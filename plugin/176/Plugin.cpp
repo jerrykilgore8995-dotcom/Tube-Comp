@@ -61,6 +61,7 @@ State::ParameterLayout parameters()
         "Meter", juce::StringArray{"Gain reduction", "Input", "Output"}, 0));
 #ifdef UA176_LIVE
     result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"double", 1}, "Double", false));
+    result.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"slowAttack", 1}, "Slow ATK", false));
     result.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"oversampling", 1},
         "Oversampling", juce::StringArray{"1x", "2x", "4x"}, 0,
         juce::AudioParameterChoiceAttributes().withAutomatable(false)));
@@ -318,6 +319,7 @@ public:
         controls.attack = get("attack");
 #ifdef UA176_LIVE
         controls.doubleTiming = get("double") > .5f;
+        controls.slowAttack = get("slowAttack") > .5f;
 #endif
         controls.release = get("release");
         controls.limiting = get("limiting");
@@ -444,6 +446,11 @@ public:
         doubleSwitch.setTooltip("Double timing");
         addAndMakeVisible(doubleSwitch);
         doubleAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "double", doubleSwitch);
+        slowAttackSwitch.setLookAndFeel(&doubleLook);
+        slowAttackSwitch.setClickingTogglesState(true);
+        slowAttackSwitch.setTooltip("1 MΩ attack network");
+        addAndMakeVisible(slowAttackSwitch);
+        slowAttackAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "slowAttack", slowAttackSwitch);
         powerSwitch.setLookAndFeel(&powerLook);
         powerSwitch.setClickingTogglesState(true);
         powerSwitch.setTooltip("Power");
@@ -460,6 +467,7 @@ public:
         stopTimer();
 #ifdef UA176_LIVE
         doubleSwitch.setLookAndFeel(nullptr);
+        slowAttackSwitch.setLookAndFeel(nullptr);
         powerSwitch.setLookAndFeel(nullptr);
         processor.grMeter.stop();
 #endif
@@ -470,6 +478,7 @@ public:
     {
 #ifdef UA176_LIVE
         doubleSwitch.setBounds(811, 48, 41, 38);
+        slowAttackSwitch.setBounds(809, 12, 45, 35);
         powerSwitch.setBounds(1048, 142, 42, 48);
         hpfFrequency.setBounds(742, 194, 60, 11);
 #endif
@@ -617,9 +626,11 @@ private:
     RingButtonLook doubleLook{0xffdbb66e, 14.f, 11.f, true};
     RingButtonLook powerLook{0xff5dafff, 32.f, 24.f, false};
     juce::TextButton doubleSwitch{"Double"};
+    juce::TextButton slowAttackSwitch{"Slow ATK"};
     juce::TextButton powerSwitch{"Power"};
     juce::Label hpfFrequency;
     std::unique_ptr<State::ButtonAttachment> doubleAttachment;
+    std::unique_ptr<State::ButtonAttachment> slowAttackAttachment;
     std::unique_ptr<State::ButtonAttachment> powerAttachment;
 #endif
     Processor& processor;

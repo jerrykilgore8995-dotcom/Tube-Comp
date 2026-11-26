@@ -106,6 +106,7 @@ constexpr double sdirkGamma = .2928932188134524756; // 1 - 1/sqrt(2)
 constexpr int phaseTaps = 2 * Live176::phaseLatency + 1;
 constexpr int detectorStart = deviceCount - 2;
 constexpr double referenceTap = .29;
+constexpr std::array<int, 4> inputTubeGridPorts{1, 2, 4, 5};
 using Complex = std::complex<double>;
 
 #ifndef UA176_PHASE_REFERENCE
@@ -129,7 +130,11 @@ ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtere
     p.limitOff = c.limiting > .5 ? 1e-12 : 1000.;
     p.tap = c.tap;
     p.ratioBias = 1 / static_cast<double>(c.biasResistance);
-    p.attack = 1 / std::max(.001, 1e6 * (1 - c.attack));
+    const double attack = std::clamp(static_cast<double>(c.attack), 0., 1.);
+    const double wiper = 25e3 * attack;
+    const double resistance = c.slowAttack ? 1e6 * (1 - attack)
+                                          : 25e3 - wiper + wiper * 10e3 / (wiper + 10e3);
+    p.attack = 1 / std::max(.001, resistance);
     p.releaseUpper = 1 / std::max(.001, 5e6 * (1 - c.release));
     p.releaseLower = 1 / std::max(.001, 5e6 * c.release);
     return p;
@@ -138,7 +143,8 @@ ElectricalControls electrical(const LiveControls& c, double hpGain, bool filtere
 bool same(const LiveControls& a, const LiveControls& b)
 {
     return a.input == b.input && a.output == b.output && a.sidechainHz == b.sidechainHz && a.tap == b.tap && a.biasResistance == b.biasResistance &&
-        a.attack == b.attack && a.release == b.release && a.limiting == b.limiting && a.doubleTiming == b.doubleTiming;
+        a.attack == b.attack && a.release == b.release && a.limiting == b.limiting && a.doubleTiming == b.doubleTiming &&
+        a.slowAttack == b.slowAttack && a.suppressCvRipple == b.suppressCvRipple;
 }
 
 // Factor the linear circuit once for a control setting. Each RHS column
@@ -188,10 +194,84 @@ bool eliminate(double* a, double* rhs, int size, int width) noexcept
 
 }
 
+struct CvRipple {
+    // The detector retains the original timing network. Track a repeating bass
+    // waveform and subtract its cycle-synchronous CV at the input tube grids.
+    static constexpr unsigned capacity = 16384;
+    static constexpr unsigned mask = capacity - 1;
+    std::array<double, capacity> audioHistory, cvIntegral, learnedRipple;
+    unsigned cursor = 0, sinceCrossing = 0, period = 0, matchingCycles = 0;
+    unsigned minPeriod = 0, maxPeriod = 0;
+    double integral = 0, lastCv = 0, lastAudio = 0;
+    double peak = 0, cyclePeak = 0, strength = 0;
+    double engage = 0, disengage = 0, bandwidth = 0, ripple = 0;
+
+    void clear() noexcept
+    {
+        cursor = sinceCrossing = period = matchingCycles = 0;
+        integral = lastCv = lastAudio = peak = cyclePeak = strength = ripple = 0;
+    }
+
+    void prepare(double rate) noexcept
+    {
+        clear();
+        minPeriod = static_cast<unsigned>(rate / 180);
+        maxPeriod = static_cast<unsigned>(std::min<double>(capacity - 2, rate / 16));
+        engage = 1 - std::exp(-1 / (.004 * rate));
+        disengage = 1 - std::exp(-1 / (.0004 * rate));
+        bandwidth = 1 - std::exp(-1 / (.00015 * rate));
+    }
+
+    double correction(double audio) noexcept
+    {
+        sinceCrossing = std::min(sinceCrossing + 1, capacity);
+        cyclePeak = std::max(cyclePeak, std::abs(audio));
+        if (lastAudio <= 0 && audio > 0) {
+            const auto length = sinceCrossing;
+            const bool bass = length >= minPeriod && length <= maxPeriod && cyclePeak > .01;
+            const bool samePeriod = bass && period && length >= period * .99 && length <= period * 1.01;
+            const bool sameLevel = cyclePeak >= peak * .96 && cyclePeak <= peak * 1.04;
+            matchingCycles = samePeriod && sameLevel ? std::min(matchingCycles + 1, 3u) : 0;
+            period = bass ? length : 0;
+            peak = cyclePeak;
+            sinceCrossing = 0;
+            cyclePeak = 0;
+        }
+        lastAudio = audio;
+        const auto delayed = (cursor - period) & mask;
+        const bool coherent = period && matchingCycles >= 2 && sinceCrossing <= period * 1.01 &&
+                              std::abs(audio - audioHistory[delayed]) <= .05 * peak;
+        strength += coherent ? engage * (.9 - strength) : -disengage * strength;
+        audioHistory[cursor] = audio;
+        if (!period || strength < 1e-6) {
+            learnedRipple[cursor] = 0;
+            ripple = 0;
+            return 0;
+        }
+        const double mean = (integral - cvIntegral[delayed]) / period;
+        // Average repeated cycles at the same phase so the local feedback
+        // loop does not chase a single transient or a narrow detector pulse.
+        const double previous = learnedRipple[delayed];
+        const double estimate = previous + .15 * (std::clamp(mean - lastCv, -2., 2.) - previous);
+        learnedRipple[cursor] = coherent ? estimate : 0;
+        ripple += bandwidth * (estimate - ripple);
+        return strength * ripple;
+    }
+
+    void observe(double cv) noexcept
+    {
+        cvIntegral[cursor] = integral;
+        integral += cv;
+        lastCv = cv;
+        cursor = (cursor + 1) & mask;
+    }
+};
+
 struct Live176::Circuit {
     double rate = 44100;
     LiveControls controls{};
     bool configured = false;
+    CvRipple cvRipple;
     std::array<double, nodeCount * nodeCount> a{};
     std::array<double, nodeCount * stateCount> d{};
     std::array<double, nodeCount * historyOffset> b{};
@@ -399,7 +479,7 @@ struct Live176::Circuit {
         return true;
     }
 
-    void preparePorts(double audio, double supply)
+    void preparePorts(double audio, double supply, double gridCorrection)
     {
         feed[0] = supply;
         feed[1] = audio;
@@ -411,6 +491,8 @@ struct Live176::Circuit {
                 + row[filterInput] * hpState
                 + dot<stateCount>(row + historyOffset, feed.data() + historyOffset);
         }
+        for (int port : inputTubeGridPorts)
+            portBase[port] += gridCorrection;
     }
 
     bool factorJacobian() noexcept
@@ -613,7 +695,9 @@ struct Live176::Circuit {
 
     bool advance(double audio, double supply, int budget, double& output, double& cv) noexcept
     {
-        preparePorts(reconstructSource(audio), supply);
+        const bool suppress = configured && controls.limiting > .5 && controls.suppressCvRipple;
+        const double gridCorrection = suppress ? cvRipple.correction(audio) : 0;
+        preparePorts(reconstructSource(audio), supply, gridCorrection);
         if ((!configured || !newton(std::min(budget, controls.limiting > .5 ? 7 : 14), true))
             && !newton(budget, false)
             && (!configured || !newton(budget, false, true)))
@@ -621,6 +705,10 @@ struct Live176::Circuit {
         std::copy(deviceCurrent.begin(), deviceCurrent.end(), feed.begin() + 2);
         output = observe(deviceVoltages);
         cv = observe(deviceVoltages + 1);
+        if (suppress) {
+            cvRipple.observe(cv);
+            cv += gridCorrection;
+        }
 #ifndef UA176_PHASE_REFERENCE
         phaseBias += phaseBiasBlend * (cv - phaseBias);
 #endif
@@ -641,6 +729,7 @@ Live176::~Live176() = default;
 bool Live176::prepare(double rate, const LiveControls& knobs)
 {
     circuit->rate = rate;
+    circuit->cvRipple.prepare(rate);
     circuit->deviceCurrent.fill(0);
     circuit->previous.fill(0);
     circuit->configured = false;
@@ -670,7 +759,14 @@ bool Live176::prepare(double rate, const LiveControls& knobs)
 
 bool Live176::setControls(const LiveControls& knobs)
 {
-    return circuit->configured && (same(circuit->controls, knobs) || circuit->setup(knobs, false));
+    if (!circuit->configured)
+        return false;
+    if (same(circuit->controls, knobs))
+        return true;
+    if (!circuit->setup(knobs, false))
+        return false;
+    circuit->cvRipple.clear();
+    return true;
 }
 
 bool Live176::step(double input, double& output, double& cv) noexcept

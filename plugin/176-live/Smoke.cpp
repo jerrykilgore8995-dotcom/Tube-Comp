@@ -93,7 +93,7 @@ int main(int argc, char**)
             bassCv = controlSum;
         if (setting == 8 && !(controlSum - bassCv > 2))
             return 8;
-        if ((setting == 0 && (rms < 5.52 || rms > 5.78 || controlSum < -5.36 || controlSum > -5.16))
+        if ((setting == 0 && (rms < 5.08 || rms > 5.36 || controlSum < -5.48 || controlSum > -5.27))
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }

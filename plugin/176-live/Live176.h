@@ -9,10 +9,9 @@ struct RatioSetting {
     float biasResistance;
 };
 
-// Effective T3 tap fractions and 6AL5 bias returns fitted to the UA 176
-// hardware transfer chart. The ratio order matches the front-panel switch.
+// Effective T3 tap fractions and schematic 6AL5 bias returns in front-panel order.
 inline constexpr std::array<RatioSetting, 4> ratioSettings{{
-    {.235f, 500}, {.44f, 5400}, {.65f, 11500}, {1.f, 24000}
+    {.235f, 1000}, {.44f, 6800}, {.65f, 20000}, {1.f, 47000}
 }};
 
 struct LiveControls {
@@ -21,6 +20,8 @@ struct LiveControls {
     float attack = .5f, release = .8f, limiting = 1;
     float sidechainHz = 0;
     bool doubleTiming = false;
+    bool slowAttack = false;
+    bool suppressCvRipple = true;
 };
 
 inline float dryMix(float wet, float dry, float amount) noexcept
