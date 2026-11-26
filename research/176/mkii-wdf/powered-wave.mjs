@@ -113,6 +113,12 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
   const p=N(n,a,k,1e4);C(n+":CAK",a,k,3.2e-12,false);
   device([p],v=>{
    const target=v[0],vt=.0258649*3.15;
+   const model=opts.detectorModel??'GE';
+   if(model==='GE'||model==='Philips'){
+    const [ka,kb,eps,ex]=model==='GE'?[.004147079,.000702,-.648792,.757482]:[.000403541,.002172,.185831,.458181];
+    return [Math.max(0,ka+kb*target)*Math.pow(Math.max(0,target+eps),ex)];
+   }
+   if(model!=='legacy')throw Error('unknown 6AL5 model '+model);
    function currentAt(u){return 66e-12*Math.expm1(Math.min(50,(u+.867)/vt))+u/12.7e9}
    function drop(i){return (pos(i/.0032)+1e-9)**.775-(1e-9)**.775}
    let lo=Math.min(target,-1)-1,hi=target;
