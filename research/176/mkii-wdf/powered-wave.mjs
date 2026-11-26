@@ -81,19 +81,19 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  V("VT4A","HV_A_OC","0",t=>460*Math.sin(2*Math.PI*60*t));V("VT4B","0","HV_B_OC",t=>460*Math.sin(2*Math.PI*60*t));
  R("RT4A","HV_A_OC","HV_A",100,false);R("RT4B","HV_B_OC","HV_B",100,false);
  for(const side of ["A","B"]){let p=N("V5"+side,"HV_"+side,"RECT",100);device([p],v=>[.00331*pos(v[0])**1.5]);}
- C("C11D","RECT","0",20e-6);L("L1","RECT","CHOKE_END",10);R("RL1","CHOKE_END","FILTER",150,false);
- for(const s of ["A","B","C"])C("C11"+s,"FILTER","0",20e-6);
- R("R44","FILTER","T3_CT",1e3);C("C8B","T3_CT","0",20e-6);R("R43","T3_CT","REG",1e4);
+ C("C13","RECT","0",50e-6);L("L1","RECT","CHOKE_END",10);R("RL1","CHOKE_END","FILTER",150,false);
+ C("C12","FILTER","0",50e-6);
+ R("R44","FILTER","T3_CT",1500);C("C11","T3_CT","0",32e-6);R("R43","T3_CT","REG",1e4);
  let p=N("V6","REG","0",100);device([p],v=>[pos(v[0]-107.55)/33]);
  R("R15","NEXT_P","0",2e4);R("R17","NEXT_N","0",2e4);
  triode("V2A","V2PA","NEXT_P","V2KA","12AX7",1.025);triode("V2B","V2PB","NEXT_N","V2KB","12AX7",.975);
  R("R19","V2KA","V2_RETURN",2200);R("R20","V2KB","V2_RETURN",2200);R("R16","V2_RETURN","0",2200);
  R("R22","V3PA","FEEDBACK_A",opts.fbres??180e3);R("R18","FEEDBACK_A","0",180e3);C("C1","FEEDBACK_A","V2KA",.47e-6);
  R("R25","V3PB","FEEDBACK_B",opts.fbres??180e3);R("R21","FEEDBACK_B","0",180e3);C("C2","FEEDBACK_B","V2KB",.47e-6);
- R("R23","V2PA","V2_SUPPLY",220e3);R("R24","V2PB","V2_SUPPLY",220e3);C("C3","V2PA","V3GA",.1e-6);C("C4","V2PB","V3GB",.1e-6);
- R("R27","V3GA","0",1.2e6);R("R29","V3GB","0",1.2e6);
+ R("R23","V2PA","V2_SUPPLY",220e3);R("R24","V2PB","V2_SUPPLY",220e3);C("C3","V2PA","V3GA",.047e-6);C("C4","V2PB","V3GB",.047e-6);
+ R("R27","V3GA","0",120e3);R("R29","V3GB","0",120e3);
  triode("V3A","V3PA","V3GA","V3K","12BH7",1.025);triode("V3B","V3PB","V3GB","V3K","12BH7",.975);R("R28","V3K","0",330);
- C("C9B","T3_CT","0",10e-6);R("R26","T3_CT","V2_SUPPLY",47e3);C("C9A","V2_SUPPLY","0",10e-6);
+ R("R26","T3_CT","V2_SUPPLY",47e3);C("C9","V2_SUPPLY","0",16e-6);
  R("T3:RPA","V3PA","T3:PLEAKA",525,false);R("T3:RPB","V3PB","T3:PLEAKB",525,false);
  L("T3:LLA","T3:PLEAKA","T3:HALF_A",.05);L("T3:LLB","T3:PLEAKB","T3:HALF_B",.05);
  const lp=[62.5,62.5,250/81],li=[L("T3:LPA","T3:HALF_A","T3_CT",lp[0]),L("T3:LPB","T3_CT","T3:HALF_B",lp[1]),L("T3:LS","T3:OUT_RAW","T3_N",lp[2])];
@@ -134,9 +134,9 @@ function build176(adaptor,prepareNonlinear,manifest,opts={}){
  else {R("R32","ATK_IN","ATK_WIPER",1e4);R("R33","ATK_IN","ATK_WIPER",Math.max(.001,25000*attack));R("R33","ATK_WIPER","DET_A",Math.max(.001,25000*(1-attack)));}
  R("R34A","DET_A","REL_WIPER",Math.max(.001,5e6*(1-release)));R("R34B","REL_WIPER","0",Math.max(.001,5e6*release));R("R35","REL_WIPER","0",270e3);
  // Observe differential winding voltages via existing passive port voltages.
- const obsNames=["V1A:P","V1B:P","V1A:G","V1B:G","V2A:P","V2B:P","V2A:G","V2B:G","V3A:P","V3B:P","V3A:G","V3B:G","T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
+ const obsNames=["R7","R8","R9","R19","R20","R16","R28","R26","R44","V1A:P","V1B:P","V1A:G","V1B:G","V2A:P","V2B:P","V2A:G","V2B:G","V3A:P","V3B:P","V3A:G","V3B:G","T1:Lmag","T1:Csec","T2:Lmag","T2:Csec","T3:RC","T3:CS"];
  const obs=obsNames.map(name=>{const index=ports.findIndex(p=>p.name===name);if(index<0)throw Error(name);return index;});
- const cv=ports.findIndex(p=>p.name==="C5"),rect=ports.findIndex(p=>p.name==="C11D"),reg=ports.findIndex(p=>p.name==="C10"),bplus=ports.findIndex(p=>p.name==="C8B");
+ const cv=ports.findIndex(p=>p.name==="C5"),rect=ports.findIndex(p=>p.name==="C13"),reg=ports.findIndex(p=>p.name==="C10"),bplus=ports.findIndex(p=>p.name==="C11");
  const mat=(n,m)=>Array.from({length:n},()=>Array(m).fill(0));
  const A=mat(nodes.size,ports.length),Z=mat(ports.length,ports.length),Q=mat(nodes.size,constraints.length);
  for(let j=0;j<ports.length;j++){Z[j][j]=ports[j].z;for(const [i,x] of ports[j].inc)A[i][j]+=x;}
