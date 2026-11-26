@@ -1,0 +1,48 @@
+name: 176 MK II WDF reference parity
+on:
+  push:
+    branches: [176-mkii-wdf]
+    paths:
+      - 'research/176/mkii-wdf/**'
+      - '.github/workflows/176-mkii-wdf-reference.yml'
+  workflow_dispatch:
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        rate: [44100, 88200]
+        ratio: [2, 4, 8, 12]
+    defaults:
+      run:
+        working-directory: research/176/mkii-wdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install reference tools
+        run: sudo apt-get update && sudo apt-get install -y ngspice python3-numpy
+      - name: Run wave primitive regressions
+        run: node wave-core-test.mjs
+      - name: Run mismatched SPICE reference
+        run: |
+          sed -E 's/(LIMITING=1 RATIO=)2/\1${{ matrix.ratio }}/' powered-mismatch.cir > run.cir
+          ngspice -b run.cir > spice.log 2>&1
+          test -s powered.txt
+      - name: Run powered wave simulation
+        run: node run-powered-wave.mjs ${{ matrix.rate }} ${{ matrix.ratio }} 3.474135043921514 wave.csv 1 1000 20 > wave.log 2>&1
+      - name: Compare settled waveforms
+        run: /usr/bin/python3 compare-powered.py wave.csv powered.txt
+      - name: Upload all available evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 176-mkii-wdf-${{ matrix.rate }}-ratio-${{ matrix.ratio }}
+          path: |
+            research/176/mkii-wdf/*.log
+            research/176/mkii-wdf/powered.txt
+            research/176/mkii-wdf/wave.csv*
+            research/176/mkii-wdf/comparison.json
