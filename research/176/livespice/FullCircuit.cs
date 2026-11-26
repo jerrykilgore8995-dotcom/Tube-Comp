@@ -10,9 +10,10 @@ internal sealed partial class FrontEnd
     private string outputReturn = "T3_N";
     public Expression Output => Node("OUT_P").V - Node(outputReturn).V;
     public Expression ControlVoltage => Node("CV").V;
-    public Expression BPlus => Node("T3_CT").V;
+    public Expression BPlus => Node("BPLUS").V;
     public Expression Regulated => Node("REG").V;
     public Expression LinePlate => Node("V3PA").V;
+    private string OutputCenterTap => export ? "T3_CT" : "BPLUS";
     private Expression DetectorSense => Node("V3PA").V - Node("V3PB").V;
     private readonly Expression filterHistory = Variable.New("filterHistory");
 
@@ -132,10 +133,16 @@ internal sealed partial class FrontEnd
         else
         {
             // Average T4 and the rectifier while retaining the original
-            // reservoir and choke filter. The total series resistance still
-            // matches the warmed supply fit at 55, 60 and 65 mA.
+            // reservoir and choke filter. The Live model adds source
+            // resistance in series with the warmed supply fit.
             V("FILTER_AVERAGE", "SUPPLY_DC", "0", 439.417);
-            R("SUPPLY_DC", "RECT", 528.671);
+            if (export)
+            {
+                R("SUPPLY_DC", "SAG_FEED", 150);
+                R("SAG_FEED", "RECT", 528.671);
+            }
+            else
+                R("SUPPLY_DC", "RECT", 528.671);
             V("REG_REFERENCE", "REG_DC", "0", 107.55);
             R("REG", "REG_DC", 33);
         }
@@ -143,9 +150,9 @@ internal sealed partial class FrontEnd
         L("RECT", "CHOKE_END", 10);
         R("CHOKE_END", "FILTER", 150);
         C("FILTER", "0", 60e-6); // C11A, C11B and C11C
-        R("FILTER", "T3_CT", 1000);
-        C("T3_CT", "0", 30e-6); // C8B and C9B share this node
-        R("T3_CT", "REG", 10e3);
+        R("FILTER", "BPLUS", 1000);
+        C("BPLUS", "0", 30e-6); // C8B and C9B share this node
+        R("BPLUS", "REG", 10e3);
     }
 
     private void LineStage(Settings settings)
@@ -157,7 +164,7 @@ internal sealed partial class FrontEnd
         R("V2KA", "V2_RETURN", 2200 * LineHalfScale(true));
         R("V2KB", "V2_RETURN", 2200 * LineHalfScale(false));
         R("V2_RETURN", "0", 2200);
-        R("T3_CT", "V2_SUPPLY", 47e3);
+        R("BPLUS", "V2_SUPPLY", export ? 82e3 : 47e3);
         C("V2_SUPPLY", "0", 10e-6);
         foreach (var side in new[] { "A", "B" })
         {
@@ -176,8 +183,12 @@ internal sealed partial class FrontEnd
         R("V3PB", "PLEAKB", 525);
         L("PLEAKA", "HALF_A", .05);
         L("PLEAKB", "HALF_B", .05);
-        var plus = new[] { "HALF_A", "T3_CT", "OUT_RAW" };
-        var minus = new[] { "T3_CT", "HALF_B", "T3_N" };
+        // Feed the 12BH7 through the T3 center tap while V2 and the regulator
+        // continue to draw from the upstream B+ node.
+        if (export)
+            R("BPLUS", OutputCenterTap, 470);
+        var plus = new[] { "HALF_A", OutputCenterTap, "OUT_RAW" };
+        var minus = new[] { OutputCenterTap, "HALF_B", "T3_N" };
         var inductances = new[] { 62.5, 62.5, 250.0 / 81 };
         var currents = inductances.Select((_, i) => analysis.AddUnknown("IT3_" + i)).ToArray();
         for (var i = 0; i < currents.Length; i++)
@@ -222,9 +233,9 @@ internal sealed partial class FrontEnd
             var terminal = "TAP_" + side;
             var k = "DET_K" + side;
             var current = analysis.AddUnknown("ITAP_" + side);
-            analysis.AddPassiveComponent(Node(terminal), Node("T3_CT"), current);
-            analysis.AddPassiveComponent(Node(plate), Node("T3_CT"), -selectedTap * current);
-            Expression drive = selectedTap * (Node(plate).V - Node("T3_CT").V);
+            analysis.AddPassiveComponent(Node(terminal), Node(OutputCenterTap), current);
+            analysis.AddPassiveComponent(Node(plate), Node(OutputCenterTap), -selectedTap * current);
+            Expression drive = selectedTap * (Node(plate).V - Node(OutputCenterTap).V);
             if (export)
             {
                 // An ideal differential correction at the detector taps,
@@ -232,7 +243,7 @@ internal sealed partial class FrontEnd
                 Expression low = Parameter("hpFeed") * DetectorSense + Parameter("hpMemory") * filterHistory;
                 drive = side == "A" ? drive - low : drive + low;
             }
-            analysis.AddEquation(Node(terminal).V - Node("T3_CT").V, drive);
+            analysis.AddEquation(Node(terminal).V - Node(OutputCenterTap).V, drive);
             C(terminal, k, .5e-6);
             R(k, "DET_BIAS", 220e3);
             DetectorDiode(side, k);

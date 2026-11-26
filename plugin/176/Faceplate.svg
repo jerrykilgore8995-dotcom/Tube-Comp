@@ -425,11 +425,13 @@
 <rect x="481" y="42" width="177" height="87" rx="1.5" fill="#1a1612" stroke="#09090a" stroke-width="4"/>
 <rect x="483" y="44" width="173" height="83" rx="1" fill="url(#glass)"/>
 <path d="M484 45H655V50Q568 45 484 53Z" fill="#fff4d0" opacity=".16"/>
+<g id="legacy-power">
 <circle cx="995" cy="168" r="12.2" fill="#262023" stroke="#86725d"/>
 <circle cx="995" cy="168" r="8.3" fill="url(#jewel)" stroke="#200b0b"/>
 <path d="M1055 157L1069 149L1083 157V174L1069 183L1055 174Z" fill="url(#brass)" stroke="#281e17"/>
 <circle cx="1069" cy="166" r="9" fill="#4c4032" stroke="#dac5a3"/>
 <path d="M1064 169l2-16q3-4 7 0l1 14q-5 7-10 2Z" fill="url(#brass)" stroke="#322417"/>
+</g>
 
 <path d="M498 97Q565 28 641 94" fill="none" stroke="#302219" stroke-width=".8"/>
 <path d="M616 74Q631 82 641 94" fill="none" stroke="#a6402d" stroke-width="2"/>

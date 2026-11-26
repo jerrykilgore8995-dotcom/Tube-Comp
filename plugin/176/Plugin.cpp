@@ -420,6 +420,11 @@ public:
         doubleSwitch.setTooltip("Double timing");
         addAndMakeVisible(doubleSwitch);
         doubleAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "double", doubleSwitch);
+        powerSwitch.setLookAndFeel(&powerLook);
+        powerSwitch.setClickingTogglesState(true);
+        powerSwitch.setTooltip("Power");
+        addAndMakeVisible(powerSwitch);
+        powerAttachment = std::make_unique<State::ButtonAttachment>(processor.state, "on", powerSwitch);
 #endif
         setSize(1140, 218);
         startTimerHz(30);
@@ -430,6 +435,7 @@ public:
         stopTimer();
 #ifdef UA176_LIVE
         doubleSwitch.setLookAndFeel(nullptr);
+        powerSwitch.setLookAndFeel(nullptr);
 #endif
         for (auto& knob : knobs) knob.setLookAndFeel(nullptr);
     }
@@ -438,6 +444,7 @@ public:
     {
 #ifdef UA176_LIVE
         doubleSwitch.setBounds(811, 48, 41, 38);
+        powerSwitch.setBounds(1048, 142, 42, 48);
         hpfFrequency.setBounds(742, 194, 60, 11);
 #endif
         constexpr std::array<int, 7> x{237, 370, 370, 772, 772, 904, 1035};
@@ -455,10 +462,12 @@ public:
         const float angle = juce::degreesToRadians(-53.f + 106.f * needle);
         g.setColour(juce::Colour(0xff39261c));
         g.drawLine(565, 126, 565 + 65 * std::sin(angle), 126 - 65 * std::cos(angle), 1.4f);
+#ifndef UA176_LIVE
         if (processor.get("on") < .5f) {
             g.setColour(juce::Colours::black.withAlpha(.5f));
             g.fillEllipse(987, 160, 16, 16);
         }
+#endif
     }
 
     void mouseDown(const juce::MouseEvent& event) override
@@ -482,9 +491,13 @@ public:
         }
 #endif
         const auto p = event.getPosition();
-        if (juce::Rectangle<int>{1048, 142, 42, 48}.contains(p))
+#ifndef UA176_LIVE
+        if (juce::Rectangle<int>{1048, 142, 42, 48}.contains(p)) {
             processor.set("on", processor.get("on") > .5f ? 0.f : 1.f);
-        else if (juce::Rectangle<int>{466, 29, 207, 116}.contains(p))
+            return;
+        }
+#endif
+        if (juce::Rectangle<int>{466, 29, 207, 116}.contains(p))
             processor.set("meter", std::fmod(processor.get("meter") + 1, 3.f) / 2.f);
         else if (juce::Rectangle<int>{751, 19, 42, 18}.contains(p))
             processor.set("limiting", processor.get("limiting") > .5f ? 0.f : 1.f);
@@ -515,29 +528,41 @@ private:
     }
 
 #ifdef UA176_LIVE
-    struct DoubleLook final : juce::LookAndFeel_V4 {
+    struct RingButtonLook final : juce::LookAndFeel_V4 {
+        RingButtonLook(juce::uint32 onColour, float diameter, float centreY, bool showLabel)
+            : onColour(onColour), diameter(diameter), centreY(centreY), showLabel(showLabel) {}
+
         void drawButtonBackground(juce::Graphics& g, juce::Button& b, const juce::Colour&,
                                   bool hovered, bool pressed) override
         {
-            const auto dot = juce::Rectangle<float>(14, 14).withCentre({b.getWidth() * .5f, 11});
+            const auto dot = juce::Rectangle<float>(diameter, diameter)
+                                 .withCentre({b.getWidth() * .5f, centreY});
             g.setColour(juce::Colour(0xff100e0d));
             g.fillEllipse(dot);
-            g.setColour(juce::Colour(b.getToggleState() ? 0xffdbb66e : 0xff766656));
+            g.setColour(juce::Colour(b.getToggleState() ? onColour : 0xff766656));
             g.drawEllipse(dot, b.getToggleState() ? 1.5f : 1.f);
-            if (hovered || pressed)
+            if (showLabel && (hovered || pressed))
                 g.drawEllipse(dot.reduced(3), .65f);
         }
         void drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, bool) override
         {
+            if (!showLabel) return;
             g.setColour(juce::Colour(0xffe3d4ad));
             g.setFont(juce::FontOptions(9.f));
             g.drawText(b.getButtonText(), 0, 20, b.getWidth(), 13, juce::Justification::centred);
         }
+
+        const juce::uint32 onColour;
+        const float diameter, centreY;
+        const bool showLabel;
     };
-    DoubleLook doubleLook;
+    RingButtonLook doubleLook{0xffdbb66e, 14.f, 11.f, true};
+    RingButtonLook powerLook{0xff5dafff, 32.f, 24.f, false};
     juce::TextButton doubleSwitch{"Double"};
+    juce::TextButton powerSwitch{"Power"};
     juce::Label hpfFrequency;
     std::unique_ptr<State::ButtonAttachment> doubleAttachment;
+    std::unique_ptr<State::ButtonAttachment> powerAttachment;
 #endif
     Processor& processor;
     PinLook pins;

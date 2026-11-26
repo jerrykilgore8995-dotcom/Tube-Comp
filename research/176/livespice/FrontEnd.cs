@@ -104,10 +104,13 @@ internal sealed partial class FrontEnd
         var x = 1.794225622 * (1 + 54.16463004 * vg * Binary.Power(922.2704089 + vp * vp, -.5));
         var softplus = Call.If(x > 50, x, Call.Ln(1 + Call.Exp(x)));
         var e = vp * softplus / 1.794225622;
+        // The Live fit matches the measured 83.6 V idle plate voltage
+        // with the original plate feed and cathode network.
+        var currentScale = export ? 119.8e-6 : 20.19891536e-6;
         var law = export
             ? Call.New("plate", vp, vg, 1.794225622, 1.794225622 * 54.16463004,
-                1.794225622, 922.2704089, 0, 20.19891536e-6, 1.439822572)
-            : Call.If(e > 0, 20.19891536e-6 * (e ^ 1.439822572), 0);
+                1.794225622, 922.2704089, 0, currentScale, 1.439822572)
+            : Call.If(e > 0, currentScale * (e ^ 1.439822572), 0);
         Current("I_" + plate, plate, cathode, law, (vp, plate, cathode), (vg, grid, cathode));
         R(plate, cathode, 1e9);
         C(grid, cathode, 3.9e-12);

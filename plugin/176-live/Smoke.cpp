@@ -93,7 +93,7 @@ int main(int argc, char**)
             bassCv = controlSum;
         if (setting == 8 && !(controlSum - bassCv > 2))
             return 8;
-        if ((setting == 0 && (rms < 3.60 || rms > 3.82 || controlSum < -4.45 || controlSum > -4.24))
+        if ((setting == 0 && (rms < 4.49 || rms > 4.73 || controlSum < -5.65 || controlSum > -5.43))
             || (setting == 4 && std::abs(controlSum) > .01))
             return 4;
     }
@@ -162,8 +162,8 @@ int main(int argc, char**)
             const double interstagePhase = 360 / tau * std::atan2(interstageImag, interstageReal);
             std::printf("Aligned phase at %d Hz: output %+.2f degrees, interstage %+.2f degrees\n",
                         frequency, outputPhase, interstagePhase);
-            const double outputReference = frequency == 10000 ? 149.01 : 117.92;
-            const double interstageReference = frequency == 10000 ? 159.59 : 138.78;
+            const double outputReference = frequency == 10000 ? 148.66 : 117.26;
+            const double interstageReference = frequency == 10000 ? 159.25 : 138.13;
             if (!std::isfinite(outputPhase) || !std::isfinite(interstagePhase)
                 || std::abs(std::remainder(outputPhase - outputReference, 360)) > 3
                 || std::abs(std::remainder(interstagePhase - interstageReference, 360)) > 3)

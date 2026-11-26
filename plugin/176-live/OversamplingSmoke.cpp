@@ -79,8 +79,8 @@ int main()
                 continue;
             }
             // Linearized continuous LiveSPICE deck at the stock operating point.
-            constexpr std::array<double, 4> gain{-1.517, -.722, -.169, -.701};
-            constexpr std::array<double, 4> phase{46.736, 33.063, -28.853, -59.943};
+            constexpr std::array<double, 4> gain{-1.420, -.677, -.175, -.726};
+            constexpr std::array<double, 4> phase{44.860, 31.764, -29.112, -60.517};
             const auto relative = value / midband;
             const auto db = 20 * std::log10(std::abs(relative));
             const auto deg = std::arg(relative) * 360 / tau;
